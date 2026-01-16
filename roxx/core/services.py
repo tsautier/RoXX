@@ -1,5 +1,5 @@
 """
-Multi-OS service management for RoXX
+Linux service management (systemd) for RoXX
 """
 
 import subprocess

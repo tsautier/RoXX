@@ -1,6 +1,6 @@
 """
 RoXX Admin Console - Modern TUI with Rich
-Multi-OS compatible console interface
+Linux console interface
 """
 
 import sys
@@ -55,7 +55,7 @@ def show_header():
     
     header = Panel.fit(
         f"[bold cyan]{_('app_title', 'RoXX Admin Console')}[/bold cyan]\n"
-        f"[dim]v1.0-beta - Multi-OS Edition[/dim]\n"
+        f"[dim]v1.0-beta - Linux Edition[/dim]\n"
         f"[yellow]OS:[/yellow] {SystemManager.get_os().title()} | "
         f"[yellow]Locale:[/yellow] {get_locale()}",
         border_style="cyan",
