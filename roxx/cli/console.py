@@ -228,6 +228,297 @@ def show_configuration():
         input("\nPress Enter to continue...")
 
 
+
+def manage_pki():
+    """Local PKI Management Menu"""
+    show_header()
+    
+    config_dir = SystemManager.get_config_dir()
+    certs_dir = config_dir / "certs"
+    certs_dir.mkdir(parents=True, exist_ok=True)
+    
+    while True:
+        show_header()
+        
+        # List existing certificates
+        console.print(Panel(f"[bold]Certificates Directory:[/bold] {certs_dir}", style="cyan"))
+        
+        certs = list(certs_dir.glob("*.pem"))
+        if certs:
+            table = Table(box=box.SIMPLE)
+            table.add_column("Filename", style="green")
+            table.add_column("Size", style="dim")
+            
+            for cert in certs:
+                table.add_row(cert.name, f"{cert.stat().st_size} bytes")
+            console.print(table)
+        else:
+            console.print("[dim]No certificates found.[/dim]")
+        
+        console.print()
+        
+        action = questionary.select(
+            "PKI Actions:",
+            choices=[
+                'Generate Self-Signed CA',
+                'Generate Client Certificate',
+                'View Certificate Details',
+                '← Back'
+            ],
+            style=custom_style
+        ).ask()
+        
+        if not action or action == '← Back':
+            return
+            
+        if action == 'Generate Self-Signed CA':
+            _generate_ca(certs_dir)
+        elif action == 'Generate Client Certificate':
+            _generate_client_cert(certs_dir)
+        elif action == 'View Certificate Details':
+            _view_cert_details(certs_dir)
+
+
+def _generate_ca(certs_dir: Path):
+    """Generate a self-signed CA"""
+    if (certs_dir / "ca_cert.pem").exists():
+        if not questionary.confirm("CA already exists. Overwrite?", default=False).ask():
+            return
+
+    console.print("\n[yellow]Generating Self-Signed CA...[/yellow]")
+    try:
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+        import datetime
+
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, u"RoXX Local CA"),
+        ])
+        
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            private_key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow()
+        ).not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=3650)
+        ).add_extension(
+            x509.BasicConstraints(ca=True, path_length=None), critical=True,
+        ).sign(private_key, hashes.SHA256())
+
+        # Save
+        with open(certs_dir / "ca_key.pem", "wb") as f:
+            f.write(private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+            
+        with open(certs_dir / "ca_cert.pem", "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+            
+        console.print("[green]✓ CA generated successfully![/green]")
+        input("\nPress Enter to continue...")
+        
+    except ImportError:
+        console.print("[red]Error: cryptography module not found.[/red]")
+        input("\nPress Enter to continue...")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        input("\nPress Enter to continue...")
+
+
+def _generate_client_cert(certs_dir: Path):
+    """Generate a client certificate signed by local CA"""
+    ca_key_path = certs_dir / "ca_key.pem"
+    ca_cert_path = certs_dir / "ca_cert.pem"
+    
+    if not ca_key_path.exists() or not ca_cert_path.exists():
+        console.print("[red]Error: CA not found. Generate CA first.[/red]")
+        input("\nPress Enter to continue...")
+        return
+        
+    name = questionary.text("Client Name (CN):", style=custom_style).ask()
+    if not name:
+        return
+
+    try:
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+        import datetime
+
+        # Load CA
+        with open(ca_key_path, "rb") as f:
+            ca_key = serialization.load_pem_private_key(f.read(), password=None)
+        with open(ca_cert_path, "rb") as f:
+            ca_cert = x509.load_pem_x509_certificate(f.read())
+
+        # Generate Client Key
+        client_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        
+        # Create CSR
+        csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, name),
+        ])).sign(client_key, hashes.SHA256())
+        
+        # Sign Certificate
+        cert = x509.CertificateBuilder().subject_name(
+            csr.subject
+        ).issuer_name(
+            ca_cert.subject
+        ).public_key(
+            csr.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow()
+        ).not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=365)
+        ).sign(ca_key, hashes.SHA256())
+
+        # Save
+        base_name = name.replace(" ", "_").lower()
+        with open(certs_dir / f"{base_name}_key.pem", "wb") as f:
+            f.write(client_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+            
+        with open(certs_dir / f"{base_name}_cert.pem", "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        console.print(f"[green]✓ Certificate for {name} generated![/green]")
+        input("\nPress Enter to continue...")
+
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        input("\nPress Enter to continue...")
+
+
+def _view_cert_details(certs_dir: Path):
+    """View details of a certificate"""
+    certs = list(certs_dir.glob("*.pem"))
+    if not certs:
+        return
+        
+    choice = questionary.select(
+        "Select certificate:",
+        choices=[c.name for c in certs] + ['← Back'],
+        style=custom_style
+    ).ask()
+    
+    if not choice or choice == '← Back':
+        return
+        
+    cert_path = certs_dir / choice
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+        
+        with open(cert_path, "rb") as f:
+            cert_data = f.read()
+            
+        # Try loading as Cert
+        try:
+            cert = x509.load_pem_x509_certificate(cert_data, default_backend())
+            console.print(Panel(f"[bold]Subject:[/bold] {cert.subject}\n[bold]Issuer:[/bold] {cert.issuer}\n[bold]Serial:[/bold] {cert.serial_number}\n[bold]Valid Until:[/bold] {cert.not_valid_after}", title="Certificate Details"))
+        except:
+             console.print("[dim]Not a displayable certificate (maybe a key).[/dim]")
+             
+    except Exception as e:
+        console.print(f"[red]Error reading cert: {e}[/red]")
+    
+    input("\nPress Enter to continue...")
+
+
+def view_logs():
+    """View System Logs"""
+    show_header()
+    
+    log_dir = SystemManager.get_log_dir()
+    if not log_dir.exists():
+        console.print(f"[yellow]Log directory not found: {log_dir}[/yellow]")
+        input("\nPress Enter to continue...")
+        return
+
+    logs = list(log_dir.glob("*.log"))
+    if not logs:
+        console.print("[dim]No log files found.[/dim]")
+        input("\nPress Enter to continue...")
+        return
+        
+    log_file = questionary.select(
+        "Select log file to view:",
+        choices=[l.name for l in logs] + ['← Back'],
+        style=custom_style
+    ).ask()
+    
+    if not log_file or log_file == '← Back':
+        return
+        
+    path = log_dir / log_file
+    
+    try:
+        # Read last 50 lines
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
+             lines = f.readlines()
+             last_lines = lines[-50:]
+        
+        console.clear()
+        console.print(Panel("".join(last_lines), title=f"Log Viewer: {log_file} (Last 50 lines)", border_style="blue"))
+    except Exception as e:
+        console.print(f"[red]Error reading log: {e}[/red]")
+        
+    input("\nPress Enter to continue...")
+
+
+def toggle_debug():
+    """Toggle Debug Mode"""
+    import json
+    
+    config_dir = SystemManager.get_config_dir()
+    config_file = config_dir / "roxx_config.json"
+    
+    config = {}
+    if config_file.exists():
+        try:
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+        except:
+            pass
+            
+    current_debug = config.get('debug', False)
+    new_debug = not current_debug
+    
+    config['debug'] = new_debug
+    
+    try:
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+            
+        status = "[green]ENABLED[/green]" if new_debug else "[red]DISABLED[/red]"
+        console.print(f"\nDebug mode is now {status}")
+        
+    except Exception as e:
+        console.print(f"\n[red]Error saving config: {e}[/red]")
+        
+    input("\nPress Enter to continue...")
+
+
 def main_menu():
     """Main console menu"""
     while True:
@@ -261,6 +552,12 @@ def main_menu():
             show_system_info()
         elif choice == '⚙️  Configuration':
             show_configuration()
+        elif choice == '🔐 Local PKI':
+            manage_pki()
+        elif choice == '📝 View Logs':
+            view_logs()
+        elif choice == '🐛 Debug Mode':
+            toggle_debug()
         elif choice == '🌐 Change Language':
             lang = questionary.select(
                 "Select language:",
