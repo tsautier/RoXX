@@ -125,7 +125,8 @@ class SetupAssistant:
                 'inWebo Push',
                 'TOTP (Time-based OTP)',
                 'EntraID / Azure AD',
-                'Local Users'
+                'Local Users',
+                'Generic LDAP'
             ],
             style=custom_style
         ).ask()
@@ -144,6 +145,9 @@ class SetupAssistant:
         
         if 'Local Users' in providers:
             self._configure_local_users()
+            
+        if 'Generic LDAP' in providers:
+            self._configure_ldap()
     
     def _configure_inwebo(self):
         """Configure inWebo"""
@@ -247,6 +251,36 @@ class SetupAssistant:
             console.print(f"[green]✓[/green] Created users file: {users_file}")
         
         console.print("[green]✓[/green] Local users configured")
+    
+    def _configure_ldap(self):
+        """Configure Generic LDAP"""
+        console.print("\n[bold]Generic LDAP Configuration[/bold]")
+        
+        server = questionary.text("LDAP Server (e.g., ldap.example.com):", style=custom_style).ask()
+        port = questionary.text("Port:", default="389", style=custom_style).ask()
+        use_ssl = questionary.confirm("Use Access over SSL (LDAPS)?", default=False, style=custom_style).ask()
+        
+        base_dn = questionary.text("Base DN (e.g., dc=example,dc=com):", style=custom_style).ask()
+        bind_dn = questionary.text("Bind DN (Service Account):", style=custom_style).ask()
+        bind_password = questionary.password("Bind Password:", style=custom_style).ask()
+        
+        user_filter = questionary.text(
+            "User Filter:", 
+            default="(uid={user})",
+            style=custom_style
+        ).ask()
+        
+        self.config['ldap'] = {
+            'server': server,
+            'port': int(port),
+            'use_ssl': use_ssl,
+            'base_dn': base_dn,
+            'bind_dn': bind_dn,
+            'bind_password': bind_password,
+            'user_search_filter': user_filter
+        }
+        
+        console.print("[green]✓[/green] LDAP configured")
     
     def configure_pki(self):
         """PKI configuration"""

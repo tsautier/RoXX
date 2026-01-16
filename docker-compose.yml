@@ -1,0 +1,23 @@
+services:
+  roxx:
+    build: .
+    image: roxx:latest
+    container_name: roxx
+    restart: unless-stopped
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+      - "8000:8000"
+    volumes:
+      - roxx_config:/etc/roxx
+      - roxx_data:/var/lib/roxx
+      - roxx_logs:/var/log/roxx
+      # Map FreeRADIUS config if customization is needed
+      # - ./freeradius:/etc/freeradius/3.0
+    environment:
+      - TZ=UTC
+
+volumes:
+  roxx_config:
+  roxx_data:
+  roxx_logs:
