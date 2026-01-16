@@ -1,0 +1,40 @@
+[project]
+name = "roxx"
+version = "1.0.0-beta"
+description = "Multi-OS RADIUS Authentication Proxy"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = []
+
+dependencies = [
+    "rich>=13.0.0",
+    "questionary>=2.0.0",
+    "psutil>=5.9.0",
+    "cryptography>=41.0.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.0.0",
+    "loguru>=0.7.0",
+    "msal>=1.24.0",
+]
+
+[project.optional-dependencies]
+windows = ["pywin32>=306"]
+dev = ["pytest>=7.0.0", "black>=23.0.0", "ruff>=0.1.0"]
+
+[project.scripts]
+roxx = "roxx.__main__:main"
+roxx-console = "roxx.cli.console:main"
+roxx-setup = "roxx.cli.setup:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

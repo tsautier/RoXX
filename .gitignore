@@ -1,0 +1,156 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific
+*.log
+*.tmp
+/tmp/
+*.bak
+*.orig
+
+# Sensitive data (DO NOT COMMIT)
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.txt
+totp_secrets.txt
+*.conf.local
+config.local.json
+roxx_config.json
+
+# OS specific
+Thumbs.db
+.DS_Store
+*.lnk
+
+# Build artifacts
+roxx.exe
+dist/
+build/
+
+# Test artifacts
+.pytest_cache/
+test_results/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# Node modules (if any web dev)
+node_modules/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.backup
+*~
+
+# Certificate files (sensitive)
+certs/
+*.crt
+*.cer
+*.ca-bundle
+*.ca-cert
+
+# Configuration files with secrets
+*_secrets.*
+*.secret
+.env
+.env.local
+
+# Large files / artifacts
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*

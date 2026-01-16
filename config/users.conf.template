@@ -1,0 +1,20 @@
+# RoXX Local Users Database Template
+# Format: username Cleartext-Password := "password"
+# 
+# This file is used for local user authentication when no external
+# identity provider (AD, LDAP, EntraID) is configured.
+#
+# SECURITY WARNING: Store this file securely with restricted permissions!
+# Recommended: chmod 600 on Linux/macOS
+
+# Example users (CHANGE THESE!)
+# admin Cleartext-Password := "ChangeMe123!"
+# testuser Cleartext-Password := "TestPassword456!"
+
+# User with VLAN assignment
+# john Cleartext-Password := "SecurePass789!", Tunnel-Type := VLAN, Tunnel-Medium-Type := IEEE-802, Tunnel-Private-Group-Id := "100"
+
+# User with session timeout
+# jane Cleartext-Password := "AnotherPass!", Session-Timeout := 3600
+
+# Add your users below:
