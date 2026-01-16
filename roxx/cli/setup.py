@@ -38,9 +38,7 @@ class SetupAssistant:
     def __init__(self):
         self.config_dir = SystemManager.get_config_dir()
         self.data_dir = SystemManager.get_data_dir()
-        self.os_type = SystemManager.get_os()
         self.config = {}
-    
     def show_welcome(self):
         """Display welcome screen"""
         console.clear()
@@ -97,35 +95,25 @@ class SetupAssistant:
         console.print("\n[bold cyan]Step 2: FreeRADIUS Configuration[/bold cyan]")
         
         # Check if FreeRADIUS is installed
-        if self.os_type == 'linux':
-            freeradius_paths = [
-                Path('/etc/freeradius/3.0'),
-                Path('/etc/freeradius'),
-                Path('/usr/local/etc/raddb'),
-            ]
-            
-            freeradius_dir = None
-            for path in freeradius_paths:
-                if path.exists():
-                    freeradius_dir = path
-                    break
-            
-            if not freeradius_dir:
-                console.print("[yellow]⚠[/yellow] FreeRADIUS not found. Please install it first.")
-                if questionary.confirm("Skip FreeRADIUS configuration?", style=custom_style).ask():
-                    return
-            else:
-                console.print(f"[green]✓[/green] FreeRADIUS found: {freeradius_dir}")
-                self.config['freeradius_dir'] = str(freeradius_dir)
+        freeradius_paths = [
+            Path('/etc/freeradius/3.0'),
+            Path('/etc/freeradius'),
+            Path('/usr/local/etc/raddb'),
+        ]
         
-        elif self.os_type == 'windows':
-            console.print("[yellow]ℹ[/yellow] FreeRADIUS on Windows requires manual installation.")
-            freeradius_dir = questionary.text(
-                "Enter FreeRADIUS installation directory:",
-                default="C:\\FreeRADIUS",
-                style=custom_style
-            ).ask()
-            self.config['freeradius_dir'] = freeradius_dir
+        freeradius_dir = None
+        for path in freeradius_paths:
+            if path.exists():
+                freeradius_dir = path
+                break
+        
+        if not freeradius_dir:
+            console.print("[yellow]⚠[/yellow] FreeRADIUS not found. Please install it first.")
+            if questionary.confirm("Skip FreeRADIUS configuration?", style=custom_style).ask():
+                return
+        else:
+            console.print(f"[green]✓[/green] FreeRADIUS found: {freeradius_dir}")
+            self.config['freeradius_dir'] = str(freeradius_dir)
     
     def configure_auth_providers(self):
         """Configure authentication providers"""
@@ -356,10 +344,8 @@ class SetupAssistant:
                     format=serialization.PrivateFormat.TraditionalOpenSSL,
                     encryption_algorithm=serialization.NoEncryption()
                 ))
-            
             # Set permissions (Unix only)
-            if self.os_type != 'windows':
-                os.chmod(key_file, 0o600)
+            os.chmod(key_file, 0o600)
             
             console.print(f"[green]✓[/green] CA certificate: {cert_file}")
             console.print(f"[green]✓[/green] CA private key: {key_file}")
@@ -447,12 +433,7 @@ def main():
     # Check admin privileges
     if not SystemManager.is_admin():
         console.print("\n[bold red]⚠ Warning:[/bold red] This program requires administrator privileges.")
-        console.print("Please run as:", style="yellow")
-        
-        if SystemManager.get_os() == 'windows':
-            console.print("  • Right-click → Run as administrator", style="cyan")
-        else:
-            console.print("  • sudo python -m roxx.cli.setup", style="cyan")
+        console.print("  • sudo python -m roxx.cli.setup", style="cyan")
         
         sys.exit(1)
     

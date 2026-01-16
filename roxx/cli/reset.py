@@ -30,11 +30,7 @@ def reset_factory():
     if not SystemManager.is_admin():
         console.print("\n[bold red]⚠ Error:[/bold red] Administrator privileges required.")
         console.print("Please run as:", style="yellow")
-        
-        if SystemManager.get_os() == 'windows':
-            console.print("  • Right-click → Run as administrator", style="cyan")
-        else:
-            console.print("  • sudo python -m roxx.cli.reset", style="cyan")
+        console.print("  • sudo python -m roxx.cli.reset", style="cyan")
         
         sys.exit(1)
     

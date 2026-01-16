@@ -219,7 +219,7 @@ def show_configuration():
     
     # Open with default editor
     import subprocess
-    editor = 'notepad' if SystemManager.get_os() == 'windows' else 'nano'
+    editor = 'nano'
     
     try:
         subprocess.run([editor, str(filepath)])

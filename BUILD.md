@@ -168,16 +168,10 @@ git tag -a v1.0.0-beta -m "Release 1.0.0-beta"
 git push origin v1.0.0-beta
 ```
 
-### 2. Build All Packages
-
+## Build for Linux
 ```bash
-# Python package
 python -m build
-
-# Windows exe
-pyinstaller roxx.spec
-
-# Linux packages (on Linux)
+# The Python package will be in `dist/`.
 python setup.py bdist_deb
 python setup.py bdist_rpm
 ```
