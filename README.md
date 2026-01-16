@@ -26,12 +26,38 @@ Modern Python-based RADIUS proxy supporting Windows, Linux, and macOS with advan
 
 ## 🚀 Quick Start
 
-### Installation
+## 🐳 Docker Deployment
+
+The easiest way to run RoXX is with Docker:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/roxx.git
-cd roxx
+git clone https://github.com/tsautier/RoXX.git
+cd RoXX
+
+# Start with Docker Compose
+docker compose up -d
+
+# Check logs
+docker compose logs -f
+
+# Access logs directly
+docker exec -it roxx ls /var/log/roxx
+```
+
+## 🛠 Manual Installation
+
+### Requirements
+- Linux (Debian/Ubuntu/CentOS/RHEL)
+- **Python 3.9+** (Required)
+- **FreeRADIUS 3.0+** (Required for production, optional for unit tests)
+  - Linux/macOS: Native installation
+- **Optional**: Active Directory, LDAP, EntraID for respective backends
+
+```bash
+# Clone repository
+git clone https://github.com/tsautier/RoXX.git
+cd RoXX
 
 # Install dependencies
 pip install -r requirements.txt
