@@ -27,6 +27,11 @@ roxx = "roxx.__main__:main"
 roxx-console = "roxx.cli.console:main"
 roxx-setup = "roxx.cli.setup:main"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["roxx*"]
+exclude = ["config*", "tests*", "docs*"]
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
