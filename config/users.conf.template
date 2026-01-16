@@ -5,7 +5,7 @@
 # identity provider (AD, LDAP, EntraID) is configured.
 #
 # SECURITY WARNING: Store this file securely with restricted permissions!
-# Recommended: chmod 600 on Linux/macOS
+# Recommended: chmod 600
 
 # Example users (CHANGE THESE!)
 # admin Cleartext-Password := "ChangeMe123!"

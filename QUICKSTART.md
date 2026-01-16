@@ -120,7 +120,7 @@ python test_installation.py
 
 ## 📚 Next Steps
 
-- Read [TESTING_GUIDE.md](TESTING_GUIDE.md) for multi-OS testing
+- Read [TESTING_GUIDE.md](TESTING_GUIDE.md) for testing instructions
 - See [FREERADIUS_INTEGRATION.md](FREERADIUS_INTEGRATION.md) for RADIUS setup
 - Check [BUILD.md](BUILD.md) for packaging instructions
 - Review configuration templates in `config/`
@@ -133,10 +133,6 @@ python test_installation.py
 
 Run with administrator/sudo privileges:
 ```bash
-# Windows
-Right-click → Run as administrator
-
-# Linux/macOS
 sudo roxx-console
 ```
 

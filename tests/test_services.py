@@ -14,7 +14,7 @@ class TestServiceManager:
     def test_init(self):
         """Test ServiceManager initialization"""
         mgr = ServiceManager()
-        assert mgr.os_type in ['linux', 'windows', 'darwin']
+        assert mgr.os_type == 'linux'
     
     def test_get_service_name(self):
         """Test service name mapping"""

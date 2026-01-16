@@ -54,7 +54,7 @@ cture with modular design
 - Configuration templates
 
 #### Packaging
-- PyInstaller spec for Windows executable
+
 - pip package configuration
 - MANIFEST for distribution
 - Requirements file

@@ -15,8 +15,7 @@ class TestSystemManager:
     def test_get_os(self):
         """Test OS detection"""
         os_type = SystemManager.get_os()
-        assert os_type in ['linux', 'windows', 'darwin']
-        assert os_type == platform.system().lower()
+        assert os_type == 'linux'
     
     def test_is_admin(self):
         """Test admin detection"""
@@ -29,10 +28,10 @@ class TestSystemManager:
         assert isinstance(config_dir, Path)
         
         # Verify path is OS-appropriate
-        if SystemManager.get_os() == 'windows':
-            assert 'ProgramData' in str(config_dir) or 'RoXX' in str(config_dir)
-        else:
-            assert str(config_dir).startswith('/usr/local')
+        # Linux specific checks
+        assert 'ProgramData' not in str(config_dir) and 'RoXX' not in str(config_dir)
+        assert str(config_dir).startswith('/usr/local') or str(config_dir).startswith('/etc')
+
     
     def test_get_data_dir(self):
         """Test data directory path"""
@@ -50,12 +49,8 @@ class TestSystemManager:
         assert isinstance(temp_dir, Path)
         assert 'roxx' in str(temp_dir).lower()
     
-    def test_run_command_success(self):
-        """Test successful command execution"""
-        if SystemManager.get_os() == 'windows':
-            result = SystemManager.run_command(['cmd', '/c', 'echo', 'test'])
-        else:
-            result = SystemManager.run_command(['echo', 'test'])
+        # Linux specific checks
+        result = SystemManager.run_command(['echo', 'test'])
         
         assert result.returncode == 0
         assert 'test' in result.stdout
