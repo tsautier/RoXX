@@ -1,5 +1,5 @@
 """
-RoXX - Multi-OS RADIUS Authentication Proxy
+RoXX - Linux RADIUS Authentication Proxy
 """
 
 __version__ = "2.0.0"

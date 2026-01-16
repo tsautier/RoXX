@@ -1,6 +1,6 @@
 """
-Multi-OS System Utilities
-Provides cross-platform abstractions for system operations
+Linux System Utilities
+Provides Linux-specific abstractions for system operations
 """
 
 import os
