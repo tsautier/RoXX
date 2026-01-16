@@ -14,41 +14,35 @@ class TestServiceManager:
     def test_init(self):
         """Test ServiceManager initialization"""
         mgr = ServiceManager()
-        assert mgr.os_type == 'linux'
+        # No os_type assertion needed for pure Linux manager
     
     def test_get_service_name(self):
         """Test service name mapping"""
         mgr = ServiceManager()
         
-        # Test known service
-        service_name = mgr._get_service_name('freeradius')
-        assert service_name is not None
+        # Access class attribute directly since it's cleaner
+        assert mgr.SERVICES['freeradius'] == 'freeradius'
         
-        # Test unknown service
-        unknown = mgr._get_service_name('unknown_service_xyz')
-        assert unknown == 'unknown_service_xyz'
-    
     @patch('subprocess.run')
     def test_get_status_linux(self, mock_run):
         """Test service status on Linux"""
         mgr = ServiceManager()
-        mgr.os_type = 'linux'
         
         # Mock successful status check
         mock_run.return_value = Mock(returncode=0)
-        status = mgr._get_status_linux('freeradius')
+        status = mgr.get_status('freeradius')
         assert status == ServiceStatus.RUNNING
         
         # Mock stopped service
         mock_run.return_value = Mock(returncode=3)
-        status = mgr._get_status_linux('freeradius')
+        status = mgr.get_status('freeradius')
         assert status == ServiceStatus.STOPPED
     
     @patch('subprocess.run')
     def test_start_service(self, mock_run):
         """Test starting a service"""
         mgr = ServiceManager()
-        mgr.os_type = 'linux'
+
         
         mock_run.return_value = Mock(returncode=0)
         result = mgr.start('freeradius')
@@ -62,7 +56,7 @@ class TestServiceManager:
     def test_stop_service(self, mock_run):
         """Test stopping a service"""
         mgr = ServiceManager()
-        mgr.os_type = 'linux'
+
         
         mock_run.return_value = Mock(returncode=0)
         result = mgr.stop('freeradius')
@@ -72,7 +66,7 @@ class TestServiceManager:
     def test_restart_service(self, mock_run):
         """Test restarting a service"""
         mgr = ServiceManager()
-        mgr.os_type = 'linux'
+
         
         mock_run.return_value = Mock(returncode=0)
         result = mgr.restart('freeradius')

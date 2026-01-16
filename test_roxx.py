@@ -77,7 +77,7 @@ def test_service_manager():
     
     mgr = ServiceManager()
     
-    print(f"OS Type: {mgr.os_type}")
+    # print(f"OS Type: {mgr.os_type}")
     print("\nService Status:")
     
     statuses = mgr.get_all_services_status()
