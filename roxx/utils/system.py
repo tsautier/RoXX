@@ -10,60 +10,37 @@ from pathlib import Path
 from typing import Optional
 
 
+
 class SystemManager:
-    """Multi-OS abstraction for system operations"""
+    """Linux System Utilities"""
     
     @staticmethod
     def get_os() -> str:
-        """
-        Returns the operating system name
-        Returns: 'windows', 'linux', or 'darwin' (macOS)
-        """
-        return platform.system().lower()
+        """Returns the operating system name"""
+        return 'linux'
     
     @staticmethod
     def is_admin() -> bool:
-        """Checks if the program is running with administrator privileges"""
+        """Checks if the program is running with root privileges"""
         try:
-            if SystemManager.get_os() == 'windows':
-                import ctypes
-                return ctypes.windll.shell32.IsUserAnAdmin() != 0
-            else:
-                # Linux/macOS: check if root (UID 0)
-                return os.geteuid() == 0
+            return os.geteuid() == 0
         except:
             return False
     
     @staticmethod
     def get_config_dir() -> Path:
-        """Returns the configuration directory according to the OS"""
-        os_type = SystemManager.get_os()
-        
-        if os_type == 'windows':
-            return Path(os.environ.get('PROGRAMDATA', 'C:\\ProgramData')) / 'RoXX'
-        else:
-            # Linux/macOS
-            return Path('/usr/local/etc')
+        """/etc/roxx"""
+        return Path('/etc/roxx')
     
     @staticmethod
     def get_data_dir() -> Path:
-        """Application data directory"""
-        os_type = SystemManager.get_os()
-        
-        if os_type == 'windows':
-            return Path(os.environ.get('PROGRAMDATA', 'C:\\ProgramData')) / 'RoXX' / 'data'
-        else:
-            return Path('/usr/local/var')
+        """/var/lib/roxx"""
+        return Path('/var/lib/roxx')
     
     @staticmethod
     def get_log_dir() -> Path:
-        """Log directory"""
-        os_type = SystemManager.get_os()
-        
-        if os_type == 'windows':
-            return Path(os.environ.get('PROGRAMDATA', 'C:\\ProgramData')) / 'RoXX' / 'logs'
-        else:
-            return Path('/var/log/roxx')
+        """/var/log/roxx"""
+        return Path('/var/log/roxx')
     
     @staticmethod
     def run_command(
@@ -74,17 +51,7 @@ class SystemManager:
         timeout: Optional[int] = None
     ) -> subprocess.CompletedProcess:
         """
-        Executes a system command in a cross-platform way
-        
-        Args:
-            command: Command and arguments as a list
-            check: Raise exception if return code != 0
-            capture_output: Capture stdout/stderr
-            text: Return output as string (not bytes)
-            timeout: Timeout in seconds
-            
-        Returns:
-            CompletedProcess with stdout, stderr, returncode
+        Executes a system command
         """
         return subprocess.run(
             command,
@@ -104,10 +71,15 @@ class SystemManager:
         ]
         
         for directory in dirs:
-            directory.mkdir(parents=True, exist_ok=True)
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                # Expected if not running as root during dev/test
+                pass
     
     @staticmethod
     def get_temp_dir() -> Path:
-        """Multi-OS temporary directory"""
+        """Temporary directory"""
         import tempfile
         return Path(tempfile.gettempdir())
+
