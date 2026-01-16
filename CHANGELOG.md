@@ -11,8 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 #### Core Features
-- Multi-OS RADIUS authentication proxy (Windows, Linux, macOS)
-- Modern Python architecture with modular design
+- **Linux Only**: Optimized for Linux production environments (Debian/Ubuntu/RHEL)
+- **Systemd Integration**: Native service management
+- Interactive Console (`roxx-console`)
+cture with modular design
 - Rich TUI admin console with service management
 - Interactive setup wizard for easy configuration
 - Factory reset functionality
