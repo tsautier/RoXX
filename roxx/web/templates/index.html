@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1E3A8A 0%, #06B6D4 100%);
@@ -18,31 +19,31 @@
             display: flex;
             flex-direction: column;
         }
-        
+
         header {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             padding: 1.5rem 2rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
+
         .logo {
             display: flex;
             align-items: center;
             gap: 1rem;
         }
-        
+
         .logo h1 {
             color: white;
             font-size: 2rem;
             font-weight: 700;
         }
-        
+
         .logo span {
             color: #06B6D4;
             font-size: 0.9rem;
         }
-        
+
         main {
             flex: 1;
             display: flex;
@@ -50,7 +51,7 @@
             align-items: center;
             padding: 2rem;
         }
-        
+
         .container {
             background: white;
             border-radius: 20px;
@@ -59,20 +60,20 @@
             max-width: 800px;
             width: 100%;
         }
-        
+
         h2 {
             color: #1E3A8A;
             margin-bottom: 2rem;
             font-size: 2rem;
         }
-        
+
         .card-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1.5rem;
             margin-top: 2rem;
         }
-        
+
         .card {
             background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
             color: white;
@@ -82,22 +83,22 @@
             transition: transform 0.3s, box-shadow 0.3s;
             cursor: pointer;
         }
-        
+
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
-        
+
         .card h3 {
             font-size: 1.5rem;
             margin-bottom: 0.5rem;
         }
-        
+
         .card p {
             opacity: 0.9;
             font-size: 0.95rem;
         }
-        
+
         footer {
             background: rgba(0, 0, 0, 0.2);
             color: white;
@@ -107,6 +108,7 @@
         }
     </style>
 </head>
+
 <body>
     <header>
         <div class="logo">
@@ -114,30 +116,30 @@
             <span>v1.0-beta</span>
         </div>
     </header>
-    
+
     <main>
         <div class="container">
             <h2>Welcome to RoXX Admin Interface</h2>
             <p style="color: #666; margin-bottom: 2rem;">
-                Modern RADIUS Authentication Proxy - Multi-OS Edition
+                Modern RADIUS Authentication Proxy - Linux Edition
             </p>
-            
+
             <div class="card-grid">
                 <a href="/totp/enroll" class="card">
                     <h3>📱 TOTP Enrollment</h3>
                     <p>Generate QR codes for Google Authenticator, Microsoft Authenticator, etc.</p>
                 </a>
-                
+
                 <div class="card" style="background: linear-gradient(135deg, #059669 0%, #10B981 100%);">
                     <h3>👥 User Management</h3>
                     <p>Manage local users and authentication settings</p>
                 </div>
-                
+
                 <div class="card" style="background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);">
                     <h3>📊 Dashboard</h3>
                     <p>View authentication logs and statistics</p>
                 </div>
-                
+
                 <div class="card" style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);">
                     <h3>⚙️ Configuration</h3>
                     <p>Configure RADIUS clients and backends</p>
@@ -145,9 +147,10 @@
             </div>
         </div>
     </main>
-    
+
     <footer>
-        <p>&copy; 2026 RoXX - Multi-OS RADIUS Authentication Proxy</p>
+        <p>&copy; 2026 RoXX - Linux RADIUS Authentication Proxy</p>
     </footer>
 </body>
+
 </html>

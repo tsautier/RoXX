@@ -1,6 +1,6 @@
 """
 RoXX Factory Reset - Reset configuration to defaults
-Multi-OS replacement for bin/resetfactory
+Linux replacement for bin/resetfactory
 """
 
 import sys

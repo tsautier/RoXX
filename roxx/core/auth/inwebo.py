@@ -1,6 +1,6 @@
 """
 inWebo/TrustBuilder Push Authentication Module
-Multi-OS replacement for bin/push.sh
+Linux replacement for bin/push.sh
 """
 
 import time

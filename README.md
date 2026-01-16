@@ -1,14 +1,14 @@
 # RoXX
 
-**Multi-OS RADIUS Authentication Proxy** - Version 1.0-beta
+**Linux RADIUS Authentication Proxy** - Version 1.0-beta
 
-Modern Python-based RADIUS proxy supporting Windows, Linux, and macOS with advanced authentication backends.
+Modern Python-based RADIUS proxy for Linux with advanced authentication backends.
 
 ---
 
 ## ✨ Features
 
-- **Multi-OS Support**: Native support for Windows, Linux, and macOS
+- **Linux Native**: Optimized for Debian/RedHat based systems
 - **Modern TUI Console**: Rich terminal interface for administration
 - **Multiple Auth Backends**:
   - inWebo Push Authentication
@@ -51,7 +51,7 @@ docker exec -it roxx ls /var/log/roxx
 - Linux (Debian/Ubuntu/CentOS/RHEL)
 - **Python 3.9+** (Required)
 - **FreeRADIUS 3.0+** (Required for production, optional for unit tests)
-  - Linux/macOS: Native installation
+
 - **Optional**: Active Directory, LDAP, EntraID for respective backends
 
 ```bash
@@ -137,7 +137,7 @@ Configuration templates are provided in the `config/` directory:
 - [Quick Start Guide](QUICKSTART.md)
 - [Testing Guide](TESTING_GUIDE.md)
 - [FreeRADIUS Integration](FREERADIUS_INTEGRATION.md)
-- [FreeRADIUS on Windows](FREERADIUS_WINDOWS.md) - WSL2 Setup
+
 - [Build Instructions](BUILD.md)
 - [Project Overview](PROJECT_OVERVIEW.md)
 - [Changelog](CHANGELOG.md)
@@ -161,7 +161,7 @@ pytest tests/test_totp.py
 
 ## 📦 Building
 
-### Windows Executable
+
 ```bash
 pyinstaller roxx.spec
 ```
@@ -207,7 +207,7 @@ Features:
 
 - **Python 3.9+** (Required)
 - **FreeRADIUS 3.0+** (Required for production, optional for unit tests)
-  - Linux/macOS: Native installation
+
 - **Optional**: Active Directory, LDAP, EntraID for respective backends
 
 ---
@@ -230,4 +230,4 @@ For issues and questions, please use the GitHub issue tracker.
 
 ---
 
-**RoXX** - Modern RADIUS Authentication for the Multi-OS Era
+**RoXX** - Modern RADIUS Authentication for the Modern Era
