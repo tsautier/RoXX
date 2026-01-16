@@ -1,0 +1,52 @@
+# RoXX RADIUS Clients Configuration Template
+# Define your network access servers (NAS) here
+
+# Example client configuration
+# Uncomment and modify for your environment
+
+# client example_switch {
+#     ipaddr = 192.168.1.10
+#     secret = your_secure_shared_secret_here
+#     require_message_authenticator = yes
+#     nas_type = cisco
+#     shortname = switch-01
+#     
+#     # Rate limiting
+#     limit {
+#         max_connections = 16
+#         lifetime = 0
+#         idle_timeout = 30
+#     }
+# }
+
+# client example_wifi_controller {
+#     ipaddr = 192.168.1.20
+#     secret = another_secure_shared_secret
+#     require_message_authenticator = yes
+#     nas_type = other
+#     shortname = wifi-ctrl-01
+# }
+
+# Client network (for multiple devices)
+# client office_network {
+#     ipaddr = 10.0.0.0/24
+#     secret = network_shared_secret
+#     require_message_authenticator = yes
+#     shortname = office-net
+# }
+
+# Localhost (for testing)
+client localhost {
+    ipaddr = 127.0.0.1
+    secret = testing123
+    require_message_authenticator = no
+    nas_type = other
+    shortname = localhost
+}
+
+# IPv6 localhost
+client localhost_ipv6 {
+    ipv6addr = ::1
+    secret = testing123
+    shortname = localhost-v6
+}

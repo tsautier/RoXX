@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - RoXX</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1E3A8A 0%, #06B6D4 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #1E3A8A;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #E5E7EB;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #3B82F6;
+        }
+        
+        button {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        #result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #F3F4F6;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        #qrcode {
+            text-align: center;
+            margin: 1rem 0;
+        }
+        
+        #qrcode img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+        
+        .secret-box {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 1.1rem;
+            text-align: center;
+            border: 2px dashed #3B82F6;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 1rem;
+            color: #3B82F6;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .instructions {
+            background: #EFF6FF;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #3B82F6;
+        }
+        
+        .instructions h3 {
+            color: #1E3A8A;
+            margin-bottom: 0.5rem;
+        }
+        
+        .instructions ol {
+            margin-left: 1.5rem;
+            color: #374151;
+        }
+        
+        .instructions li {
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 TOTP Enrollment</h1>
+        
+        <div class="instructions">
+            <h3>How to enroll:</h3>
+            <ol>
+                <li>Enter your username and organization name</li>
+                <li>Click "Generate QR Code"</li>
+                <li>Scan the QR code with your authenticator app (Google Authenticator, Microsoft Authenticator, etc.)</li>
+                <li>Save the secret key securely</li>
+            </ol>
+        </div>
+        
+        <form id="enrollForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required placeholder="john.doe">
+            </div>
+            
+            <div class="form-group">
+                <label for="issuer">Organization/Issuer</label>
+                <input type="text" id="issuer" name="issuer" value="RoXX" required>
+            </div>
+            
+            <button type="submit" id="submitBtn">Generate QR Code</button>
+        </form>
+        
+        <div id="result">
+            <h3 style="color: #1E3A8A; margin-bottom: 1rem;">✅ QR Code Generated!</h3>
+            
+            <div id="qrcode"></div>
+            
+            <p style="margin: 1rem 0; color: #374151;">
+                <strong>Secret Key (save this!):</strong>
+            </p>
+            <div class="secret-box" id="secret"></div>
+            
+            <p style="color: #6B7280; font-size: 0.9rem; margin-top: 1rem;">
+                ⚠️ Keep this secret key secure! You'll need it to recover access if you lose your device.
+            </p>
+        </div>
+        
+        <a href="/" class="back-link">← Back to Home</a>
+    </div>
+    
+    <script>
+        document.getElementById('enrollForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Generating...';
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/totp/generate-qr', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('qrcode').innerHTML = `<img src="${data.qr_code}" alt="TOTP QR Code">`;
+                    document.getElementById('secret').textContent = data.secret;
+                    document.getElementById('result').style.display = 'block';
+                }
+            } catch (error) {
+                alert('Error generating QR code: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Generate QR Code';
+            }
+        });
+    </script>
+</body>
+</html>

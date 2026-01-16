@@ -1,0 +1,25 @@
+# Manifest file for package data
+include README.md
+include LICENSE
+include CHANGELOG.md
+include QUICKSTART.md
+include TESTING.md
+include SUMMARY.md
+include CODE_COMPARISON.md
+include FREERADIUS_INTEGRATION.md
+include BUILD.md
+include roxx_logo.png
+include requirements.txt
+include pyproject.toml
+
+# Include all Python files
+recursive-include roxx *.py
+
+# Include config files
+recursive-include roxx/config *.json
+
+# Exclude tests and cache
+recursive-exclude tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store

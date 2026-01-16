@@ -1,0 +1,280 @@
+{
+    "se_err_001": {
+        "FR": "ECHEC, relancer la phase et verifier les parametres",
+        "EN": "FAILED, retry this step and check again all parameters"
+	},
+        "se_err_002": {
+        "FR": "Pas de carte reseau presente",
+        "EN": "Network card not found"
+	},
+        "se_err_003": {
+        "FR": "Adresse IP invalide",
+        "EN": "Bad IP address"
+	},
+        "se_err_004": {
+        "FR": "Masque invalide",
+        "EN": "Bad netmask"
+	},
+        "se_err_005": {
+        "FR": "Passerelle par defaut invalide",
+        "EN": "Bad default gateway"
+	},
+        "se_err_006": {
+        "FR": "DNS invalide",
+        "EN": "Bad DNS"
+	},
+        "se_err_007": {
+        "FR": "PKI locale non installee, verifier l'installation",
+        "EN": "Local PKI not found, check install"
+	},
+    
+    
+    
+    "se_te_001": {
+        "FR": "Choix des etapes",
+        "EN": "Choose a step"
+	},
+    "se_te_002": {
+        "FR": "Veuillez entrer l'adresse IP :",
+        "EN": "Please enter the IP address :"
+	},
+    "se_te_003": {
+        "FR": "Veuillez entrer le masque reseau :",
+        "EN": "Please enter the netmask :"
+	},
+    "se_te_004": {
+        "FR": "Veuillez entrer l'IP de la passerelle par defaut :",
+        "EN": "Please enter the default gateway IP :"
+	},
+    "se_te_004b": {
+	"FR": "Veuillez indiquer un DNS:",
+	"EN": "Please enter a DNS:"
+	},
+    "se_te_005": {
+        "FR": "Redemarrage du reseau...",
+        "EN": "Network restarting..."
+	},
+    "se_te_006": {
+        "FR": "OK , etape complete",
+        "EN": "OK , step completed"
+	},
+    "se_te_007": {
+        "FR": "ERREUR , relancer cette phase et verifier les parametres",
+        "EN": "ERROR, retry this step and check all parameters"
+	},
+    "se_te_008": {
+        "FR": "Activer un AD externe [Methode NTLM]?",
+        "EN": "Enable an external AD [NTLM]"
+	},
+     "se_te_009": {
+        "FR": "Veuillez entrer le domaine AD (ex: toto.com) :",
+        "EN": "Please enter the AD domain name (eg: toto.com) :"
+	},
+    "se_te_010": {
+        "FR": "Veuillez entrer le fqdn d'un domain controller :",
+        "EN": "Please enter the FQDN of a domain controller :"
+	},
+    "se_te_011": {
+        "FR": "Veuillez entrer le nom NetBIOS du domaine (ex: TOTO) :",
+        "EN": "Please enter the NetBIOS domain name (eg: TOTO) :"
+	},
+    "se_te_012": {
+        "FR": "Veuillez entrer un compte admin pour la jonction AD :",
+        "EN": "Please enter a domain username to join the AD domain :"
+	},
+  "se_te_013": {
+        "FR": "Traitement de ",
+        "EN": "Processing "
+	},
+      "se_te_014": {
+        "FR": "Activer un annuaire LDAP externe [Methode LDAP BIND]?\n(CHAP / MSCHAP / MSCHAPv2 non supportes)",
+        "EN": "Enable anb external LDAP directory [LDAP BIND]?\n(CHAP / MSCHAP / MSCHAPv2 not supported) "
+	},
+     "se_te_015": {
+        "FR": "Veuillez entrer l'ip ou le fqdn de serveur LDAP :",
+        "EN": "Please enter the ip or hostname of the LDAP server :"
+	},
+    "se_te_016": {
+        "FR": "Veuillez entrer le base DN :",
+        "EN": "Please enter the base DN :"
+	},
+    "se_te_017": {
+        "FR": "Veuillez entrer le login d'un compte LDAP :",
+        "EN": "Please enter the login of a ldap account :"
+	},
+  "se_te_018": {
+        "FR": "Veuillez entrer le password du compte LDAP :",
+        "EN": "Please enter the LDAP account's password :"
+	},
+  "se_te_019": {
+        "FR": "Activer la base fichier local ?",
+        "EN": "Enable local text database ?"
+	},
+    "se_te_020": {
+        "FR": "Installation finie! \nOuvrir la console d'administration pour verifier les services",
+        "EN": "Setup completed !\n Open the management console to check the services status"
+	},
+       "se_te_021": {
+        "FR": "Veuillez exporter le certificat .p12 (PKCS12) depuis la console INWEBO (Sites securises>Telecharger un nouveau certificat pour l'API) et le copier (scp) dans /home/userx/",
+        "EN": "Please export the .p12 (PKCS12) certificate from the inWebo/TrustBuilder console (Sites securises>Telecharger un nouveau certificat pour l'API) and copy it (scp) into /home/userx/"
+	},
+       "se_te_022": {
+        "FR": "Le certificat a ete trouve :",
+        "EN": "The certificate has been found :"
+	},
+       "se_te_023": {
+        "FR": "Aucun certificat .p12 trouve dans /home/userx",
+        "EN": "No .p12 certificate found in /home/userx"
+	},
+        "se_te_024": {
+        "FR": "Veuillez entrer le serviceID INWEBO :",
+        "EN": "Please enter the inWebo/TrustBuilder serviceID :"
+	},
+       "se_te_025": {
+        "FR": "Si besoin d'un Proxy pour sortir l'indiquer ici (http://x.x.x.x:port) sinon laisser vide :",
+        "EN": "If you need a proxy to connect to Internet please type it here (http://x.x.x.x:port) else leave empty :"
+	},
+        "se_te_026": {
+        "FR": "Conversion du certificat PKCS en PEM... (le mot de passe du certificat PKCS12 va etre demande).",
+        "EN": "Converting certificate from PKCS to PEM... (key/password will be prompted)."
+	},
+     "se_te_027": {
+        "FR": "\n Confirmer la reinitialisation du systeme (sauf parametres reseau) ?",
+        "EN": "\n Confirm system factory-reset (except network settings) ?"
+	},
+     "se_te_028": {
+        "FR": "Controle des services",
+        "EN": "Services Control"
+	},
+     "se_te_029": {
+        "FR": "Penser a redemarrer le service Freeradius apres chaque changement !",
+        "EN": "Don't forget to restart Freeradius service after any changes !"
+	},
+     "se_te_030": {
+        "FR": "Etat des services",
+        "EN": "Services Status"
+	},
+     "se_te_031": {
+        "FR": "Modifier la configuration",
+        "EN": "Change configuration"
+	},
+    "se_te_032": {
+        "FR": "Activer l'authentification externe Entra-ID [JWT Token]?\n(CHAP / MSCHAP / MSCHAPv2 non supportes)",
+        "EN": "Enable Entra-ID external authentication [JWT Token]?\n(CHAP / MSCHAP / MSCHAPv2 not supported) "
+	},
+    "se_te_033": {
+        "FR": "Indiquer le Tenant ID (id d'organisation)",
+        "EN": "Please enter the Tenant ID"
+	},
+    
+    "se_te_034": {
+        "FR": "Indiquer un Application/Client ID (xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx)",
+        "EN": "Please enter an Application/Client ID (xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+	},    
+    "se_te_035": {
+        "FR": "Indiquer le domaine principal de l'organisation",
+        "EN": "Please enter the main domain of the organization"
+	},
+    "se_te_036": {
+        "FR": "Appliquer la configuration",
+        "EN": "Apply configuration"
+	},
+    "se_te_037": {
+        "FR": "Activer le MFA PUSH ?",
+        "EN": "Enable PUSH Authenticate MFA ?"
+	},
+     "se_te_038": {
+        "FR": "Activer le MFA avec YubiKey ?",
+        "EN": "Enable MFA with YubiKey ?"
+	},
+    "se_te_039": {
+        "FR": "Activer le MFA avec TOTP ?",
+        "EN": "Enable MFA with TOTP ?"
+	},
+     "se_te_040": {
+        "FR": "Indiquer le client ID de l'API",
+        "EN": "Please enter the API Client ID"
+	},
+     "se_te_041": {
+        "FR": "Indiquer la clé API (base64)",
+        "EN": "Please enter the API key (base64)"
+	},
+     "se_te_042": {
+        "FR": "Autorite cree, pour les opérations courantes utiliser l'outil console.sh",
+        "EN": "PKI created. Use console.sh to manage it."
+	}, 
+    "se_te_043": {
+        "FR": "Dans l'etape suivante, entrez un mot de passe pour proteger la cle privee de la PKI",
+        "EN": "Next you will be prompted for a password to protect the PKI private key"
+	}, 
+    "se_te_044": {
+        "FR": "Dans l'etape suivante, saisissez le mot de passe de la PKI pour génerer le certificat",
+        "EN": "For the next step pleae enter the PKI password in order to generate the requested certificate"
+	}, 
+      "se_te_045": {
+        "FR": "Indiquer le nom de l'entreprise",
+        "EN": "Please enter the company name"
+	},
+     "se_te_046": {
+        "FR": "Indiquer le secret TOTP",
+        "EN": "Please enter the TOTP secret"
+	},
+    
+    "se_ti_001": {
+        "FR": "Application des changements",
+        "EN": "Applying changes"
+	},
+    "se_ti_002": {
+        "FR": "Erreur",
+        "EN": "Error"
+	},
+    "se_ti_003": {
+        "FR": "Choisir",
+        "EN": "Choose"
+	},
+    "se_ti_004": {
+        "FR": "Choisir un fournisseur d'identites",
+        "EN": "Choose an identity provider"
+	},
+     "se_ti_005": {
+        "FR": "Journaux des services",
+        "EN": "Services logs"
+	},
+    "se_ti_006": {
+        "FR": "Modifier",
+        "EN": "Change"
+	},
+    "se_ti_007": {
+        "FR": "Choisir un mode de gestion des certificats",
+        "EN": "Choose a way to manage certificates"
+	},
+     "se_ti_008": {
+        "FR": "Format de certificat a importer pour RadX",
+        "EN": "Choose a certificate format for Radx server"
+	},
+    
+     "se_me_001": {
+        "FR": "RESEAU",
+        "EN": "NETWORKING"
+	},
+    "se_me_002": {
+        "FR": "GESTION DES IDENTITES",
+        "EN": "IDENTITY MANAGEMENT"
+	},
+    "se_me_003": {
+        "FR": "GESTION DU MFA",
+        "EN": "MFA PROVIDERS"
+	}
+    ,
+    "se_me_004": {
+        "FR": "Recuperer le certificat de l'autorite",
+        "EN": "Get CA certificate"
+	}
+    ,
+    "se_me_005": {
+        "FR": "Creer, signer et recuperer un nouveau certificat client",
+        "EN": "Request,sign and get a new client certificate"
+	}
+    
+
+}

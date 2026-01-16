@@ -1,0 +1,74 @@
+# RoXX FreeRADIUS LDAP Module Configuration Template
+# Modern LDAP integration for Active Directory or OpenLDAP
+
+ldap {
+    # LDAP server configuration
+    server = 'ldap.example.com'
+    port = 389
+    
+    # Use LDAPS (recommended for production)
+    # server = 'ldaps://ldap.example.com'
+    # port = 636
+    
+    # Bind credentials
+    identity = 'cn=radius,ou=services,dc=example,dc=com'
+    password = 'YourSecurePassword'
+    
+    # Base DN for searches
+    base_dn = 'dc=example,dc=com'
+    
+    # LDAP filter for user authentication
+    # Active Directory:
+    # filter = "(sAMAccountName=%{%{Stripped-User-Name}:-%{User-Name}})"
+    # OpenLDAP:
+    # filter = "(uid=%{%{Stripped-User-Name}:-%{User-Name}})"
+    
+    # User search configuration
+    user {
+        base_dn = "${..base_dn}"
+        filter = "(sAMAccountName=%{%{Stripped-User-Name}:-%{User-Name}})"
+        scope = 'sub'
+        
+        # Attributes to retrieve
+        # access_attribute = 'dialupAccess'
+    }
+    
+    # Group search configuration
+    group {
+        base_dn = "${..base_dn}"
+        filter = "(objectClass=group)"
+        scope = 'sub'
+        membership_attribute = 'memberOf'
+        
+        # Group membership filter
+        # membership_filter = "(member=%{control:Ldap-UserDn})"
+    }
+    
+    # LDAP options
+    options {
+        # Follow referrals
+        chase_referrals = yes
+        rebind = yes
+        
+        # Timeout settings
+        timeout = 10
+        timelimit = 10
+        net_timeout = 5
+        
+        # TLS settings (for LDAPS)
+        # start_tls = yes
+        # require_cert = 'allow'
+    }
+    
+    # Connection pool
+    pool {
+        start = ${thread[pool].start_servers}
+        min = ${thread[pool].min_spare_servers}
+        max = ${thread[pool].max_servers}
+        spare = ${thread[pool].max_spare_servers}
+        uses = 0
+        retry_delay = 30
+        lifetime = 0
+        idle_timeout = 60
+    }
+}
