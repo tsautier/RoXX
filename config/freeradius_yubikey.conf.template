@@ -1,0 +1,39 @@
+# RoXX FreeRADIUS YubiKey Module Configuration Template
+# YubiKey OTP authentication via Yubico validation service
+
+yubikey {
+    # Decrypt YubiKey OTP (not typically used)
+    decrypt = no
+    
+    # Validate YubiKey OTP
+    validate = yes
+    
+    # Validation configuration
+    validation {
+        # Yubico validation servers
+        servers {
+            # Primary server
+            uri = 'https://api.yubico.com/wsapi/2.0/verify?id=%d&otp=%s'
+            
+            # Backup servers (optional)
+            # uri = 'https://api2.yubico.com/wsapi/2.0/verify?id=%d&otp=%s'
+            # uri = 'https://api3.yubico.com/wsapi/2.0/verify?id=%d&otp=%s'
+        }
+        
+        # Yubico API credentials (get from https://upgrade.yubico.com/getapikey/)
+        client_id = YOUR_CLIENT_ID
+        api_key = 'YOUR_API_KEY_BASE64'
+        
+        # Connection pool
+        pool {
+            start = ${thread[pool].start_servers}
+            min = ${thread[pool].min_spare_servers}
+            max = ${thread[pool].max_servers}
+            uses = 0
+            retry_delay = 10
+            lifetime = 0
+            idle_timeout = 60
+            spread = yes
+        }
+    }
+}

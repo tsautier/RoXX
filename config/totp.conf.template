@@ -1,0 +1,26 @@
+# RoXX TOTP Configuration
+# Time-based One-Time Password settings
+
+[totp]
+# Company/Organization name (shown in authenticator apps)
+issuer = YourCompany
+
+# TOTP algorithm (SHA1, SHA256, SHA512)
+algorithm = SHA1
+
+# Number of digits in OTP
+digits = 6
+
+# Time step in seconds
+period = 30
+
+# Tolerance window (number of time steps to check)
+# Allows for clock drift between server and client
+window = 1
+
+# Secrets file path
+secrets_file = /usr/local/etc/roxx/totp_secrets.txt
+
+# Logging
+log_level = INFO
+log_file = /var/log/roxx/totp.log
