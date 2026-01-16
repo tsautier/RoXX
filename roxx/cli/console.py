@@ -41,10 +41,7 @@ def check_admin():
         console.print("\n[bold red]⚠ Warning:[/bold red] This program requires administrator privileges.")
         console.print("Please run as:", style="yellow")
         
-        if SystemManager.get_os() == 'windows':
-            console.print("  • Right-click → Run as administrator", style="cyan")
-        else:
-            console.print("  • sudo roxx-console", style="cyan")
+        console.print("  • sudo roxx-console", style="cyan")
         
         sys.exit(1)
 
@@ -157,7 +154,7 @@ def show_system_info():
     table.add_column("Value", style="green")
     
     # System information
-    table.add_row("Operating System", f"{platform.system()} {platform.release()}")
+    table.add_row("Operating System", "Linux (RoXX)")
     table.add_row("Architecture", platform.machine())
     table.add_row("Python Version", platform.python_version())
     

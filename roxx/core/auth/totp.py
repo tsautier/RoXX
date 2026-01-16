@@ -1,6 +1,6 @@
 """
 TOTP (Time-based One-Time Password) Authentication Module
-Multi-OS replacement for bin/totp.sh
+Linux replacement for bin/totp.sh
 """
 
 import os
