@@ -1,5 +1,5 @@
 """
-RoXX Setup Assistant - Multi-OS Interactive Configuration
+RoXX Setup Assistant - Linux Interactive Configuration
 Replacement for bin/setup (1157 lines Bash)
 """
 
@@ -45,7 +45,7 @@ class SetupAssistant:
         
         welcome = Panel.fit(
             "[bold cyan]RoXX Setup Assistant[/bold cyan]\n"
-            f"[dim]v1.0-beta - Multi-OS Configuration Wizard[/dim]\n\n"
+            f"[dim]v1.0-beta - Linux Configuration Wizard[/dim]\n\n"
             f"[yellow]OS:[/yellow] {self.os_type.title()}\n"
             f"[yellow]Config:[/yellow] {self.config_dir}",
             border_style="cyan",

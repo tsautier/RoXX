@@ -44,35 +44,7 @@ twine upload dist/*
 
 ---
 
-### 2. Windows Executable (.exe)
-
-**Using PyInstaller**:
-
-```powershell
-# Install PyInstaller
-pip install pyinstaller
-
-# Build executable
-pyinstaller roxx.spec
-
-# Output: dist/roxx.exe
-```
-
-**One-file executable** (alternative):
-
-```powershell
-pyinstaller --onefile --name roxx --icon roxx_logo.png roxx/__main__.py
-```
-
-**Test the executable**:
-
-```powershell
-.\dist\roxx.exe
-```
-
----
-
-### 3. Linux Package (.deb)
+### 2. Linux Package (.deb)
 
 **Using stdeb**:
 
@@ -94,7 +66,7 @@ sudo dpkg -i deb_dist/python3-roxx_1.0.0b0-1_all.deb
 
 ---
 
-### 4. Linux Package (.rpm)
+### 3. Linux Package (.rpm)
 
 **Using setup.py**:
 
@@ -109,6 +81,14 @@ python setup.py bdist_rpm
 
 ```bash
 sudo rpm -i dist/roxx-1.0.0b0-1.noarch.rpm
+```
+
+---
+
+### 4. Docker Image
+
+```bash
+docker build -t roxx .
 ```
 
 ---
@@ -138,8 +118,7 @@ pytest -v
 pytest --cov=roxx --cov-report=html
 
 # Open in browser
-# Windows: start htmlcov/index.html
-# Linux: xdg-open htmlcov/index.html
+xdg-open htmlcov/index.html
 ```
 
 ---
@@ -168,7 +147,7 @@ git tag -a v1.0.0-beta -m "Release 1.0.0-beta"
 git push origin v1.0.0-beta
 ```
 
-## Build for Linux
+### 2. Build for Linux
 ```bash
 python -m build
 # The Python package will be in `dist/`.
@@ -182,7 +161,6 @@ python setup.py bdist_rpm
 2. Create new release from tag `v1.0.0-beta`
 3. Upload artifacts:
    - `dist/roxx-1.0.0b0-py3-none-any.whl`
-   - `dist/roxx.exe` (Windows)
    - `deb_dist/python3-roxx_1.0.0b0-1_all.deb` (Debian)
    - `dist/roxx-1.0.0b0-1.noarch.rpm` (RPM)
 
@@ -201,46 +179,11 @@ Users install with:
 pip install roxx
 ```
 
-### GitHub Releases
+### Docker Hub
 
-- Attach pre-built binaries
-- Users download directly
-
-### Docker (Future)
-
-```dockerfile
-FROM python:3.9-slim
-COPY . /app
-WORKDIR /app
-RUN pip install .
-CMD ["roxx"]
+```bash
+docker push yourregistry/roxx:latest
 ```
-
----
-
-## 🔧 Build Troubleshooting
-
-### PyInstaller Issues
-
-**Missing modules**:
-- Add to `hiddenimports` in `roxx.spec`
-
-**Missing data files**:
-- Add to `datas` in `roxx.spec`
-
-**Large exe size**:
-- Use `--exclude-module` for unused packages
-- Enable UPX compression
-
-### Package Issues
-
-**Import errors**:
-- Check `MANIFEST.in` includes all necessary files
-- Verify `package_data` in `setup.py`
-
-**Version conflicts**:
-- Update `requires-python` in `pyproject.toml`
-- Pin dependency versions if needed
 
 ---
 
@@ -249,7 +192,6 @@ CMD ["roxx"]
 | Package Type | Size | Notes |
 |--------------|------|-------|
 | Python wheel | ~50 KB | Requires Python installed |
-| Windows exe | ~30 MB | Standalone, includes Python |
 | Linux deb | ~50 KB | Requires Python installed |
 | Docker image | ~200 MB | Includes Python runtime |
 
@@ -266,10 +208,9 @@ on: [push, pull_request]
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12']
     
     steps:

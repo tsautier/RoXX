@@ -34,14 +34,14 @@ cture with modular design
 - RESTful API endpoints
 
 #### Infrastructure
-- Multi-OS service management (systemctl/sc/launchctl)
+- Linux service management (systemd)
 - Internationalization (EN/FR)
 - PKI management (Local CA generation)
 - Comprehensive logging with loguru
 
 #### Testing & Quality
 - 35+ unit tests with pytest
-- Multi-OS testing guide
+- Linux testing guide
 - Code coverage reporting
 - Type hints throughout
 
