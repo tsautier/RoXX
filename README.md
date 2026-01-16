@@ -182,7 +182,6 @@ Features:
 - **Python 3.9+** (Required)
 - **FreeRADIUS 3.0+** (Required for production, optional for unit tests)
   - Linux/macOS: Native installation
-  - Windows: WSL2 recommended (see [FREERADIUS_WINDOWS.md](FREERADIUS_WINDOWS.md))
 - **Optional**: Active Directory, LDAP, EntraID for respective backends
 
 ---
