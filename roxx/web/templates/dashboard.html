@@ -105,9 +105,71 @@
         </div>
 
         <div class="card">
-            <h2>Recent Activity</h2>
-            <p><i>Log integration coming soon...</i></p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>Live Logs</h2>
+                <div style="font-size: 0.9rem; color: #666;">
+                    <span id="connectionStatus" style="color: orange;">Connecting...</span>
+                </div>
+            </div>
+
+            <div id="logConsole" style="
+                background: #1e1e1e; 
+                color: #d4d4d4; 
+                font-family: 'Consolas', 'Monaco', monospace; 
+                padding: 1rem; 
+                border-radius: 5px; 
+                height: 300px; 
+                overflow-y: auto; 
+                font-size: 0.9rem;
+                white-space: pre-wrap;
+            ">
+                <div style="color: #666;">Waiting for logs...</div>
+            </div>
         </div>
+
+        <script>
+            const logConsole = document.getElementById('logConsole');
+            const statusSpan = document.getElementById('connectionStatus');
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
+
+            function connect() {
+                const ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    statusSpan.textContent = '● Live';
+                    statusSpan.style.color = '#10B981'; // Green
+                    logConsole.innerHTML = ''; // Clear initial message
+                };
+
+                ws.onmessage = (event) => {
+                    const line = document.createElement('div');
+                    line.textContent = event.data;
+
+                    // Simple color highlighting
+                    if (event.data.includes('Access-Accept')) line.style.color = '#10B981';
+                    if (event.data.includes('Access-Reject')) line.style.color = '#EF4444';
+                    if (event.data.includes('Error')) line.style.color = '#EF4444';
+                    if (event.data.includes('WARNING')) line.style.color = '#F59E0B';
+
+                    logConsole.appendChild(line);
+                    logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll
+                };
+
+                ws.onclose = () => {
+                    statusSpan.textContent = '○ Disconnected (Reconnecting...)';
+                    statusSpan.style.color = '#EF4444';
+                    setTimeout(connect, 2000);
+                };
+
+                ws.onerror = (err) => {
+                    console.error('WebSocket error:', err);
+                    ws.close();
+                };
+            }
+
+            connect();
+        </script>
     </main>
 </body>
 

@@ -29,18 +29,69 @@ class SystemManager:
     
     @staticmethod
     def get_config_dir() -> Path:
-        """/etc/roxx"""
-        return Path('/etc/roxx')
+        """/etc/roxx or ROXX_CONFIG_DIR"""
+        return Path(os.getenv('ROXX_CONFIG_DIR', '/etc/roxx'))
     
     @staticmethod
     def get_data_dir() -> Path:
-        """/var/lib/roxx"""
-        return Path('/var/lib/roxx')
+        """/var/lib/roxx or ROXX_DATA_DIR"""
+        return Path(os.getenv('ROXX_DATA_DIR', '/var/lib/roxx'))
     
     @staticmethod
     def get_log_dir() -> Path:
-        """/var/log/roxx"""
-        return Path('/var/log/roxx')
+        """/var/log/roxx or ROXX_LOG_DIR"""
+        return Path(os.getenv('ROXX_LOG_DIR', '/var/log/roxx'))
+
+    @staticmethod
+    def get_radius_log_file() -> Path:
+        """/var/log/freeradius/radius.log or ROXX_RADIUS_LOG"""
+        return Path(os.getenv('ROXX_RADIUS_LOG', '/var/log/freeradius/radius.log'))
+
+    @staticmethod
+    def add_radius_user(username: str, password: str, attribute: str = "Cleartext-Password", op: str = ":=") -> bool:
+        """Adds a user to users.conf"""
+        try:
+            users_file = SystemManager.get_config_dir() / "users.conf"
+            # format: username attribute op password
+            entry = f'{username} {attribute} {op} "{password}"\n'
+            
+            # Simple append (not checking duplicates for MVP flexibility, but ideally should)
+            # Better: read, filter, append.
+            current_lines = []
+            if users_file.exists():
+                with open(users_file, 'r') as f:
+                    current_lines = f.readlines()
+            
+            # Remove existing user if any to avoid duplicates
+            clean_lines = [l for l in current_lines if not l.strip().startswith(f"{username} ")]
+            clean_lines.append(entry)
+            
+            with open(users_file, 'w') as f:
+                f.writelines(clean_lines)
+            return True
+        except Exception as e:
+            print(f"Error adding user: {e}")
+            return False
+
+    @staticmethod
+    def delete_radius_user(username: str) -> bool:
+        """Removes a user from users.conf"""
+        try:
+            users_file = SystemManager.get_config_dir() / "users.conf"
+            if not users_file.exists():
+                return False
+                
+            with open(users_file, 'r') as f:
+                lines = f.readlines()
+            
+            clean_lines = [l for l in lines if not l.strip().startswith(f"{username} ")]
+            
+            with open(users_file, 'w') as f:
+                f.writelines(clean_lines)
+            return True
+        except Exception as e:
+            print(f"Error deleting user: {e}")
+            return False
     
     @staticmethod
     def run_command(
