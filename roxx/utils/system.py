@@ -62,7 +62,12 @@ class SystemManager:
     
     @staticmethod
     def get_config_dir() -> Path:
-        """/etc/roxx or ROXX_CONFIG_DIR"""
+        """/etc/roxx or ROXX_CONFIG_DIR (Local config preferred in Dev)"""
+        # Dev Convenience: Check local config dir first
+        local_config = Path("config")
+        if local_config.exists() and local_config.is_dir():
+             return local_config.absolute()
+             
         return Path(os.getenv('ROXX_CONFIG_DIR', '/etc/roxx'))
     
     @staticmethod
