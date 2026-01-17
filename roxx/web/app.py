@@ -3,22 +3,53 @@ RoXX Web Interface - Modern FastAPI Application
 Replaces the old SimpleSAMLphp interface with a modern Python web app
 """
 
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import qrcode
 import io
 import base64
+import os
+import secrets
+import asyncio
 from pathlib import Path
+from typing import List
 
 from roxx.core.auth.totp import TOTPAuthenticator
 from roxx.utils.system import SystemManager
 
+# ------------------------------------------------------------------------------
+# Security & Authentication
+# ------------------------------------------------------------------------------
+security = HTTPBasic()
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verifies HTTP Basic Auth credentials"""
+    correct_username = os.getenv("ROXX_ADMIN_USER", "admin").encode("utf8")
+    correct_password = os.getenv("ROXX_ADMIN_PASSWORD", "admin").encode("utf8")
+    
+    is_correct_username = secrets.compare_digest(credentials.username.encode("utf8"), correct_username)
+    is_correct_password = secrets.compare_digest(credentials.password.encode("utf8"), correct_password)
+    
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+# ------------------------------------------------------------------------------
+# App Initialization
+# ------------------------------------------------------------------------------
+
 app = FastAPI(
     title="RoXX Admin Interface",
     description="Modern web interface for RoXX RADIUS Authentication Proxy",
-    version="1.0.0-beta"
+    version="1.0.0-beta2",
+    dependencies=[Depends(get_current_username)] # Secure ALL endpoints
 )
 
 # Templates directory
@@ -174,9 +205,124 @@ async def health_check():
 
 
 
+
+# ------------------------------------------------------------------------------
+# User Management API
+# ------------------------------------------------------------------------------
+@app.post("/api/users")
+async def create_user(
+    username: str = Form(...),
+    password: str = Form(...),
+    user_type: str = Form(default="Cleartext-Password")
+):
+    """Add a new user"""
+    if SystemManager.add_radius_user(username, password, user_type):
+        return {"success": True, "message": f"User {username} added"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to write to users.conf")
+
+@app.delete("/api/users/{username}")
+async def delete_user(username: str):
+    """Delete a user"""
+    if SystemManager.delete_radius_user(username):
+        return {"success": True, "message": f"User {username} deleted"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+
+# ------------------------------------------------------------------------------
+# Real-time Logs (WebSocket)
+# ------------------------------------------------------------------------------
+@app.websocket("/ws/logs")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        log_file = SystemManager.get_radius_log_file()
+        
+        # If file doesn't exist (e.g. dev env without radius), simulate logs
+        if not log_file.exists():
+            await websocket.send_text(f"Log file not found at {log_file} - Simulating logs...")
+            while True:
+                await asyncio.sleep(2)
+                await websocket.send_text(f"SIMULATED LOG: Heartbeat... {secrets.token_hex(4)}")
+                
+        # Tail the file
+        # Simple implementation: read from end
+        with open(log_file, "r") as f:
+            f.seek(0, 2) # Go to end
+            while True:
+                line = f.readline()
+                if line:
+                    await websocket.send_text(line.strip())
+                else:
+                    await asyncio.sleep(0.5)
+                    
+    except WebSocketDisconnect:
+        print("Client disconnected")
+    except Exception as e:
+        await websocket.send_text(f"Error: {str(e)}")
+
+
+
+# ------------------------------------------------------------------------------
+# User Management API
+# ------------------------------------------------------------------------------
+@app.post("/api/users")
+async def create_user(
+    username: str = Form(...),
+    password: str = Form(...),
+    user_type: str = Form(default="Cleartext-Password")
+):
+    """Add a new user"""
+    if SystemManager.add_radius_user(username, password, user_type):
+        return {"success": True, "message": f"User {username} added"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to write to users.conf")
+
+@app.delete("/api/users/{username}")
+async def delete_user(username: str):
+    """Delete a user"""
+    if SystemManager.delete_radius_user(username):
+        return {"success": True, "message": f"User {username} deleted"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+
+# ------------------------------------------------------------------------------
+# Real-time Logs (WebSocket)
+# ------------------------------------------------------------------------------
+@app.websocket("/ws/logs")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        log_file = SystemManager.get_radius_log_file()
+        
+        # If file doesn't exist (e.g. dev env without radius), simulate logs
+        if not log_file.exists():
+            await websocket.send_text(f"Log file not found at {log_file} - Simulating logs...")
+            while True:
+                await asyncio.sleep(2)
+                await websocket.send_text(f"SIMULATED LOG: Heartbeat... {secrets.token_hex(4)}")
+                
+        # Tail the file
+        # Simple implementation: read from end
+        with open(log_file, "r") as f:
+            f.seek(0, 2) # Go to end
+            while True:
+                line = f.readline()
+                if line:
+                    await websocket.send_text(line.strip())
+                else:
+                    await asyncio.sleep(0.5)
+                    
+    except WebSocketDisconnect:
+        print("Client disconnected")
+    except Exception as e:
+        await websocket.send_text(f"Error: {str(e)}")
+
+
 def main():
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 if __name__ == "__main__":
     main()
