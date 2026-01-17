@@ -5,172 +5,148 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - RoXX</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #f0f2f5;
-            margin: 0;
-            padding: 0;
-        }
-
-        header {
-            background: #1E3A8A;
-            color: white;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        header a {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        main {
-            padding: 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        h2 {
-            margin-top: 0;
-            color: #1E3A8A;
-        }
-
         .status-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
+            gap: 1.5rem;
         }
 
         .status-item {
             text-align: center;
-            padding: 1rem;
+            padding: 1.5rem;
             background: #f8fafc;
-            border-radius: 8px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
         }
 
         .status-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #06B6D4;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin-top: 0.5rem;
         }
 
-        .back-link {
-            display: inline-block;
-            margin-bottom: 1rem;
-            color: #666;
-            text-decoration: none;
+        #logConsole {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Monaco', monospace;
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            height: 400px;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <img src="/static/img/logo.png" alt="RoXX"
-                style="height: 40px; background: rgba(255,255,255,0.1); border-radius: 5px; padding: 5px;">
-            <h1 style="margin: 0;">Dashboard</h1>
+    <header class="app-header">
+        <div class="brand">
+            <img src="/static/img/logo.png" alt="RoXX Logo">
+            <span>Dashboard</span>
         </div>
-        <a href="/">back to Home</a>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <a href="/" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back</a>
+            <a href="/logout" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Logout</a>
+        </div>
     </header>
-    <main>
-        <div class="card">
-            <h2>System Status</h2>
+
+    <main class="main-container">
+        <div class="card" style="margin-bottom: 2rem;">
+            <h2 style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                System Status</h2>
             <div class="status-grid">
                 <div class="status-item">
-                    <div>OS</div>
-                    <div class="status-value">{{ os_type }}</div>
+                    <div
+                        style="color: var(--text-light); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        OS</div>
+                    <div class="status-value" style="color: var(--primary-light);">{{ os_type }}</div>
                 </div>
                 <div class="status-item">
-                    <div>FreeRADIUS</div>
-                    <div class="status-value" style="color: {{ 'green' if radius_status == 'UP' else 'red' }}">{{
-                        radius_status }}</div>
+                    <div
+                        style="color: var(--text-light); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        FreeRADIUS</div>
+                    <div class="status-value"
+                        style="color: {{ 'var(--success-color)' if radius_status == 'UP' else 'var(--danger-color)' }}">
+                        {{ radius_status }}</div>
                 </div>
                 <div class="status-item">
-                    <div>Uptime</div>
-                    <div class="status-value">{{ uptime }}</div>
+                    <div
+                        style="color: var(--text-light); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Uptime</div>
+                    <div class="status-value" style="color: var(--text-main); font-size: 1.25rem;">{{ uptime }}</div>
                 </div>
             </div>
         </div>
 
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h2>Live Logs</h2>
-                <div style="font-size: 0.9rem; color: #666;">
-                    <span id="connectionStatus" style="color: orange;">Connecting...</span>
+                <h2 style="margin: 0;">Live Logs</h2>
+                <div style="font-size: 0.9rem; font-weight: 600;">
+                    <span id="connectionStatus" style="color: #f59e0b;">Connecting...</span>
                 </div>
             </div>
 
-            <div id="logConsole" style="
-                background: #1e1e1e; 
-                color: #d4d4d4; 
-                font-family: 'Consolas', 'Monaco', monospace; 
-                padding: 1rem; 
-                border-radius: 5px; 
-                height: 300px; 
-                overflow-y: auto; 
-                font-size: 0.9rem;
-                white-space: pre-wrap;
-            ">
-                <div style="color: #666;">Waiting for logs...</div>
+            <div id="logConsole">
+                <div style="color: #666; font-style: italic;">Waiting for logs...</div>
             </div>
         </div>
-
-        <script>
-            const logConsole = document.getElementById('logConsole');
-            const statusSpan = document.getElementById('connectionStatus');
-            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
-
-            function connect() {
-                const ws = new WebSocket(wsUrl);
-
-                ws.onopen = () => {
-                    statusSpan.textContent = '● Live';
-                    statusSpan.style.color = '#10B981'; // Green
-                    logConsole.innerHTML = ''; // Clear initial message
-                };
-
-                ws.onmessage = (event) => {
-                    const line = document.createElement('div');
-                    line.textContent = event.data;
-
-                    // Simple color highlighting
-                    if (event.data.includes('Access-Accept')) line.style.color = '#10B981';
-                    if (event.data.includes('Access-Reject')) line.style.color = '#EF4444';
-                    if (event.data.includes('Error')) line.style.color = '#EF4444';
-                    if (event.data.includes('WARNING')) line.style.color = '#F59E0B';
-
-                    logConsole.appendChild(line);
-                    logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll
-                };
-
-                ws.onclose = () => {
-                    statusSpan.textContent = '○ Disconnected (Reconnecting...)';
-                    statusSpan.style.color = '#EF4444';
-                    setTimeout(connect, 2000);
-                };
-
-                ws.onerror = (err) => {
-                    console.error('WebSocket error:', err);
-                    ws.close();
-                };
-            }
-
-            connect();
-        </script>
     </main>
+
+    <footer class="app-footer">
+        roxx v{{ version }}
+    </footer>
+
+    <script>
+        const logConsole = document.getElementById('logConsole');
+        const statusSpan = document.getElementById('connectionStatus');
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
+
+        function connect() {
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusSpan.textContent = '● Live';
+                statusSpan.style.color = '#10B981'; // Green
+                logConsole.innerHTML = ''; // Clear initial message
+            };
+
+            ws.onmessage = (event) => {
+                const line = document.createElement('div');
+                line.textContent = event.data;
+
+                // Simple color highlighting
+                if (event.data.includes('Access-Accept')) line.style.color = '#10B981';
+                if (event.data.includes('Access-Reject')) line.style.color = '#EF4444';
+                if (event.data.includes('Error')) line.style.color = '#EF4444';
+                if (event.data.includes('WARNING')) line.style.color = '#F59E0B';
+
+                logConsole.appendChild(line);
+                logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll
+            };
+
+            ws.onclose = () => {
+                statusSpan.textContent = '○ Disconnected (Reconnecting...)';
+                statusSpan.style.color = '#EF4444';
+                setTimeout(connect, 2000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+                ws.close();
+            };
+        }
+
+        connect();
+    </script>
 </body>
 
 </html>

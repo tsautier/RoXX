@@ -5,92 +5,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuration - RoXX</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #f0f2f5;
-            margin: 0;
-            padding: 0;
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        header {
-            background: #DC2626;
-            color: white;
-            padding: 1rem 2rem;
+        .file-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: #f8fafc;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            transition: border-color 0.2s;
         }
 
-        header a {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
+        .file-item:hover {
+            border-color: var(--accent-color);
         }
 
-        main {
-            padding: 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
+        .file-name {
+            font-weight: 600;
+            color: var(--text-main);
         }
 
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        h2 {
-            margin-top: 0;
-            color: #DC2626;
-        }
-
-        .file-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .file-list li {
-            padding: 0.75rem 0;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .path {
-            font-family: monospace;
-            color: #4b5563;
+        .file-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: var(--text-light);
+            background: #eee;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <h1>⚙️ Configuration</h1>
-        <a href="/">back to Home</a>
+    <header class="app-header">
+        <div class="brand">
+            <img src="/static/img/logo.png" alt="RoXX Logo">
+            <span>Configuration</span>
+        </div>
+        <div>
+            <a href="/" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back</a>
+        </div>
     </header>
-    <main>
+
+    <main class="main-container">
         <div class="card">
-            <h2>Config Files</h2>
-            <ul class="file-list">
-                <li>
-                    <span>Main Configuration</span>
-                    <span class="path">/etc/roxx/roxx.conf</span>
-                </li>
-                <li>
-                    <span>Users</span>
-                    <span class="path">/etc/roxx/users.conf</span>
-                </li>
-                <li>
-                    <span>RADIUS Clients</span>
-                    <span class="path">/etc/roxx/radius_clients.conf</span>
-                </li>
-            </ul>
-            <p><i>Note: Configuration editing is currently restricted to the CLI tool or manual file editing.</i></p>
+            <h2 style="margin-bottom: 2rem;">Configuration Files</h2>
+            <div class="file-list">
+                <div class="file-item">
+                    <span class="file-name">Main Configuration</span>
+                    <span class="file-path">/etc/roxx/roxx.conf</span>
+                </div>
+                <div class="file-item">
+                    <span class="file-name">Users Database</span>
+                    <span class="file-path">/etc/roxx/users.conf</span>
+                </div>
+                <div class="file-item">
+                    <span class="file-name">RADIUS Clients</span>
+                    <span class="file-path">/etc/roxx/radius_clients.conf</span>
+                </div>
+            </div>
+
+            <div class="alert"
+                style="background: #eff6ff; border: 1px solid #dbeafe; color: #1e40af; margin-top: 2rem;">
+                <strong>Note:</strong> Configuration editing is currently restricted to the CLI tool or manual file
+                editing via SSH. web-based editing coming soon.
+            </div>
         </div>
     </main>
+
+    <footer class="app-footer">
+        roxx v{{ version }}
+    </footer>
 </body>
 
 </html>
