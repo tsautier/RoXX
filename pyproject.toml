@@ -17,6 +17,12 @@ dependencies = [
     "loguru>=0.7.0",
     "msal>=1.24.0",
     "ldap3>=2.9.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "python-multipart>=0.0.6",
+    "jinja2>=3.1.0",
+    "qrcode>=7.0",
+    "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +32,7 @@ dev = ["pytest>=7.0.0", "black>=23.0.0", "ruff>=0.1.0"]
 roxx = "roxx.__main__:main"
 roxx-console = "roxx.cli.console:main"
 roxx-setup = "roxx.cli.setup:main"
+roxx-web = "roxx.web.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
