@@ -367,6 +367,50 @@ async def health_check():
 
 
 # ------------------------------------------------------------------------------
+# Admin Management API
+# ------------------------------------------------------------------------------
+@app.get("/admins", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def admins_page(request: Request):
+    """Admin management page"""
+    is_admin = True # Todo: Check if super-admin? For now all admins are equal.
+    admins_list = AuthManager.list_admins()
+    
+    return templates.TemplateResponse("admins.html", {
+        "request": request,
+        "admins": admins_list,
+        "version": VERSION
+    })
+
+@app.post("/api/admins", dependencies=[Depends(get_current_username)])
+async def create_admin(
+    username: str = Form(...),
+    password: str = Form(None),
+    auth_source: str = Form("local")
+):
+    """Create a new admin"""
+    # Validation
+    if auth_source == "local" and not password:
+        raise HTTPException(status_code=400, detail="Password required for local auth")
+    
+    success, message = AuthManager.create_admin(username, password, auth_source)
+    if success:
+        return {"success": True, "message": message}
+    else:
+        raise HTTPException(status_code=400, detail=message)
+
+@app.delete("/api/admins/{username}", dependencies=[Depends(get_current_username)])
+async def delete_admin(username: str, current_user: str = Depends(get_current_username)):
+    """Delete an admin"""
+    if username == current_user:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+        
+    success, message = AuthManager.delete_admin(username)
+    if success:
+        return {"success": True, "message": message}
+    else:
+        raise HTTPException(status_code=400, detail=message)
+
+# ------------------------------------------------------------------------------
 # User Management API
 # ------------------------------------------------------------------------------
 @app.post("/api/users", dependencies=[Depends(get_current_username)])

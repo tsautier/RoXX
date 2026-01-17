@@ -25,14 +25,27 @@ class AdminDatabase:
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             username TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL,
+            password_hash TEXT,
             email TEXT,
             mfa_secret TEXT,
-            must_change_password INTEGER DEFAULT 1,
+            must_change_password INTEGER DEFAULT 0,
+            auth_source TEXT DEFAULT 'local',
+            external_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP
         )
         ''')
+        
+        # Simple migration: Add columns if missing (sqlite doesn't support IF NOT EXISTS for ADD COLUMN)
+        try:
+            cursor.execute("ALTER TABLE admins ADD COLUMN auth_source TEXT DEFAULT 'local'")
+        except sqlite3.OperationalError:
+            pass
+            
+        try:
+            cursor.execute("ALTER TABLE admins ADD COLUMN external_id TEXT")
+        except sqlite3.OperationalError:
+            pass
         
         conn.commit()
         conn.close()

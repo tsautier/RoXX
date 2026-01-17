@@ -25,6 +25,9 @@ dependencies = [
     "pillow>=10.0.0",
     "websockets>=11.0",
     "bcrypt>=4.0.0",
+    "ldap3>=2.9.0",
+    "python3-saml>=1.15.0",
+
 
 
 ]

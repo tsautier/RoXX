@@ -43,10 +43,10 @@ class AuthManager:
         conn.close()
 
     @staticmethod
-    def verify_credentials(username, password):
+    def verify_credentials(username, password=None):
         """
-        Verify username and password.
-        Returns: 
+        Verify username and password (or just existence for SSO).
+        Returns:
            (success: bool, user_data: dict or None)
         """
         conn = AdminDatabase.get_connection()
@@ -60,20 +60,47 @@ class AuthManager:
         if not user:
             logger.warning(f"User {username} not found")
             return False, None
-
-        # Verify password
-        try:
-            stored_hash = user["password_hash"].encode('utf-8')
-            password_bytes = password.encode('utf-8')
             
-            # logger.info(f"Verifying {username}. Stored hash start: {user['password_hash'][:10]}...")
-            
-            if not bcrypt.checkpw(password_bytes, stored_hash):
-                logger.warning(f"Password mismatch for {username}")
+        auth_source = user["auth_source"]
+        
+        # 1. Local Auth
+        if auth_source == 'local':
+            if not password:
                 return False, None
-        except Exception as e:
-            logger.error(f"Password check failed: {e}")
-            return False, None
+            try:
+                stored_hash = user["password_hash"].encode('utf-8')
+                password_bytes = password.encode('utf-8')
+                if not bcrypt.checkpw(password_bytes, stored_hash):
+                    logger.warning(f"Password mismatch for {username}")
+                    return False, None
+            except Exception as e:
+                logger.error(f"Password check failed: {e}")
+                return False, None
+
+        # 2. LDAP Auth
+        elif auth_source == 'ldap':
+            if not password:
+                return False, None
+            
+            try:
+                from roxx.core.auth.ldap import LdapProvider
+                if LdapProvider.verify_credentials(username, password):
+                    return True, dict(user)
+                else:
+                    logger.warning(f"LDAP verification failed for {username}")
+                    return False, None
+            except ImportError:
+                 logger.error("ldap3 library not installed")
+                 return False, None
+            except Exception as e:
+                 logger.error(f"LDAP Auth Error: {e}")
+                 return False, None
+
+        # 3. SAML Auth (No password check here, usually done via ACS)
+        elif auth_source == 'saml':
+             # SAML login is handled via /auth/saml/acs, not here usually.
+             # If we are here, it might be a re-check or error.
+             pass
 
         # Update last login
         try:
@@ -85,6 +112,59 @@ class AuthManager:
             pass
 
         return True, dict(user)
+
+    @staticmethod
+    def create_admin(username, password=None, auth_source='local', external_id=None):
+        """Create a new admin user"""
+        conn = AdminDatabase.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            pw_hash = None
+            if auth_source == 'local' and password:
+                pw_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            cursor.execute("""
+                INSERT INTO admins (username, password_hash, auth_source, external_id, must_change_password)
+                VALUES (?, ?, ?, ?, ?)
+            """, (username, pw_hash, auth_source, external_id, 1 if auth_source == 'local' else 0))
+            conn.commit()
+            return True, "User created"
+        except sqlite3.IntegrityError:
+            return False, "Username already exists"
+        except Exception as e:
+            return False, str(e)
+        finally:
+            conn.close()
+
+    @staticmethod
+    def list_admins():
+        """List all admin users"""
+        conn = AdminDatabase.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, email, auth_source, last_login FROM admins")
+        users = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return users
+
+    @staticmethod
+    def delete_admin(username):
+        """Delete an admin user"""
+        if username == 'admin': # Prevent deleting default admin
+             return False, "Cannot delete default admin"
+             
+        conn = AdminDatabase.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM admins WHERE username = ?", (username,))
+            conn.commit()
+            return True, "User deleted"
+        except Exception as e:
+            return False, str(e)
+        finally:
+            conn.close()
+
 
     @staticmethod
     def check_password_complexity(password: str) -> tuple[bool, str]:
