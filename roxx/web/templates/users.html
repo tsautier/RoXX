@@ -74,6 +74,25 @@
     </header>
     <main>
         <div class="card">
+            <h2>Add New User</h2>
+            <form id="addUserForm" style="display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1rem;">
+                <div style="flex: 1;">
+                    <label>Username</label>
+                    <input type="text" name="username" required
+                        style="width: 100%; padding: 0.5rem; margin-top: 0.25rem;">
+                </div>
+                <div style="flex: 1;">
+                    <label>Password</label>
+                    <input type="password" name="password" required
+                        style="width: 100%; padding: 0.5rem; margin-top: 0.25rem;">
+                </div>
+                <button type="submit"
+                    style="background: #059669; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 5px; cursor: pointer;">Add
+                    User</button>
+            </form>
+        </div>
+
+        <div class="card">
             <h2>Local Users</h2>
             <p>Users defined in <code>users.conf</code></p>
             <table>
@@ -84,18 +103,60 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="userTableBody">
                     {% for user in users %}
                     <tr>
                         <td>{{ user }}</td>
                         <td>Cleartext-Password</td>
-                        <td><button disabled>Edit (CLI only)</button></td>
+                        <td>
+                            <button onclick="deleteUser('{{ user }}')"
+                                style="background: #EF4444; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer;">Delete</button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </main>
+
+    <script>
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to add user');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error submitting form');
+            }
+        });
+
+        async function deleteUser(username) {
+            if (!confirm(`Are you sure you want to delete ${username}?`)) return;
+
+            try {
+                const response = await fetch(`/api/users/${username}`, {
+                    method: 'DELETE'
+                });
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete user');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error deleting user');
+            }
+        }
+    </script>
 </body>
 
 </html>
