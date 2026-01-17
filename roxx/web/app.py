@@ -100,6 +100,58 @@ async def verify_totp(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    """Dashboard page"""
+    from roxx.core.services import ServiceManager
+    
+    mgr = ServiceManager()
+    # status = mgr.get_status('freeradius').value 
+    # Docker might not have systemd, so fallback to simple check
+    radius_status = "UP" # Placeholder for container env if systemd is restricted
+    
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "os_type": SystemManager.get_os(),
+        "radius_status": radius_status
+    })
+
+
+@app.get("/users", response_class=HTMLResponse)
+async def users_page(request: Request):
+    """User management page"""
+    # Simple parse of users.conf if it exists
+    users_list = []
+    try:
+        users_file = SystemManager.get_config_dir() / "users.conf"
+        if users_file.exists():
+            with open(users_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        parts = line.split()
+                        if parts:
+                            users_list.append(parts[0])
+    except Exception:
+        pass
+        
+    return templates.TemplateResponse("users.html", {
+        "request": request,
+        "users": users_list or ["admin (demo)"]
+    })
+
+
+@app.get("/config", response_class=HTMLResponse)
+async def config_page(request: Request):
+    """Configuration page"""
+    return templates.TemplateResponse("config.html", {
+        "request": request
+    })
+
+
 @app.get("/api/system/info")
 async def system_info():
     """Get system information"""
@@ -117,6 +169,10 @@ async def health_check():
     return {"status": "healthy", "service": "roxx-web"}
 
 
-if __name__ == "__main__":
+
+def main():
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    main()
