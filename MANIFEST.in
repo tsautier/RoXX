@@ -18,6 +18,8 @@ recursive-include roxx *.py
 # Include config files
 recursive-include roxx/config *.json
 recursive-include roxx/web/templates *
+recursive-include roxx/web/static *
+
 
 # Exclude tests and cache
 recursive-exclude tests *
