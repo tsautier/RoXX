@@ -6,19 +6,52 @@ Provides Linux-specific abstractions for system operations
 import os
 import platform
 import subprocess
+import psutil
+import datetime
 from pathlib import Path
 from typing import Optional
-
-
 
 class SystemManager:
     """Linux System Utilities"""
     
     @staticmethod
     def get_os() -> str:
-        """Returns the operating system name"""
-        return 'linux'
-    
+        """Returns the operating system description"""
+        try:
+            # Try to get pretty name from os-release
+            if Path("/etc/os-release").exists():
+                with open("/etc/os-release") as f:
+                    for line in f:
+                        if line.startswith("PRETTY_NAME="):
+                            return line.split("=")[1].strip().strip('"')
+            
+            # Fallback to platform
+            return platform.system() + " " + platform.release()
+        except:
+            return "Linux (Unknown)"
+            
+    @staticmethod
+    def get_uptime() -> str:
+        """Returns system uptime string"""
+        try:
+            boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
+            uptime = datetime.datetime.now() - boot_time
+            # Format: "2 days, 4:32:01"
+            return str(uptime).split('.')[0]
+        except:
+            return "Unknown"
+
+    @staticmethod
+    def is_service_running(service_name: str) -> bool:
+        """Checks if a process is running"""
+        try:
+            for proc in psutil.process_iter(['name']):
+                if service_name in proc.info['name']:
+                    return True
+            return False
+        except:
+            return False
+
     @staticmethod
     def is_admin() -> bool:
         """Checks if the program is running with root privileges"""

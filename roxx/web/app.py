@@ -141,17 +141,17 @@ async def verify_totp(
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Dashboard page"""
-    from roxx.core.services import ServiceManager
+    from roxx.core.services import ServiceManager as SvcMgr
     
-    mgr = ServiceManager()
-    # status = mgr.get_status('freeradius').value 
-    # Docker might not have systemd, so fallback to simple check
-    radius_status = "UP" # Placeholder for container env if systemd is restricted
+    # Check FreeRADIUS status (process name usually 'freeradius' or 'radiusd')
+    radius_active = SystemManager.is_service_running('freeradius') or SystemManager.is_service_running('radiusd')
+    radius_status = "UP" if radius_active else "DOWN"
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "os_type": SystemManager.get_os(),
-        "radius_status": radius_status
+        "radius_status": radius_status,
+        "uptime": SystemManager.get_uptime()
     })
 
 
@@ -194,7 +194,8 @@ async def system_info():
         "os": SystemManager.get_os(),
         "is_admin": SystemManager.is_admin(),
         "config_dir": str(SystemManager.get_config_dir()),
-        "version": "1.0.0-beta"
+        "uptime": SystemManager.get_uptime(),
+        "version": "1.0.0-beta2"
     })
 
 
@@ -202,121 +203,6 @@ async def system_info():
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "roxx-web"}
-
-
-
-
-# ------------------------------------------------------------------------------
-# User Management API
-# ------------------------------------------------------------------------------
-@app.post("/api/users")
-async def create_user(
-    username: str = Form(...),
-    password: str = Form(...),
-    user_type: str = Form(default="Cleartext-Password")
-):
-    """Add a new user"""
-    if SystemManager.add_radius_user(username, password, user_type):
-        return {"success": True, "message": f"User {username} added"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to write to users.conf")
-
-@app.delete("/api/users/{username}")
-async def delete_user(username: str):
-    """Delete a user"""
-    if SystemManager.delete_radius_user(username):
-        return {"success": True, "message": f"User {username} deleted"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to delete user")
-
-# ------------------------------------------------------------------------------
-# Real-time Logs (WebSocket)
-# ------------------------------------------------------------------------------
-@app.websocket("/ws/logs")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        log_file = SystemManager.get_radius_log_file()
-        
-        # If file doesn't exist (e.g. dev env without radius), simulate logs
-        if not log_file.exists():
-            await websocket.send_text(f"Log file not found at {log_file} - Simulating logs...")
-            while True:
-                await asyncio.sleep(2)
-                await websocket.send_text(f"SIMULATED LOG: Heartbeat... {secrets.token_hex(4)}")
-                
-        # Tail the file
-        # Simple implementation: read from end
-        with open(log_file, "r") as f:
-            f.seek(0, 2) # Go to end
-            while True:
-                line = f.readline()
-                if line:
-                    await websocket.send_text(line.strip())
-                else:
-                    await asyncio.sleep(0.5)
-                    
-    except WebSocketDisconnect:
-        print("Client disconnected")
-    except Exception as e:
-        await websocket.send_text(f"Error: {str(e)}")
-
-
-
-# ------------------------------------------------------------------------------
-# User Management API
-# ------------------------------------------------------------------------------
-@app.post("/api/users")
-async def create_user(
-    username: str = Form(...),
-    password: str = Form(...),
-    user_type: str = Form(default="Cleartext-Password")
-):
-    """Add a new user"""
-    if SystemManager.add_radius_user(username, password, user_type):
-        return {"success": True, "message": f"User {username} added"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to write to users.conf")
-
-@app.delete("/api/users/{username}")
-async def delete_user(username: str):
-    """Delete a user"""
-    if SystemManager.delete_radius_user(username):
-        return {"success": True, "message": f"User {username} deleted"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to delete user")
-
-# ------------------------------------------------------------------------------
-# Real-time Logs (WebSocket)
-# ------------------------------------------------------------------------------
-@app.websocket("/ws/logs")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        log_file = SystemManager.get_radius_log_file()
-        
-        # If file doesn't exist (e.g. dev env without radius), simulate logs
-        if not log_file.exists():
-            await websocket.send_text(f"Log file not found at {log_file} - Simulating logs...")
-            while True:
-                await asyncio.sleep(2)
-                await websocket.send_text(f"SIMULATED LOG: Heartbeat... {secrets.token_hex(4)}")
-                
-        # Tail the file
-        # Simple implementation: read from end
-        with open(log_file, "r") as f:
-            f.seek(0, 2) # Go to end
-            while True:
-                line = f.readline()
-                if line:
-                    await websocket.send_text(line.strip())
-                else:
-                    await asyncio.sleep(0.5)
-                    
-    except WebSocketDisconnect:
-        print("Client disconnected")
-    except Exception as e:
-        await websocket.send_text(f"Error: {str(e)}")
 
 
 def main():
