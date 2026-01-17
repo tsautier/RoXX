@@ -1,5 +1,9 @@
 # RoXX
 
+<p align="center">
+  <img src="assets/logo.png" alt="RoXX Logo" width="200"/>
+</p>
+
 
 **R**adius **O**pen e**X**tensible e**X**change - Version 1.0.0-beta2
 
