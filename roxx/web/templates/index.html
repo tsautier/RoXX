@@ -29,8 +29,9 @@
 
         .logo {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 1rem;
+            gap: 0.5rem;
         }
 
         .logo h1 {
@@ -112,11 +113,8 @@
 <body>
     <header>
         <div class="logo">
-            <img src="/static/img/logo.png" alt="RoXX Logo" style="height: 60px;">
-            <div>
-                <h1>RoXX</h1>
-                <span>v1.0.0-beta2</span>
-            </div>
+            <img src="/static/img/logo.png" alt="RoXX Logo" style="height: 120px;">
+            <span style="display: block; margin-top: 10px; color: #06B6D4;">v1.0.0-beta2</span>
         </div>
     </header>
 
