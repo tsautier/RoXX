@@ -25,6 +25,66 @@ Modern Python-based RADIUS proxy for Linux with advanced authentication backends
 
 ---
 
+## 🔀 Authentication Flows
+
+### 1. Standard MFA Flow (VPN/SSH)
+Classic scenario where **RoXX** validates the primary password against Active Directory/LDAP, then challenges the user for MFA (TOTP or inWebo Push).
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant NAS as VPN/Switch
+    participant RoXX
+    participant LDAP as AD/LDAP
+    participant MFA as inWebo/TOTP
+
+    User->>NAS: Login (User + Pwd)
+    NAS->>RoXX: RADIUS Access-Request
+    RoXX->>LDAP: Validate Credentials
+    
+    alt Credentials Invalid
+        LDAP-->>RoXX: Reject
+        RoXX-->>NAS: Access-Reject
+    else Credentials Valid
+        LDAP-->>RoXX: OK
+        RoXX->>MFA: Trigger Push / Verify Code
+        
+        alt MFA Success
+            MFA-->>RoXX: OK
+            RoXX-->>NAS: Access-Accept
+        else MFA Failure/Timeout
+            MFA-->>RoXX: Fail
+            RoXX-->>NAS: Access-Reject
+        end
+    end
+```
+
+### 2. Cloud Identity Flow (WiFi 802.1X)
+Modern scenario where **RoXX** acts as a bridge between legacy EAP-PEAP WiFi infrastructure and cloud-native **EntraID** (Azure AD).
+
+```mermaid
+sequenceDiagram
+    participant Device as Laptop/Phone
+    participant WiFi as Access Point
+    participant RoXX
+    participant EntraID as Azure AD
+
+    Device->>WiFi: Connect (EAP-PEAP)
+    WiFi->>RoXX: TLS Tunnel Establishment
+    RoXX->>EntraID: Authenticate (MSAL/Graph API)
+    
+    alt EntraID Auth Success
+        EntraID-->>RoXX: Token + Groups
+        RoXX-->>WiFi: Access-Accept (VLAN Assignment)
+        WiFi-->>Device: Connected
+    else Auth Fail
+        EntraID-->>RoXX: Error
+        RoXX-->>WiFi: Access-Reject
+    end
+```
+
+---
+
 ## 🚀 Quick Start
 
 ## 🐳 Docker Deployment
