@@ -5,153 +5,94 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - RoXX</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1E3A8A 0%, #06B6D4 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        header {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 1.5rem 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .logo {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .logo h1 {
+        /* Specific overrides for Home cards with gradients */
+        .card-home {
             color: white;
-            font-size: 2rem;
-            font-weight: 700;
-        }
-
-        .logo span {
-            color: #06B6D4;
-            font-size: 0.9rem;
-        }
-
-        main {
-            flex: 1;
+            border: none;
             display: flex;
+            flex-direction: column;
             justify-content: center;
-            align-items: center;
-            padding: 2rem;
+            min-height: 160px;
         }
 
-        .container {
-            background: white;
-            border-radius: 20px;
-            padding: 3rem;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 800px;
-            width: 100%;
-        }
-
-        h2 {
-            color: #1E3A8A;
-            margin-bottom: 2rem;
-            font-size: 2rem;
-        }
-
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-
-        .card {
-            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+        .card-home h3 {
             color: white;
-            padding: 2rem;
-            border-radius: 15px;
-            text-decoration: none;
-            transition: transform 0.3s, box-shadow 0.3s;
-            cursor: pointer;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .card h3 {
-            font-size: 1.5rem;
             margin-bottom: 0.5rem;
+            font-size: 1.4rem;
         }
 
-        .card p {
-            opacity: 0.9;
+        .card-home p {
+            color: rgba(255, 255, 255, 0.9);
             font-size: 0.95rem;
         }
 
-        footer {
-            background: rgba(0, 0, 0, 0.2);
-            color: white;
-            text-align: center;
-            padding: 1rem;
-            margin-top: auto;
+        .bg-gradient-blue {
+            background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+        }
+
+        .bg-gradient-green {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        }
+
+        .bg-gradient-purple {
+            background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+        }
+
+        .bg-gradient-red {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <div class="logo">
-            <img src="/static/img/logo.png" alt="RoXX Logo" style="height: 120px;">
-            <span style="display: block; margin-top: 10px; color: #06B6D4;">v1.0.0-beta2</span>
+    <header class="app-header">
+        <div class="brand">
+            <img src="/static/img/logo.png" alt="RoXX Logo">
+            <span>Admin Console</span>
+        </div>
+        <div>
+            <a href="/logout" class="btn btn-outline">Logout</a>
         </div>
     </header>
 
-    <main>
-        <div class="container">
-            <h2>Welcome to RoXX Admin Interface</h2>
-            <p style="color: #666; margin-bottom: 2rem;">
-                Modern RADIUS Authentication Proxy - Linux Edition
+    <main class="main-container">
+        <div style="margin-bottom: 3rem; text-align: center;">
+            <h2 style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--primary-color);">Welcome to RoXX</h2>
+            <p style="color: var(--text-light); font-size: 1.1rem;">Modern RADIUS Authentication Proxy - Linux Edition
             </p>
+        </div>
 
-            <div class="card-grid">
-                <a href="/totp/enroll" class="card">
-                    <h3>📱 TOTP Enrollment</h3>
-                    <p>Generate QR codes for Google Authenticator, Microsoft Authenticator, etc.</p>
-                </a>
+        <div class="card-grid">
+            <a href="/totp/enroll" class="card card-home bg-gradient-blue">
+                <h3>📱 TOTP Enrollment</h3>
+                <p>Generate QR codes for Google Authenticator, Microsoft Authenticator & more.</p>
+            </a>
 
-                <a href="/users" class="card" style="background: linear-gradient(135deg, #059669 0%, #10B981 100%);">
-                    <h3>👥 User Management</h3>
-                    <p>Manage local users and authentication settings</p>
-                </a>
+            <a href="/users" class="card card-home bg-gradient-green">
+                <h3>👥 User Management</h3>
+                <p>Manage local users, passwords, and assigned groups.</p>
+            </a>
 
-                <a href="/dashboard" class="card"
-                    style="background: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);">
-                    <h3>📊 Dashboard</h3>
-                    <p>View authentication logs and statistics</p>
-                </a>
+            <a href="/dashboard" class="card card-home bg-gradient-purple">
+                <h3>📊 Dashboard</h3>
+                <p>Real-time authentication logs, system health, and statistics.</p>
+            </a>
 
-                <a href="/config" class="card" style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);">
-                    <h3>⚙️ Configuration</h3>
-                    <p>Configure RADIUS clients and backends</p>
-                </a>
-            </div>
+            <a href="/config" class="card card-home bg-gradient-red">
+                <h3>⚙️ Configuration</h3>
+                <p>Configure RADIUS clients, backends, and system settings.</p>
+            </a>
         </div>
     </main>
 
-    <footer>
-        <p>&copy; 2026 RoXX - Linux RADIUS Authentication Proxy</p>
+    <footer class="app-footer">
+        <p>&copy; 2026 RoXX - Linux RADIUS Authentication Proxy <span style="opacity: 0.6; margin-left: 10px;">v{{
+                version }}</span></p>
     </footer>
 </body>
 
