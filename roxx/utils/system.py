@@ -62,13 +62,22 @@ class SystemManager:
     
     @staticmethod
     def get_config_dir() -> Path:
-        """/etc/roxx or ROXX_CONFIG_DIR (Local config preferred in Dev)"""
+        """
+        Returns config directory.
+        Priority:
+        1. ROXX_CONFIG_DIR environment variable
+        2. Local 'config' directory (Dev convenience)
+        3. /etc/roxx (Default)
+        """
+        if 'ROXX_CONFIG_DIR' in os.environ:
+            return Path(os.environ['ROXX_CONFIG_DIR'])
+            
         # Dev Convenience: Check local config dir first
         local_config = Path("config")
         if local_config.exists() and local_config.is_dir():
              return local_config.absolute()
              
-        return Path(os.getenv('ROXX_CONFIG_DIR', '/etc/roxx'))
+        return Path('/etc/roxx')
     
     @staticmethod
     def get_data_dir() -> Path:
