@@ -73,7 +73,7 @@ class ServiceManager:
         try:
             subprocess.run(['systemctl', 'start', service_name], check=True, timeout=10)
             return True
-        except subprocess.CalledProcessError:
+        except Exception:
             return False
 
     def stop(self, service: str) -> bool:
@@ -82,7 +82,7 @@ class ServiceManager:
         try:
             subprocess.run(['systemctl', 'stop', service_name], check=True, timeout=10)
             return True
-        except subprocess.CalledProcessError:
+        except Exception:
             return False
 
     def restart(self, service: str) -> bool:
@@ -91,7 +91,7 @@ class ServiceManager:
         try:
             subprocess.run(['systemctl', 'restart', service_name], check=True, timeout=10)
             return True
-        except subprocess.CalledProcessError:
+        except Exception:
             return False
 
     def get_all_services_status(self) -> dict:
