@@ -24,6 +24,9 @@ dependencies = [
     "qrcode>=7.0",
     "pillow>=10.0.0",
     "websockets>=11.0",
+    "bcrypt>=4.0.0",
+
+
 ]
 
 [project.optional-dependencies]

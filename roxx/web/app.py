@@ -37,7 +37,7 @@ from roxx.utils.system import SystemManager
 # App Initialization
 # ------------------------------------------------------------------------------
 
-VERSION = "1.0.0-beta2"
+VERSION = "1.0.0-rc1"
 
 app = FastAPI(
     title="RoXX Admin Interface",
@@ -57,96 +57,60 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # ------------------------------------------------------------------------------
 # Auth Logic (Hybrid: Cookie + Basic)
 # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Auth Logic (Database Backed)
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Auth Logic (Database Backed)
+# ------------------------------------------------------------------------------
 from fastapi.responses import RedirectResponse
 from fastapi.security.utils import get_authorization_scheme_param
+from roxx.core.auth.manager import AuthManager
+
+# Initialize Auth Subsystem on startup
+AuthManager.init()
 
 async def get_current_username(request: Request):
     """
-    Verifies authentication. 
-    1. Checks for 'session' cookie (Browser)
-    2. Checks for Basic Auth header (API/Script)
-    3. If HTML requested, redirect to /login
-    4. Else (API), raise 401
+    Verifies authentication via Session Cookie.
+    Enforces 'active' status for general access.
     """
-    correct_username = os.getenv("ROXX_ADMIN_USER", "admin").encode("utf8")
-    correct_password = os.getenv("ROXX_ADMIN_PASSWORD", "admin").encode("utf8")
-
     # 1. Check Cookie
     session_cookie = request.cookies.get("session")
     if session_cookie:
         try:
-            # In a real app, this would be a signed JWT. 
-            # For this MVP, it's a simple base64 "user:pass" string (same as Basic Auth but in cookie)
             decoded = base64.b64decode(session_cookie).decode("utf-8")
-            username, password = decoded.split(":")
-            
-            is_correct_username = secrets.compare_digest(username.encode("utf8"), correct_username)
-            is_correct_password = secrets.compare_digest(password.encode("utf8"), correct_password)
-            
-            if is_correct_username and is_correct_password:
-                return username
+            if ":" in decoded:
+                username, status = decoded.split(":", 1)
+                # Only allow 'active' sessions for general routes
+                if username and status == 'active':
+                    return username
         except:
-            pass # Invalid cookie, fall through
+            pass 
 
-    # 2. Check Basic Auth Header
-    authorization = request.headers.get("Authorization")
-    scheme, param = get_authorization_scheme_param(authorization)
-    if scheme.lower() == "basic":
-        try:
-            decoded = base64.b64decode(param).decode("utf-8")
-            username, password = decoded.split(":")
-            
-            is_correct_username = secrets.compare_digest(username.encode("utf8"), correct_username)
-            is_correct_password = secrets.compare_digest(password.encode("utf8"), correct_password)
-            
-            if is_correct_username and is_correct_password:
-                return username
-        except:
-            pass
-
-    # 3. Handle Unauthorized
-    # If the client wants HTML (Browser), redirect to login
+    # 2. Handle Unauthorized
     accept = request.headers.get("Accept", "")
     if "text/html" in accept:
+        raise NotAuthenticatedException()
+    else:
+        # API Response
         raise HTTPException(
-            status_code=307, 
-            headers={"Location": "/login"}
+            status_code=401,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Basic"},
         )
-        # Note: In FastAPI dependency, raising HTTPException(307) acts as a response provided catch logic is tricky.
-        # Better: We return a RedirectResponse if we could, but dependencies return values.
-        # We will handle this by letting the ExceptionHandler catch it? 
-        # Actually easiest is using `RedirectResponse` directly from the path operation? No.
-        # We will raise a custom exception or just standard 401 and let global exception handler redirect?
-        # Let's keep it simple: raise standard 401 for now, but configured cleanly.
-        # BETTER: For this dependency, we simply Redirect if it's a page load.
-    
-    # But wait, dependencies are run before path op. return RedirectResponse doesn't work inside dependency unless we raise response.
-    # The clean way in FastAPI:
-    if "text/html" in accept:
-        # We can't easily return a RedirectResponse from here without stopping execution.
-        # We will Raise a specialized exception that we handle globally?
-        # Or just raise 401 and let browser handle (User didn't want that).
-        # LET'S DO THIS:
-        # The dependency returns `username` OR raises.
-        pass
 
-    # Simplified approach:
-    # We will use this dependency in endpoints.
-    # If it fails, we need to know if we should Redirect or 401.
-    # Let's act as a 401, but we'll add an exception handler for 401 in main app to redirect if HTML?
-    # No, that affects API too.
-    
-    # Strategy: Explicit Redirect for Browser
-    if "text/html" in accept:
-        # Check if we are already on /login to avoid loop? No, this dep is not on /login
-        pass
-
-    # We cannot redirect easily from a dependency without custom exception handlers.
-    # Let's try this: Raising HTTPException with status_code=307 works if we treat it as an error response? No.
-    # Let's raise 401, and let the frontend redirect? No, user wants server-side redirect.
-    
-    # OK, we will define a custom exception and handler.
-    raise NotAuthenticatedException()
+# Dependency for Auth Routes (allows partial auth)
+async def get_partial_user(request: Request):
+    session_cookie = request.cookies.get("session")
+    if session_cookie:
+        try:
+            decoded = base64.b64decode(session_cookie).decode("utf-8")
+            username, status = decoded.split(":", 1)
+            return username, status
+        except:
+            pass
+    return None, None
 
 
 class NotAuthenticatedException(Exception):
@@ -158,11 +122,7 @@ async def not_authenticated_exception_handler(request: Request, exc: NotAuthenti
     if "text/html" in accept:
         return RedirectResponse(url="/login")
     else:
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Not authenticated"},
-            headers={"WWW-Authenticate": "Basic"},
-        )
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -171,16 +131,25 @@ async def login_page(request: Request):
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    correct_username = os.getenv("ROXX_ADMIN_USER", "admin")
-    correct_password = os.getenv("ROXX_ADMIN_PASSWORD", "admin")
+    success, user_data = AuthManager.verify_credentials(username, password)
     
-    if (secrets.compare_digest(username, correct_username) and 
-        secrets.compare_digest(password, correct_password)):
-        
-        # Create session cookie (simple base64 of creds for this MVP)
-        # In prod, use signed JWT or session ID.
-        session_val = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("utf-8")
-        
+    if success:
+        # 1. Forced Password Change?
+        if user_data.get("must_change_password"):
+            session_val = base64.b64encode(f"{username}:force_change".encode("utf-8")).decode("utf-8")
+            response = RedirectResponse(url="/auth/change-password", status_code=303)
+            response.set_cookie(key="session", value=session_val, httponly=True)
+            return response
+
+        # 2. MFA Enabled?
+        if user_data.get("mfa_secret"):
+            session_val = base64.b64encode(f"{username}:mfa_pending".encode("utf-8")).decode("utf-8")
+            response = RedirectResponse(url="/auth/mfa-challenge", status_code=303)
+            response.set_cookie(key="session", value=session_val, httponly=True)
+            return response
+
+        # 3. Standard Login
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
         response = RedirectResponse(url="/", status_code=303)
         response.set_cookie(key="session", value=session_val, httponly=True)
         return response
@@ -195,6 +164,110 @@ async def logout():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("session")
     return response
+
+# ------------------------------------------------------------------------------
+# Password & MFA Management
+# ------------------------------------------------------------------------------
+@app.get("/auth/change-password", response_class=HTMLResponse)
+async def change_password_page(request: Request):
+    username, status = await get_partial_user(request)
+    if not username:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("change_password.html", {"request": request})
+
+@app.post("/auth/change-password", response_class=HTMLResponse)
+async def change_password(
+    request: Request, 
+    current_password: str = Form(...), 
+    new_password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    username, status = await get_partial_user(request)
+    if not username:
+        return RedirectResponse("/login")
+
+    if new_password != confirm_password:
+        return templates.TemplateResponse("change_password.html", {
+            "request": request, "error": "New passwords do not match"
+        })
+
+    success, _ = AuthManager.verify_credentials(username, current_password)
+    if not success:
+        return templates.TemplateResponse("change_password.html", {
+            "request": request, "error": "Current password incorrect"
+        })
+
+    try:
+        AuthManager.change_password(username, new_password)
+    except ValueError as e:
+         return templates.TemplateResponse("change_password.html", {
+            "request": request, "error": str(e)
+        })
+
+    # Success -> Active Session
+    session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(key="session", value=session_val, httponly=True)
+    return response
+
+@app.get("/auth/mfa-challenge", response_class=HTMLResponse)
+async def mfa_challenge_page(request: Request):
+    username, status = await get_partial_user(request)
+    if not username or status != "mfa_pending":
+        return RedirectResponse("/login")
+    return templates.TemplateResponse("mfa_challenge.html", {"request": request})
+
+@app.post("/auth/mfa-challenge", response_class=HTMLResponse)
+async def mfa_challenge(request: Request, code: str = Form(...)):
+    username, status = await get_partial_user(request)
+    if not username or status != "mfa_pending":
+        return RedirectResponse("/login")
+
+    if AuthManager.verify_mfa(username, code):
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="session", value=session_val, httponly=True)
+        return response
+    
+    return templates.TemplateResponse("mfa_challenge.html", {
+        "request": request, "error": "Invalid authentication code"
+    })
+
+@app.get("/auth/mfa-setup", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def mfa_setup_page(request: Request):
+    username = await get_current_username(request)
+    secret, uri = AuthManager.setup_mfa(username)
+    
+    # Check if we have 'qrcode' lib support for image generation
+    # If not, client side JS or just display secret
+    # roxx requirements has qrcode.
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    
+    return templates.TemplateResponse("mfa_setup.html", {
+        "request": request, 
+        "secret": secret,
+        "qr_b64": qr_b64
+    })
+
+@app.post("/auth/mfa-setup", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(...)):
+    username = await get_current_username(request)
+    
+    # Verify code against the NEW secret
+    if AuthManager.verify_mfa(username, code, pending_secret=secret):
+        AuthManager.enable_mfa(username, secret)
+        return RedirectResponse(url="/", status_code=303)
+    
+    # Error handling? Need to re-generate QR? 
+    # Usually we re-render page. For simplicity, just error.
+    return templates.TemplateResponse("error.html", {"request": request, "message": "Invalid code. MFA Setup Failed."}) # Needs error.html or logic
+
+
+
+
 
 
 # ------------------------------------------------------------------------------

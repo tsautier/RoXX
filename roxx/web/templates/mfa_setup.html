@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Setup MFA - RoXX Admin</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <img src="/static/img/logo.png" alt="RoXX Logo">
+                    <span>RoXX</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="/users" class="nav-item">
+                    <span class="icon">👥</span> Users
+                </a>
+                <a href="/config" class="nav-item">
+                    <span class="icon">⚙️</span> Configuration
+                </a>
+                <a href="/totp/enroll" class="nav-item">
+                    <span class="icon">🔐</span> TOTP Tools
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">AD</div>
+                    <div class="user-details">
+                        <span class="username">admin</span>
+                        <span class="role">Administrator</span>
+                    </div>
+                </div>
+                <a href="/logout" class="logout-btn" title="Logout">🚪</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h1>Security Settings</h1>
+            </header>
+
+            <div class="content-wrapper">
+                <div class="card" style="max-width: 600px; margin: 0 auto;">
+                    <div class="card-header">
+                        <h2>Setup Multi-Factor Authentication</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if error %}
+                        <div class="alert alert-error">{{ error }}</div>
+                        {% endif %}
+
+                        <div style="text-align: center; margin-bottom: 2rem;">
+                            <p>Scan this QR Code with your Authenticator App (Google Auth, Microsoft Auth, etc.)</p>
+                            <div
+                                style="background: white; padding: 1rem; display: inline-block; border-radius: 8px; margin: 1rem 0;">
+                                <img src="data:image/png;base64,{{ qr_b64 }}" alt="MFA QR Code">
+                            </div>
+                            <p style="font-family: monospace; font-size: 0.9em; color: #666;">Secret: {{ secret }}</p>
+                        </div>
+
+                        <form action="/auth/mfa-setup" method="POST">
+                            <input type="hidden" name="secret" value="{{ secret }}">
+
+                            <div class="form-group">
+                                <label for="code">Verify Code</label>
+                                <input type="text" id="code" name="code" placeholder="Enter 6-digit code" required
+                                    style="text-align: center; letter-spacing: 2px;">
+                            </div>
+
+                            <div class="actions" style="justify-content: center; gap: 1rem; display: flex;">
+                                <a href="/" class="btn btn-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-primary">Enable MFA</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
