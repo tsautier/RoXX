@@ -83,6 +83,31 @@ sequenceDiagram
     end
 ```
 
+### 3. Wired Network Access (Switch / Port Security)
+Physical access control where a switch authenticates a device (Printer, PC) via MAC Address or 802.1X before opening the port.
+
+```mermaid
+sequenceDiagram
+    participant IoT as Printer/PC
+    participant Switch as Network Switch
+    participant RoXX
+    participant DB as Local/SQL DB
+
+    IoT->>Switch: Plug & Connect
+    Switch->>RoXX: MAC Auth Request
+    RoXX->>DB: Check Allowlist
+    
+    alt MAC Found
+        DB-->>RoXX: OK
+        RoXX-->>Switch: Access-Accept
+        Switch-->>IoT: Port Open
+    else MAC Unknown
+        DB-->>RoXX: NotFound
+        RoXX-->>Switch: Access-Reject
+        Switch-->>IoT: Port Blocked/Guest VLAN
+    end
+```
+
 ---
 
 ## 🚀 Quick Start
