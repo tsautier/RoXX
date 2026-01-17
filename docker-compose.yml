@@ -9,15 +9,15 @@ services:
       - "1813:1813/udp"
       - "8000:8000"
     volumes:
-      - roxx_config:/etc/roxx
+      - ./config:/etc/roxx
       - roxx_data:/var/lib/roxx
       - roxx_logs:/var/log/roxx
       # Map FreeRADIUS config if customization is needed
       # - ./freeradius:/etc/freeradius/3.0
     environment:
       - TZ=UTC
+      - ROXX_CONFIG_DIR=/etc/roxx
 
 volumes:
-  roxx_config:
   roxx_data:
   roxx_logs:
