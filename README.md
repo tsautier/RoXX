@@ -1,6 +1,7 @@
 # RoXX
 
-**Linux RADIUS Authentication Proxy** - Version 1.0-beta
+
+**R**adius **O**pen e**X**tensible e**X**change - Version 1.0-beta
 
 Modern Python-based RADIUS proxy for Linux with advanced authentication backends.
 
