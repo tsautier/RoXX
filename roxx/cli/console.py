@@ -214,6 +214,7 @@ def show_configuration():
         input("\nPress Enter to continue...")
         return
     
+    
     # Open with default editor
     import subprocess
     editor = 'nano'
@@ -223,6 +224,135 @@ def show_configuration():
     except Exception as e:
         console.print(f"\n[red]✗[/red] Error opening editor: {e}", style="red")
         input("\nPress Enter to continue...")
+
+
+def manage_admins():
+    """Manage Admin Accounts"""
+    from roxx.core.auth.manager import AuthManager
+    AuthManager.init()
+    
+    while True:
+        show_header()
+        
+        # List admins
+        admins = AuthManager.list_admins()
+        table = Table(title="Admin Accounts", box=box.SIMPLE)
+        table.add_column("Username", style="green")
+        table.add_column("Source", style="cyan")
+        table.add_column("Last Login", style="dim")
+        table.add_column("MFA", style="yellow")
+        
+        for admin in admins:
+            # Check MFA status safely
+            mfa_status = "Enabled" if _check_admin_mfa(admin['username']) else "Disabled"
+            table.add_row(
+                admin['username'], 
+                admin['auth_source'].upper(), 
+                str(admin['last_login'] or 'Never'),
+                mfa_status
+            )
+        console.print(table)
+        console.print()
+        
+        action = questionary.select(
+            "Admin Actions:",
+            choices=[
+                'Add New Admin',
+                'Delete Admin',
+                'Reset MFA for Admin',
+                '← Back'
+            ],
+            style=custom_style
+        ).ask()
+        
+        if not action or action == '← Back':
+            return
+            
+        if action == 'Add New Admin':
+            _add_admin()
+        elif action == 'Delete Admin':
+            _delete_admin(admins)
+        elif action == 'Reset MFA for Admin':
+            _reset_mfa(admins)
+
+def _check_admin_mfa(username):
+    """Helper to check if MFA is enabled"""
+    from roxx.core.auth.db import AdminDatabase
+    import sqlite3
+    conn = AdminDatabase.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT mfa_secret FROM admins WHERE username = ?", (username,))
+    res = cursor.fetchone()
+    conn.close()
+    return bool(res and res[0])
+
+def _add_admin():
+    """Add a new admin"""
+    from roxx.core.auth.manager import AuthManager
+    
+    username = questionary.text("Username:", style=custom_style).ask()
+    if not username: return
+    
+    source = questionary.select(
+        "Auth Source:",
+        choices=['local', 'ldap', 'saml'],
+        style=custom_style
+    ).ask()
+    
+    password = None
+    if source == 'local':
+        password = questionary.password("Password (min 12 chars):", style=custom_style).ask()
+        if not password: return
+        
+    success, msg = AuthManager.create_admin(username, password, source)
+    if success:
+        console.print(f"\n[green]✓ {msg}[/green]")
+    else:
+        console.print(f"\n[red]✗ {msg}[/red]")
+    input("\nPress Enter to continue...")
+
+def _delete_admin(admins):
+    """Delete an admin"""
+    from roxx.core.auth.manager import AuthManager
+    
+    choices = [a['username'] for a in admins if a['username'] != 'admin']
+    if not choices:
+        console.print("[yellow]No deletable admins found.[/yellow]")
+        input("\nPress Enter to continue...")
+        return
+        
+    username = questionary.select(
+        "Select admin to delete:",
+        choices=choices + ['← Back'],
+        style=custom_style
+    ).ask()
+    
+    if not username or username == '← Back': return
+    
+    if questionary.confirm(f"Are you sure you want to delete {username}?", default=False).ask():
+        success, msg = AuthManager.delete_admin(username)
+        if success:
+             console.print(f"\n[green]✓ {msg}[/green]")
+        else:
+             console.print(f"\n[red]✗ {msg}[/red]")
+        input("\nPress Enter to continue...")
+
+def _reset_mfa(admins):
+    """Reset MFA for an admin"""
+    from roxx.core.auth.manager import AuthManager
+    
+    username = questionary.select(
+        "Select admin to reset MFA:",
+        choices=[a['username'] for a in admins] + ['← Back'],
+        style=custom_style
+    ).ask()
+    
+    if not username or username == '← Back': return
+    
+    AuthManager.disable_mfa(username)
+    console.print(f"\n[green]✓ MFA disabled for {username}. They can re-enroll on next login.[/green]")
+    input("\nPress Enter to continue...")
+
 
 
 
@@ -528,6 +658,7 @@ def main_menu():
                 '🎮 Control Services',
                 '💻 System Information',
                 '⚙️  Configuration',
+                '👮 Manage Admins',
                 '🔐 Local PKI',
                 '📝 View Logs',
                 '🐛 Debug Mode',
@@ -549,6 +680,8 @@ def main_menu():
             show_system_info()
         elif choice == '⚙️  Configuration':
             show_configuration()
+        elif choice == '👮 Manage Admins':
+            manage_admins()
         elif choice == '🔐 Local PKI':
             manage_pki()
         elif choice == '📝 View Logs':
