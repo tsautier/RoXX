@@ -85,6 +85,10 @@ class SystemManager:
         """Adds a user to users.conf"""
         try:
             users_file = SystemManager.get_config_dir() / "users.conf"
+            # Ensure config directory exists (crucial for local dev/Windows)
+            if not users_file.parent.exists():
+                users_file.parent.mkdir(parents=True, exist_ok=True)
+
             # format: username attribute op password
             entry = f'{username} {attribute} {op} "{password}"\n'
             
