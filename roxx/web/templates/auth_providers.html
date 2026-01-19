@@ -143,7 +143,12 @@
     <main class="main-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
             <h2>Authentication Providers</h2>
-            <button onclick="showAddModal()" class="btn btn-primary">+ Add Provider</button>
+            <div style="display: flex; gap: 0.75rem;">
+                <button onclick="window.location.href='/config/auth-providers/logs'" class="btn btn-outline">
+                    📊 View Logs
+                </button>
+                <button onclick="showAddModal()" class="btn btn-primary">+ Add Provider</button>
+            </div>
         </div>
 
         <div id="providerGrid" class="provider-grid">

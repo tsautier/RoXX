@@ -127,7 +127,12 @@
     <main class="main-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
             <h2>RADIUS User Authentication Backends</h2>
-            <button onclick="showAddModal()" class="btn btn-primary">+ Add Backend</button>
+            <div style="display: flex; gap: 0.75rem;">
+                <button onclick="window.location.href='/config/radius-backends/logs'" class="btn btn-outline">
+                    📊 View Logs
+                </button>
+                <button onclick="showAddModal()" class="btn btn-primary">+ Add Backend</button>
+            </div>
         </div>
 
         <div id="backendGrid" class="backend-grid">

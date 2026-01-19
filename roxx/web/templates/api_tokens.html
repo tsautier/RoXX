@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}API Tokens - RoXX{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 2rem auto; padding: 0 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <div>
+            <h1 style="margin: 0; font-size: 2rem; color: #1e293b;">API Tokens</h1>
+            <p style="color: #64748b; margin-top: 0.5rem;">Manage API access tokens for external integrations</p>
+        </div>
+        <button onclick="showGenerateModal()" class="btn btn-primary">
+            <span style="margin-right: 0.5rem;">+</span> Generate New Token
+        </button>
+    </div>
+
+    <!-- Tokens Table -->
+    <div class="card" style="overflow: hidden;">
+        <table id="tokensTable" style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                <tr>
+                    <th style="padding: 1rem; text-align: left; font-weight: 600; color: #475569;">Name</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 600; color: #475569;">Created</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 600; color: #475569;">Last Used</th>
+                    <th style="padding: 1rem; text-align: left; font-weight: 600; color: #475569;">Status</th>
+                    <th style="padding: 1rem; text-align: right; font-weight: 600; color: #475569;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tokensBody">
+                <tr>
+                    <td colspan="5" style="padding: 2rem; text-align: center; color: #94a3b8;">
+                        Loading tokens...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Generate Token Modal -->
+    <div id="generateModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 id="modalTitle">Generate New API Token</h2>
+                <button class="modal-close" onclick="closeGenerateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="generateForm" style="display: block;">
+                    <div class="form-group">
+                        <label for="tokenName">Token Name</label>
+                        <input type="text" id="tokenName" class="form-control" placeholder="e.g., Production Server"
+                            required>
+                        <small style="color: #64748b; display: block; margin-top: 0.5rem;">
+                            A descriptive name to identify this token
+                        </small>
+                    </div>
+                    <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                        <button onclick="closeGenerateModal()" class="btn btn-outline">Cancel</button>
+                        <button onclick="generateToken()" class="btn btn-primary">Generate Token</button>
+                    </div>
+                </div>
+
+                <div id="tokenDisplay" style="display: none;">
+                    <div
+                        style="background: #fef3c7; border: 2px solid #fbbf24; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                        <div style="display: flex; align-items: start; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem;">⚠️</span>
+                            <div>
+                                <strong style="color: #92400e; display: block; margin-bottom: 0.25rem;">Save this token
+                                    now!</strong>
+                                <p style="color: #92400e; margin: 0; font-size: 0.9rem;">
+                                    You won't be able to see it again. Store it securely.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Your API Token</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="generatedToken" class="form-control" readonly
+                                style="font-family: 'Courier New', monospace; font-size: 0.9rem;">
+                            <button onclick="copyToken()" class="btn btn-primary" id="copyBtn">
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;">
+                        <strong style="color: #1e40af; display: block; margin-bottom: 0.5rem;">Usage:</strong>
+                        <code
+                            style="background: white; padding: 0.5rem; border-radius: 0.25rem; display: block; overflow-x: auto; font-size: 0.85rem;">
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/system/info
+                        </code>
+                    </div>
+
+                    <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
+                        <button onclick="closeGenerateModal()" class="btn btn-primary">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let tokens = [];
+
+    async function loadTokens() {
+        try {
+            const response = await fetch('/api/tokens');
+            const data = await response.json();
+            tokens = data.tokens || [];
+            renderTokens();
+        } catch (error) {
+            console.error('Error loading tokens:', error);
+            document.getElementById('tokensBody').innerHTML = `
+            <tr><td colspan="5" style="padding: 2rem; text-align: center; color: #ef4444;">
+                Error loading tokens
+            </td></tr>
+        `;
+        }
+    }
+
+    function renderTokens() {
+        const tbody = document.getElementById('tokensBody');
+
+        if (tokens.length === 0) {
+            tbody.innerHTML = `
+            <tr><td colspan="5" style="padding: 2rem; text-align: center; color: #94a3b8;">
+                No API tokens yet. Generate one to get started!
+            </td></tr>
+        `;
+            return;
+        }
+
+        tbody.innerHTML = tokens.map(token => {
+            const isEnabled = token.enabled;
+            const statusColor = isEnabled ? '#10b981' : '#94a3b8';
+            const statusText = isEnabled ? 'Active' : 'Revoked';
+            const rowStyle = isEnabled ? '' : 'opacity: 0.6;';
+
+            const created = new Date(token.created_at).toLocaleDateString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric'
+            });
+
+            const lastUsed = token.last_used
+                ? new Date(token.last_used).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                })
+                : 'Never';
+
+            return `
+            <tr style="${rowStyle}">
+                <td style="padding: 1rem; font-weight: 500; color: #1e293b;">${token.name}</td>
+                <td style="padding: 1rem; color: #64748b;">${created}</td>
+                <td style="padding: 1rem; color: #64748b;">${lastUsed}</td>
+                <td style="padding: 1rem;">
+                    <span style="background: ${statusColor}20; color: ${statusColor}; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 500;">
+                        ${statusText}
+                    </span>
+                </td>
+                <td style="padding: 1rem; text-align: right;">
+                    ${isEnabled ? `
+                        <button onclick="revokeToken(${token.id})" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">
+                            Revoke
+                        </button>
+                    ` : `
+                        <button onclick="deleteToken(${token.id})" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.4rem 0.8rem; color: #ef4444; border-color: #ef4444;">
+                            Delete
+                        </button>
+                    `}
+                </td>
+            </tr>
+        `;
+        }).join('');
+    }
+
+    function showGenerateModal() {
+        document.getElementById('generateModal').style.display = 'flex';
+        document.getElementById('generateForm').style.display = 'block';
+        document.getElementById('tokenDisplay').style.display = 'none';
+        document.getElementById('tokenName').value = '';
+        document.getElementById('tokenName').focus();
+    }
+
+    function closeGenerateModal() {
+        document.getElementById('generateModal').style.display = 'none';
+        loadTokens(); // Refresh list
+    }
+
+    async function generateToken() {
+        const name = document.getElementById('tokenName').value.trim();
+        if (!name) {
+            alert('Please enter a token name');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/tokens', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.token) {
+                document.getElementById('generatedToken').value = data.token;
+                document.getElementById('generateForm').style.display = 'none';
+                document.getElementById('tokenDisplay').style.display = 'block';
+            } else {
+                alert('Error: ' + (data.detail || 'Failed to generate token'));
+            }
+        } catch (error) {
+            console.error('Error generating token:', error);
+            alert('Error generating token');
+        }
+    }
+
+    async function copyToken() {
+        const tokenInput = document.getElementById('generatedToken');
+        tokenInput.select();
+        document.execCommand('copy');
+
+        const btn = document.getElementById('copyBtn');
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.style.background = '#10b981';
+
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.style.background = '';
+        }, 2000);
+    }
+
+    async function revokeToken(id) {
+        if (!confirm('Are you sure you want to revoke this token? It will no longer work.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/tokens/${id}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                loadTokens();
+            } else {
+                alert('Error: ' + (data.message || 'Failed to revoke token'));
+            }
+        } catch (error) {
+            console.error('Error revoking token:', error);
+            alert('Error revoking token');
+        }
+    }
+
+    async function deleteToken(id) {
+        if (!confirm('Permanently delete this token?')) {
+            return;
+        }
+
+        // Same endpoint - DELETE revokes, we can add a permanent delete if needed
+        await revokeToken(id);
+    }
+
+    // Load tokens on page load
+    loadTokens();
+</script>
+
+<style>
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #1e293b;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        color: #94a3b8;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+    }
+
+    .modal-close:hover {
+        color: #475569;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
