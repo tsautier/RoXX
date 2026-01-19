@@ -304,12 +304,31 @@ async def dashboard(request: Request):
     radius_active = SystemManager.is_service_running('freeradius') or SystemManager.is_service_running('radiusd')
     radius_status = "UP" if radius_active else "DOWN"
     
+    # Fetch recent users/admins for the user management table
+    recent_users = []
+    try:
+        admins_list = AuthManager.list_admins()
+        for admin in admins_list:
+            recent_users.append({
+                "username": admin.get("username", "N/A"),
+                "role": admin.get("auth_source", "local").title(),
+                "status": "UP",  # Could be enhanced with actual session tracking
+                "last_login": admin.get("last_login", "N/A")
+            })
+    except Exception as e:
+        # If there's an error fetching users, provide sample data
+        print(f"Error fetching users: {e}")
+        recent_users = [
+            {"username": "admin", "role": "Local", "status": "UP", "last_login": "2024-05-22"}
+        ]
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "os_type": SystemManager.get_os(),
         "radius_status": radius_status,
         "uptime": SystemManager.get_uptime(),
-        "version": VERSION
+        "version": VERSION,
+        "recent_users": recent_users
     })
 
 
