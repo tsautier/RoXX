@@ -70,6 +70,10 @@ from roxx.core.auth.manager import AuthManager
 # Initialize Auth Subsystem on startup
 AuthManager.init()
 
+# Initialize authentication provider configuration database
+from roxx.core.auth.config_db import ConfigManager as AuthConfigManager
+AuthConfigManager.init()
+
 async def get_current_username(request: Request):
     """
     Verifies authentication via Session Cookie.
@@ -364,6 +368,279 @@ async def config_page(request: Request):
         "request": request,
         "version": VERSION
     })
+
+
+# ------------------------------------------------------------------------------
+# Authentication Provider Configuration
+# ------------------------------------------------------------------------------
+@app.get("/config/auth-providers", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def auth_providers_page(request: Request):
+    """Authentication providers configuration page"""
+    return templates.TemplateResponse("auth_providers.html", {
+        "request": request,
+        "version": VERSION
+    })
+
+@app.get("/api/auth-providers", dependencies=[Depends(get_current_username)])
+async def list_auth_providers():
+    """List all authentication providers"""
+    from roxx.core.auth.config_db import ConfigManager
+    try:
+        ConfigManager.init()  # Ensure DB is initialized
+        providers = ConfigManager.list_providers()
+        return providers
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth-providers", dependencies=[Depends(get_current_username)])
+async def create_auth_provider(request: Request):
+    """Create a new authentication provider"""
+    from roxx.core.auth.config_db import ConfigManager
+    
+    try:
+        data = await request.json()
+        provider_type = data.get('provider_type')
+        name = data.get('name')
+        config_dict = data.get('config', {})
+        enabled = data.get('enabled', True)
+        
+        if not provider_type or not name:
+            raise HTTPException(status_code=400, detail="Missing provider_type or name")
+        
+        success, message, provider_id = ConfigManager.create_provider(
+            provider_type, name, config_dict, enabled
+        )
+        
+        if success:
+            return {"success": True, "message": message, "id": provider_id}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/auth-providers/{provider_id}", dependencies=[Depends(get_current_username)])
+async def update_auth_provider(provider_id: int, request: Request):
+    """Update an authentication provider"""
+    from roxx.core.auth.config_db import ConfigManager
+    
+    try:
+        data = await request.json()
+        name = data.get('name')
+        config_dict = data.get('config')
+        enabled = data.get('enabled')
+        
+        success, message = ConfigManager.update_provider(
+            provider_id, name=name, config_dict=config_dict, enabled=enabled
+        )
+        
+        if success:
+            return {"success": True, "message": message}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/auth-providers/{provider_id}", dependencies=[Depends(get_current_username)])
+async def delete_auth_provider(provider_id: int):
+    """Delete an authentication provider"""
+    from roxx.core.auth.config_db import ConfigManager
+    
+    try:
+        success, message = ConfigManager.delete_provider(provider_id)
+        
+        if success:
+            return {"success": True, "message": message}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth-providers/test", dependencies=[Depends(get_current_username)])
+async def test_auth_provider(request: Request):
+    """Test authentication provider configuration"""
+    from roxx.core.auth.config_db import ConfigManager
+    
+    try:
+        data = await request.json()
+        provider_type = data.get('provider_type')
+        config_dict = data.get('config', {})
+        test_username = data.get('test_username')
+        test_password = data.get('test_password')
+        
+        if not all([provider_type, test_username, test_password]):
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        success, message = ConfigManager.test_provider(
+            provider_type, config_dict, test_username, test_password
+        )
+        
+        return {"success": success, "message": message}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ------------------------------------------------------------------------------
+# RADIUS User Authentication Backends
+# ------------------------------------------------------------------------------
+@app.get("/config/radius-backends", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def radius_backends_page(request: Request):
+    """RADIUS backends configuration page"""
+    return templates.TemplateResponse("radius_backends.html", {
+        "request": request,
+        "version": VERSION
+    })
+
+@app.get("/api/radius-backends", dependencies=[Depends(get_current_username)])
+async def list_radius_backends():
+    """List all RADIUS backends"""
+    from roxx.core.radius_backends.config_db import RadiusBackendDB
+    try:
+        RadiusBackendDB.init()
+        backends = RadiusBackendDB.list_backends()
+        return backends
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/radius-backends", dependencies=[Depends(get_current_username)])
+async def create_radius_backend(request: Request):
+    """Create a new RADIUS backend"""
+    from roxx.core.radius_backends.config_db import RadiusBackendDB
+    
+    try:
+        data = await request.json()
+        backend_type = data.get('backend_type')
+        name = data.get('name')
+        config_dict = data.get('config', {})
+        enabled = data.get('enabled', True)
+        priority = data.get('priority', 100)
+        
+        if not backend_type or not name:
+            raise HTTPException(status_code=400, detail="Missing backend_type or name")
+        
+        success, message, backend_id = RadiusBackendDB.create_backend(
+            backend_type, name, config_dict, enabled, priority
+        )
+        
+        if success:
+            # Reload backends in manager
+            from roxx.core.radius_backends.manager import reload_manager
+            reload_manager()
+            return {"success": True, "message": message, "id": backend_id}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/radius-backends/{backend_id}", dependencies=[Depends(get_current_username)])
+async def update_radius_backend(backend_id: int, request: Request):
+    """Update a RADIUS backend"""
+    from roxx.core.radius_backends.config_db import RadiusBackendDB
+    
+    try:
+        data = await request.json()
+        name = data.get('name')
+        config_dict = data.get('config')
+        enabled = data.get('enabled')
+        priority = data.get('priority')
+        
+        success, message = RadiusBackendDB.update_backend(
+            backend_id, name=name, config_dict=config_dict, 
+            enabled=enabled, priority=priority
+        )
+        
+        if success:
+            # Reload backends in manager
+            from roxx.core.radius_backends.manager import reload_manager
+            reload_manager()
+            return {"success": True, "message": message}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/radius-backends/{backend_id}", dependencies=[Depends(get_current_username)])
+async def delete_radius_backend(backend_id: int):
+    """Delete a RADIUS backend"""
+    from roxx.core.radius_backends.config_db import RadiusBackendDB
+    
+    try:
+        success, message = RadiusBackendDB.delete_backend(backend_id)
+        
+        if success:
+            # Reload backends in manager
+            from roxx.core.radius_backends.manager import reload_manager
+            reload_manager()
+            return {"success": True, "message": message}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/radius-backends/test", dependencies=[Depends(get_current_username)])
+async def test_radius_backend(request: Request):
+    """Test RADIUS backend configuration"""
+    from roxx.core.radius_backends.manager import RadiusBackendManager
+    
+    try:
+        data = await request.json()
+        backend_type = data.get('backend_type')
+        config_dict = data.get('config', {})
+        test_username = data.get('test_username')
+        test_password = data.get('test_password')
+        
+        manager = RadiusBackendManager()
+        success, message = manager.test_backend(
+            backend_type, config_dict, test_username, test_password
+        )
+        
+        return {"success": success, "message": message}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/radius-auth", dependencies=[Depends(get_current_username)])
+async def radius_authenticate(request: Request):
+    """
+    RADIUS authentication endpoint (for REST API integration).
+    Used by FreeRADIUS rlm_rest or external systems.
+    """
+    from roxx.core.radius_backends.manager import get_manager
+    
+    try:
+        data = await request.json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Missing username or password")
+        
+        manager = get_manager()
+        success, attributes = manager.authenticate(username, password)
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Authentication successful",
+                "attributes": attributes or {}
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Authentication failed"
+            }
+            
+    except Exception as e:
+        logger.error(f"RADIUS auth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 @app.get("/api/system/info", dependencies=[Depends(get_current_username)])
