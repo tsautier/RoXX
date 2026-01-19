@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RoXX{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <img src="/static/img/logo.png" alt="RoXX Logo">
+            <span>{% block header_title %}RoXX{% endblock %}</span>
+        </div>
+        <div>
+            <a href="/config" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back to
+                Config</a>
+        </div>
+    </header>
+
+    <main class="main-container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer">
+        roxx v1.0.0-beta4
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
