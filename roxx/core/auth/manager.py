@@ -96,7 +96,26 @@ class AuthManager:
                  logger.error(f"LDAP Auth Error: {e}")
                  return False, None
 
-        # 3. SAML Auth (No password check here, usually done via ACS)
+        # 3. RADIUS Auth
+        elif auth_source == 'radius':
+            if not password:
+                return False, None
+            
+            try:
+                from roxx.core.auth.radius import RadiusProvider
+                if RadiusProvider.verify_credentials(username, password):
+                    return True, dict(user)
+                else:
+                    logger.warning(f"RADIUS verification failed for {username}")
+                    return False, None
+            except ImportError:
+                 logger.error("pyrad library not installed")
+                 return False, None
+            except Exception as e:
+                 logger.error(f"RADIUS Auth Error: {e}")
+                 return False, None
+
+        # 4. SAML Auth (No password check here, usually done via ACS)
         elif auth_source == 'saml':
              # SAML login is handled via /auth/saml/acs, not here usually.
              # If we are here, it might be a re-check or error.
