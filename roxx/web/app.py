@@ -81,6 +81,10 @@ AuthConfigManager.init()
 from roxx.core.auth.api_tokens import APITokenManager
 APITokenManager.init()
 
+# Initialize RADIUS backends database
+from roxx.core.radius_backends.config_db import RadiusBackendDB
+RadiusBackendDB.init()
+
 async def get_current_username(request: Request):
     """
     Verifies authentication via Session Cookie.
@@ -376,6 +380,11 @@ async def config_page(request: Request):
         "version": VERSION
     })
 
+@app.get("/config/api-tokens", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def api_tokens_page(request: Request):
+    """API Tokens Management"""
+    return templates.TemplateResponse("api_tokens.html", {"request": request})
+
 
 # ------------------------------------------------------------------------------
 # Authentication Provider Configuration
@@ -387,6 +396,11 @@ async def auth_providers_page(request: Request):
         "request": request,
         "version": VERSION
     })
+
+@app.get("/config/auth-providers/logs", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def auth_providers_logs_page(request: Request):
+    """Authentication Provider Debug Logs"""
+    return templates.TemplateResponse("auth_providers_logs.html", {"request": request})
 
 @app.get("/api/auth-providers", dependencies=[Depends(get_current_username)])
 async def list_auth_providers():
@@ -500,6 +514,11 @@ async def radius_backends_page(request: Request):
         "request": request,
         "version": VERSION
     })
+
+@app.get("/config/radius-backends/logs", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def radius_backends_logs_page(request: Request):
+    """RADIUS Backend Debug Logs"""
+    return templates.TemplateResponse("radius_backends_logs.html", {"request": request})
 
 @app.get("/api/radius-backends", dependencies=[Depends(get_current_username)])
 async def list_radius_backends():
