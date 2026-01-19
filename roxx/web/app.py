@@ -14,11 +14,14 @@ import base64
 import os
 import secrets
 import asyncio
+import logging
 from pathlib import Path
 from typing import List
 
 from roxx.core.auth.totp import TOTPAuthenticator
 from roxx.utils.system import SystemManager
+
+logger = logging.getLogger("roxx.web")
 
 # ------------------------------------------------------------------------------
 # Security & Authentication
