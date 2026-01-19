@@ -188,6 +188,23 @@ select:focus {
     border-color: rgba(255, 255, 255, 0.6);
 }
 
+/* Outline buttons inside modals or white backgrounds */
+.modal .btn-outline,
+.card .btn-outline,
+.modal-content .btn-outline {
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+.modal .btn-outline:hover,
+.card .btn-outline:hover,
+.modal-content .btn-outline:hover {
+    background: var(--bg-body);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+
 /* Login Page Specific */
 .login-page {
     background: var(--primary-color);
