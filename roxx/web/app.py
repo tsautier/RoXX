@@ -85,6 +85,10 @@ APITokenManager.init()
 from roxx.core.radius_backends.config_db import RadiusBackendDB
 RadiusBackendDB.init()
 
+# Initialize MFA database
+from roxx.core.auth.mfa_db import MFADatabase
+MFADatabase.init()
+
 async def get_current_username(request: Request):
     """
     Verifies authentication via Session Cookie.
@@ -872,6 +876,70 @@ async def websocket_endpoint(websocket: WebSocket):
         print("Client disconnected")
     except Exception as e:
         await websocket.send_text(f"Error: {str(e)}")
+
+
+# ------------------------------------------------------------------------------
+# MFA API Endpoints
+# ------------------------------------------------------------------------------
+from roxx.core.auth.mfa import MFAManager
+from roxx.core.auth.mfa_db import MFADatabase
+
+@app.post("/api/mfa/enroll")
+async def mfa_enroll(request: Request, username: str = Depends(get_current_username)):
+    """Start MFA enrollment for current user"""
+    secret = MFAManager.generate_secret()
+    totp_uri = MFAManager.generate_totp_uri(username, secret)
+    qr_code_data = MFAManager.generate_qr_code(totp_uri)
+    plain_codes, hashed_codes = MFAManager.generate_backup_codes(10)
+    
+    request.session['mfa_enrollment'] = {
+        'secret': secret,
+        'backup_codes': hashed_codes
+    }
+    
+    return {
+        "success": True,
+        "secret": secret,
+        "qr_code": qr_code_data,
+        "backup_codes": plain_codes
+    }
+
+@app.post("/api/mfa/verify-enrollment")
+async def mfa_verify_enrollment(request: Request, token: str = Form(...), username: str = Depends(get_current_username)):
+    """Verify TOTP token and complete enrollment"""
+    enrollment = request.session.get('mfa_enrollment')
+    if not enrollment:
+        raise HTTPException(status_code=400, detail="No enrollment in progress")
+    
+    if not MFAManager.verify_totp(enrollment['secret'], token):
+        raise HTTPException(status_code=400, detail="Invalid token")
+    
+    success, message = MFADatabase.enroll_totp(username, enrollment['secret'], enrollment['backup_codes'])
+    if success:
+        request.session.pop('mfa_enrollment', None)
+        return {"success": True, "message": "MFA enabled"}
+    raise HTTPException(status_code=500, detail=message)
+
+@app.get("/api/mfa/status")
+async def mfa_status(request: Request, username: str = Depends(get_current_username)):
+    """Get MFA status for current user"""
+    settings = MFADatabase.get_mfa_settings(username)
+    if settings:
+        return {
+            "enabled": settings['mfa_enabled'],
+            "type": settings.get('mfa_type'),
+            "backup_codes_remaining": len(settings.get('backup_codes', []))
+        }
+    return {"enabled": False}
+
+@app.post("/api/mfa/disable")
+async def mfa_disable(request: Request, username: str = Depends(get_current_username)):
+    """Disable MFA for current user"""
+    success, message = MFADatabase.disable_mfa(username)
+    if success:
+        return {"success": True, "message": message}
+    raise HTTPException(status_code=500, detail=message)
+
 
 
 def main():
