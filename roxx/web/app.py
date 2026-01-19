@@ -37,7 +37,7 @@ from roxx.utils.system import SystemManager
 # App Initialization
 # ------------------------------------------------------------------------------
 
-VERSION = "1.0.0-rc1"
+VERSION = "1.0.0-beta4"
 
 app = FastAPI(
     title="RoXX Admin Interface",
@@ -73,6 +73,10 @@ AuthManager.init()
 # Initialize authentication provider configuration database
 from roxx.core.auth.config_db import ConfigManager as AuthConfigManager
 AuthConfigManager.init()
+
+# Initialize API tokens database
+from roxx.core.auth.api_tokens import APITokenManager
+APITokenManager.init()
 
 async def get_current_username(request: Request):
     """
@@ -640,6 +644,42 @@ async def radius_authenticate(request: Request):
         logger.error(f"RADIUS auth error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# ------------------------------------------------------------------------------
+# API Tokens Management
+# ------------------------------------------------------------------------------
+@app.get("/api/tokens", dependencies=[Depends(get_current_username)])
+async def list_api_tokens():
+    """List all API tokens (admin only)"""
+    tokens = APITokenManager.list_tokens()
+    return {"tokens": tokens}
+
+@app.post("/api/tokens", dependencies=[Depends(get_current_username)])
+async def generate_api_token(request: Request):
+    """Generate a new API token"""
+    data = await request.json()
+    name = data.get('name')
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Token name required")
+    
+    success, message, token = APITokenManager.generate_token(name)
+    
+    if success:
+        return {"success": True, "message": message, "token": token}
+    else:
+        raise HTTPException(status_code=400, detail=message)
+
+@app.delete("/api/tokens/{token_id}", dependencies=[Depends(get_current_username)])
+async def revoke_api_token(token_id: int):
+    """Revoke an API token"""
+    success, message = APITokenManager.revoke_token(token_id)
+    
+    if success:
+        return {"success": True, "message": message}
+    else:
+        raise HTTPException(status_code=404, detail=message)
 
 
 
