@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}MFA Settings - RoXX{% endblock %}
+
+{% block content %}
+<style>
+    .mfa-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 2rem;
+    }
+
+    .status-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .status-enabled {
+        background: #10b981;
+        color: white;
+    }
+
+    .status-disabled {
+        background: #6b7280;
+        color: white;
+    }
+
+    .qr-container {
+        text-align: center;
+        padding: 2rem;
+        background: #f9fafb;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+    }
+
+    .qr-code {
+        max-width: 300px;
+        margin: 0 auto;
+    }
+
+    .secret-code {
+        background: #1f2937;
+        color: #10b981;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 1.1rem;
+        margin: 1rem 0;
+        word-break: break-all;
+    }
+
+    .backup-codes {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+
+    .backup-code {
+        background: #fef3c7;
+        padding: 0.75rem;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        text-align: center;
+        font-weight: bold;
+        border: 2px dashed #f59e0b;
+    }
+
+    .warning-box {
+        background: #fef2f2;
+        border-left: 4px solid #ef4444;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+    }
+
+    .info-box {
+        background: #eff6ff;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-danger {
+        background: #ef4444;
+        color: white;
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+    }
+
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+
+    .step::after {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        width: 100%;
+        height: 2px;
+        background: #e5e7eb;
+        z-index: -1;
+    }
+
+    .step:last-child::after {
+        display: none;
+    }
+
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        color: #6b7280;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .step.active .step-number {
+        background: #667eea;
+        color: white;
+    }
+
+    .step.completed .step-number {
+        background: #10b981;
+        color: white;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .verification-input {
+        width: 200px;
+        text-align: center;
+        font-size: 1.5rem;
+        padding: 0.75rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        margin: 1rem auto;
+        display: block;
+        font-family: 'Courier New', monospace;
+    }
+</style>
+
+<div class="mfa-container">
+    <h1>🔐 Multi-Factor Authentication (MFA)</h1>
+    <p style="color: #6b7280;">Add an extra layer of security to your account</p>
+
+    <!-- Current Status -->
+    <div class="status-card" id="statusCard">
+        <h2>Current Status</h2>
+        <div id="mfaStatus">
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Enrollment Section (hidden by default) -->
+    <div class="status-card hidden" id="enrollmentSection">
+        <h2>Enable MFA</h2>
+
+        <div class="step-indicator">
+            <div class="step active" id="step1">
+                <div class="step-number">1</div>
+                <div>Scan QR Code</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div>Verify</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div>Backup Codes</div>
+            </div>
+        </div>
+
+        <!-- Step 1: QR Code -->
+        <div id="qrStep">
+            <div class="info-box">
+                <strong>📱 Install an authenticator app:</strong>
+                <ul style="margin: 0.5rem 0;">
+                    <li>Google Authenticator</li>
+                    <li>Microsoft Authenticator</li>
+                    <li>Authy</li>
+                </ul>
+            </div>
+
+            <div class="qr-container">
+                <p><strong>Scan this QR code with your authenticator app:</strong></p>
+                <img id="qrCodeImage" class="qr-code" src="" alt="QR Code">
+            </div>
+
+            <div style="text-align: center;">
+                <p><strong>Or enter this secret manually:</strong></p>
+                <div class="secret-code" id="secretCode"></div>
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <button class="btn btn-primary" onclick="goToVerification()">Next: Verify Code →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Verification -->
+        <div id="verifyStep" class="hidden">
+            <p style="text-align: center;">Enter the 6-digit code from your authenticator app:</p>
+
+            <input type="text" id="verificationToken" class="verification-input" maxlength="6" placeholder="000000"
+                oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <button class="btn btn-primary" onclick="verifyEnrollment()">Verify & Enable MFA</button>
+                <button class="btn" style="background: #e5e7eb;" onclick="goToQRCode()">← Back</button>
+            </div>
+
+            <div id="verificationError" class="warning-box hidden"></div>
+        </div>
+
+        <!-- Step 3: Backup Codes -->
+        <div id="backupCodesStep" class="hidden">
+            <div class="warning-box">
+                <strong>⚠️ Save these backup codes!</strong>
+                <p>Store them in a safe place. You can use each code once if you lose access to your authenticator.</p>
+            </div>
+
+            <div class="backup-codes" id="backupCodesDisplay"></div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <button class="btn btn-primary" onclick="downloadBackupCodes()">📥 Download Codes</button>
+                <button class="btn btn-primary" onclick="finishEnrollment()">Finish</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let enrollmentData = null;
+
+    // Load MFA status on page load
+    document.addEventListener('DOMContentLoaded', loadMFAStatus);
+
+    async function loadMFAStatus() {
+        try {
+            const response = await fetch('/api/mfa/status');
+            const data = await response.json();
+
+            const statusDiv = document.getElementById('mfaStatus');
+
+            if (data.enabled) {
+                statusDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span class="status-badge status-enabled">✓ Enabled</span>
+                        <p style="margin-top: 1rem;">
+                            Type: ${data.type.toUpperCase()}<br>
+                            Backup codes remaining: ${data.backup_codes_remaining}
+                        </p>
+                    </div>
+                    <button class="btn btn-danger" onclick="disableMFA()">Disable MFA</button>
+                </div>
+            `;
+            } else {
+                statusDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span class="status-badge status-disabled">Disabled</span>
+                        <p style="margin-top: 1rem;">MFA is not enabled for your account</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="startEnrollment()">Enable MFA</button>
+                </div>
+            `;
+            }
+        } catch (error) {
+            console.error('Error loading MFA status:', error);
+        }
+    }
+
+    async function startEnrollment() {
+        try {
+            const response = await fetch('/api/mfa/enroll', { method: 'POST' });
+            const data = await response.json();
+
+            enrollmentData = data;
+
+            // Show enrollment section
+            document.getElementById('statusCard').classList.add('hidden');
+            document.getElementById('enrollmentSection').classList.remove('hidden');
+
+            // Display QR code and secret
+            document.getElementById('qrCodeImage').src = data.qr_code;
+            document.getElementById('secretCode').textContent = data.secret;
+
+            // Store backup codes for later
+            enrollmentData.backup_codes = data.backup_codes;
+
+        } catch (error) {
+            alert('Failed to start enrollment: ' + error.message);
+        }
+    }
+
+    function goToVerification() {
+        document.getElementById('qrStep').classList.add('hidden');
+        document.getElementById('verifyStep').classList.remove('hidden');
+        document.getElementById('step1').classList.add('completed');
+        document.getElementById('step1').classList.remove('active');
+        document.getElementById('step2').classList.add('active');
+        document.getElementById('verificationToken').focus();
+    }
+
+    function goToQRCode() {
+        document.getElementById('verifyStep').classList.add('hidden');
+        document.getElementById('qrStep').classList.remove('hidden');
+        document.getElementById('step1').classList.add('active');
+        document.getElementById('step1').classList.remove('completed');
+        document.getElementById('step2').classList.remove('active');
+    }
+
+    async function verifyEnrollment() {
+        const token = document.getElementById('verificationToken').value;
+
+        if (token.length !== 6) {
+            showError('Please enter a 6-digit code');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('token', token);
+
+            const response = await fetch('/api/mfa/verify-enrollment', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                // Move to backup codes step
+                document.getElementById('verifyStep').classList.add('hidden');
+                document.getElementById('backupCodesStep').classList.remove('hidden');
+                document.getElementById('step2').classList.add('completed');
+                document.getElementById('step2').classList.remove('active');
+                document.getElementById('step3').classList.add('active');
+
+                // Display backup codes
+                displayBackupCodes();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Invalid verification code');
+            }
+        } catch (error) {
+            showError('Verification failed: ' + error.message);
+        }
+    }
+
+    function displayBackupCodes() {
+        const container = document.getElementById('backupCodesDisplay');
+        container.innerHTML = enrollmentData.backup_codes
+            .map(code => `<div class="backup-code">${code}</div>`)
+            .join('');
+    }
+
+    function downloadBackupCodes() {
+        const codes = enrollmentData.backup_codes.join('\n');
+        const blob = new Blob([`RoXX MFA Backup Codes\n\n${codes}\n\nSave these codes in a secure location.`], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'roxx-backup-codes.txt';
+        a.click();
+    }
+
+    function finishEnrollment() {
+        // Reload the page to show updated status
+        window.location.reload();
+    }
+
+    async function disableMFA() {
+        if (!confirm('Are you sure you want to disable MFA? This will make your account less secure.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/mfa/disable', { method: 'POST' });
+            if (response.ok) {
+                alert('MFA disabled successfully');
+                loadMFAStatus();
+            }
+        } catch (error) {
+            alert('Failed to disable MFA: ' + error.message);
+        }
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('verificationError');
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+    }
+</script>
+{% endblock %}
