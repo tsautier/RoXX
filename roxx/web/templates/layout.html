@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RoXX{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <div class="app-shell">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="/static/img/logo.png" alt="Logo">
+                <span class="sidebar-brand">Ro<span style="color: var(--accent-color);">XX</span></span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                    <span>📊</span> Dashboard
+                </a>
+                <a href="/admins" class="nav-item {% if active_page == 'users' %}active{% endif %}">
+                    <span>👥</span> User Management
+                </a>
+                <a href="/config" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+                    <span>⚙️</span> Configuration
+                </a>
+
+                <div style="margin: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.1);"></div>
+
+                <div
+                    style="padding: 0.5rem 1.5rem; font-size: 0.75rem; color: rgba(255,255,255,0.4); text-transform: uppercase;">
+                    Security
+                </div>
+
+                <a href="/settings/mfa" class="nav-item {% if active_page == 'mfa' %}active{% endif %}">
+                    <span>🔐</span> MFA Settings
+                </a>
+                <a href="/auth/change-password" class="nav-item {% if active_page == 'password' %}active{% endif %}">
+                    <span>🔑</span> Change Password
+                </a>
+                <a href="/logs-view" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
+                    <span>📝</span> System Logs
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span>{{ request.user.username if request.user else 'Admin' }}</span>
+                    <a href="/logout" style="color: var(--danger-color);" title="Logout">⏻</a>
+                </div>
+                <div style="font-size: 0.75rem; opacity: 0.7;">
+                    v{{ version }}
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Wrapper -->
+        <div class="main-wrapper">
+            <!-- Optional Top Header -->
+            <header class="content-header">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <!-- Breadcrumbs or simple title could go here -->
+                    <a href="/logout" class="btn btn-outline"
+                        style="font-size: 0.9rem; padding: 0.4rem 0.8rem;">Logout</a>
+                </div>
+            </header>
+
+            <main class="main-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

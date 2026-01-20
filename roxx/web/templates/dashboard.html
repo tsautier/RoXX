@@ -1,216 +1,163 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - RoXX</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
+{% block title %}Dashboard - RoXX{% endblock %}
 
-<body>
-    <!-- Header with Logo and User Profile -->
-    <header class="app-header">
-        <div class="brand">
-            <img src="/static/img/logo.png" alt="RoXX Logo">
-            <span>Ro<span style="color: var(--accent-color);">XX</span></span>
+{% block content %}
+<h1 style="margin-bottom: 2rem; color: var(--primary-color);">Dashboard</h1>
+
+<!-- Two Column Grid: System Status + User Management -->
+<div class="dashboard-grid">
+    <!-- Left: System Status -->
+    <div class="status-card">
+        <h3>System Status</h3>
+
+        <!-- Large UP/DOWN Badge -->
+        <div class="status-badge-large {% if radius_status != 'UP' %}down{% endif %}">
+            <div class="status-icon">{% if radius_status == 'UP' %}✓{% else %}✕{% endif %}</div>
+            <div class="status-text">{{ radius_status }}</div>
         </div>
-        <div style="display: flex; gap: 1rem; align-items: center;">
-            <a href="/logout" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Logout</a>
-        </div>
-    </header>
 
-    <!-- Tab Navigation -->
-    <nav class="tab-nav">
-        <a href="/dashboard" class="active">📊 Dashboard</a>
-        <a href="/admins">👥 Users</a>
-        <a href="#logs">📝 Logs</a>
-        <a href="/config">⚙️ Settings</a>
-    </nav>
-
-    <main class="main-container">
-        <h1 style="margin-bottom: 2rem; color: var(--primary-color);">Dashboard</h1>
-
-        <!-- Two Column Grid: System Status + User Management -->
-        <div class="dashboard-grid">
-            <!-- Left: System Status -->
-            <div class="status-card">
-                <h3>System Status</h3>
-
-                <!-- Large UP/DOWN Badge -->
-                <div class="status-badge-large {% if radius_status != 'UP' %}down{% endif %}">
-                    <div class="status-icon">{% if radius_status == 'UP' %}✓{% else %}✕{% endif %}</div>
-                    <div class="status-text">{{ radius_status }}</div>
+        <!-- Info Items -->
+        <div class="info-items">
+            <div class="info-item">
+                <div class="info-icon">🔐</div>
+                <div>
+                    <div class="info-label">FreeRADIUS</div>
                 </div>
-
-                <!-- Info Items -->
-                <div class="info-items">
-                    <div class="info-item">
-                        <div class="info-icon">🔐</div>
-                        <div>
-                            <div class="info-label">FreeRADIUS</div>
-                        </div>
-                        <div class="info-value">{{ radius_status }}</div>
-                    </div>
-
-                    <div class="info-item">
-                        <div class="info-icon os">🐧</div>
-                        <div>
-                            <div class="info-label">OS</div>
-                        </div>
-                        <div class="info-value">{{ os_type }}</div>
-                    </div>
-
-                    <div class="info-item">
-                        <div class="info-icon" style="background: #8b5cf6;">⏱️</div>
-                        <div>
-                            <div class="info-label">Uptime</div>
-                        </div>
-                        <div class="info-value">{{ uptime }}</div>
-                    </div>
-                </div>
+                <div class="info-value">{{ radius_status }}</div>
             </div>
 
-            <!-- Right: User Management -->
-            <div class="user-table-container">
-                <h3>User Management</h3>
-                <table class="user-table">
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Role</th>
-                            <th>Status</th>
-                            <th>Last Login</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if recent_users %}
-                        {% for user in recent_users %}
-                        <tr>
-                            <td style="font-weight: 600;">{{ user.username }}</td>
-                            <td>{{ user.role }}</td>
-                            <td>
-                                <span class="status-badge">{{ user.status }}</span>
-                            </td>
-                            <td>{{ user.last_login }}</td>
-                            <td>
-                                <button class="btn-action" onclick="editUser('{{ user.username }}')">Edit</button>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% else %}
-                        <tr>
-                            <td style="font-weight: 600;">john</td>
-                            <td>Dummy</td>
-                            <td>
-                                <span class="status-badge">UP</span>
-                            </td>
-                            <td>2024-05-22</td>
-                            <td>
-                                <button class="btn-action">Edit</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="font-weight: 600;">john.doe</td>
-                            <td>Linux</td>
-                            <td>
-                                <span class="status-badge">UP</span>
-                            </td>
-                            <td>2024-05-22</td>
-                            <td>
-                                <button class="btn-action">Edit</button>
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+            <div class="info-item">
+                <div class="info-icon os">🐧</div>
+                <div>
+                    <div class="info-label">OS</div>
+                </div>
+                <div class="info-value">{{ os_type }}</div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-icon" style="background: #8b5cf6;">⏱️</div>
+                <div>
+                    <div class="info-label">Uptime</div>
+                </div>
+                <div class="info-value">{{ uptime }}</div>
             </div>
         </div>
+    </div>
 
-        <!-- Live Logs Section -->
-        <div class="log-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0;">Live Logs</h3>
-                <div style="font-size: 0.9rem; font-weight: 600;">
-                    <span id="connectionStatus" style="color: #f59e0b;">Connecting...</span>
-                </div>
-            </div>
+    <!-- Right: User Management -->
+    <div class="user-table-container">
+        <h3>User Management</h3>
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Last Login</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if recent_users %}
+                {% for user in recent_users %}
+                <tr>
+                    <td style="font-weight: 600;">{{ user.username }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>
+                        <span class="status-badge">{{ user.status }}</span>
+                    </td>
+                    <td>{{ user.last_login }}</td>
+                    <td>
+                        <button class="btn-action" onclick="editUser('{{ user.username }}')">Edit</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-light);">No users found</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
 
-            <div id="logConsole"
-                style="background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; padding: 1rem; border-radius: var(--radius-md); height: 400px; overflow-y: auto; font-size: 0.9rem; white-space: pre-wrap; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);">
-                <div style="color: #666; font-style: italic;">Waiting for logs...</div>
-            </div>
+<!-- Live Logs Section -->
+<div class="log-section">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0;">Live Logs</h3>
+        <div style="font-size: 0.9rem; font-weight: 600;">
+            <span id="connectionStatus" style="color: #f59e0b;">Connecting...</span>
         </div>
-    </main>
+    </div>
 
-    <footer class="app-footer">
-        roxx v{{ version }}
-    </footer>
+    <div id="logConsole"
+        style="background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; padding: 1rem; border-radius: var(--radius-md); height: 400px; overflow-y: auto; font-size: 0.9rem; white-space: pre-wrap; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);">
+        <div style="color: #666; font-style: italic;">Waiting for logs...</div>
+    </div>
+</div>
+{% endblock %}
 
-    <script>
-        const logConsole = document.getElementById('logConsole');
-        const statusSpan = document.getElementById('connectionStatus');
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
+{% block scripts %}
+<script>
+    const logConsole = document.getElementById('logConsole');
+    const statusSpan = document.getElementById('connectionStatus');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
 
-        function connect() {
-            const ws = new WebSocket(wsUrl);
+    function connect() {
+        const ws = new WebSocket(wsUrl);
 
-            ws.onopen = () => {
-                statusSpan.textContent = '● Live';
-                statusSpan.style.color = '#10B981'; // Green
-                logConsole.innerHTML = ''; // Clear initial message
-            };
+        ws.onopen = () => {
+            statusSpan.textContent = '● Live';
+            statusSpan.style.color = '#10B981'; // Green
+            logConsole.innerHTML = ''; // Clear initial message
+        };
 
-            ws.onmessage = (event) => {
-                const line = document.createElement('div');
-                line.textContent = event.data;
+        ws.onmessage = (event) => {
+            const line = document.createElement('div');
+            line.textContent = event.data;
 
-                // Enhanced color highlighting based on log level
-                if (event.data.includes('[Info]') || event.data.includes('SUCCESS')) {
-                    line.style.color = '#10B981'; // Green
-                } else if (event.data.includes('[Warn]') || event.data.includes('WARNING')) {
-                    line.style.color = '#F59E0B'; // Orange
-                } else if (event.data.includes('[Error]') || event.data.includes('FAILED')) {
-                    line.style.color = '#EF4444'; // Red
-                } else if (event.data.includes('Access-Accept')) {
-                    line.style.color = '#10B981';
-                } else if (event.data.includes('Access-Reject')) {
-                    line.style.color = '#EF4444';
-                }
+            // Enhanced color highlighting based on log level
+            if (event.data.includes('[Info]') || event.data.includes('SUCCESS')) {
+                line.style.color = '#10B981'; // Green
+            } else if (event.data.includes('[Warn]') || event.data.includes('WARNING')) {
+                line.style.color = '#F59E0B'; // Orange
+            } else if (event.data.includes('[Error]') || event.data.includes('FAILED')) {
+                line.style.color = '#EF4444'; // Red
+            } else if (event.data.includes('Access-Accept')) {
+                line.style.color = '#10B981';
+            } else if (event.data.includes('Access-Reject')) {
+                line.style.color = '#EF4444';
+            }
 
-                logConsole.appendChild(line);
-                logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll
-            };
+            logConsole.appendChild(line);
+            logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll
+        };
 
-            ws.onclose = () => {
-                statusSpan.textContent = '○ Disconnected (Reconnecting...)';
-                statusSpan.style.color = '#EF4444';
-                setTimeout(connect, 2000);
-            };
+        ws.onclose = () => {
+            statusSpan.textContent = '○ Disconnected (Reconnecting...)';
+            statusSpan.style.color = '#EF4444';
+            setTimeout(connect, 2000);
+        };
 
-            ws.onerror = (err) => {
-                console.error('WebSocket error:', err);
-                ws.close();
-            };
-        }
+        ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            ws.close();
+        };
+    }
 
-        function editUser(username) {
-            window.location.href = `/admins`;
-        }
+    function editUser(username) {
+        window.location.href = `/admins`;
+    }
 
-        // Smooth scroll to logs when clicking Logs tab
-        document.querySelector('a[href="#logs"]')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelector('.log-section').scrollIntoView({ behavior: 'smooth' });
-        });
+    // Smooth scroll to logs when clicking Logs tab (handled by sidebar now via ID if needed, or direct link)
+    // Sidebar link is /logs-view or similar, so this listener might be redundant but keeping for compatibility
+    if (window.location.hash === '#logs') {
+        document.querySelector('.log-section').scrollIntoView({ behavior: 'smooth' });
+    }
 
-        connect();
-    </script>
-</body>
-
-</html>
+    connect();
+</script>
+{% endblock %}
