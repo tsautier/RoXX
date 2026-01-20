@@ -441,12 +441,8 @@ async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(
 
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def home(request: Request):
-    """Home page"""
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "title": "RoXX Admin",
-        "version": VERSION
-    })
+    """Home page - redirects to dashboard"""
+    return RedirectResponse("/dashboard")
 
 
 @app.get("/totp/enroll", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
@@ -455,7 +451,8 @@ async def totp_enroll_page(request: Request):
     return templates.TemplateResponse("totp_enroll.html", {
         "request": request,
         "title": "TOTP Enrollment",
-        "version": VERSION
+        "version": VERSION,
+        "active_page": "mfa" # Sidebar highlight
     })
 
 # ... (API endpoints remain unchanged) ...
@@ -463,7 +460,11 @@ async def totp_enroll_page(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def dashboard(request: Request):
     """Dashboard page"""
+    import os # Added for os.name check
+    import logging # Added for logger.error
     from roxx.core.services import ServiceManager as SvcMgr
+    
+    logger = logging.getLogger(__name__) # Initialize logger
     
     # Check FreeRADIUS status
     radius_active = SystemManager.is_service_running('freeradius') or SystemManager.is_service_running('radiusd')
@@ -478,23 +479,26 @@ async def dashboard(request: Request):
                 "username": admin.get("username", "N/A"),
                 "role": admin.get("auth_source", "local").title(),
                 "status": "UP",  # Could be enhanced with actual session tracking
-                "last_login": admin.get("last_login", "N/A")
+                "last_login": admin.get("created_at", "N/A") # Placeholder as we don't strictly track login time in JSON yet
             })
     except Exception as e:
-        # If there's an error fetching users, provide sample data
-        print(f"Error fetching users: {e}")
+        logger.error(f"Error fetching dashboard users: {e}")
         recent_users = [
             {"username": "admin", "role": "Local", "status": "UP", "last_login": "2024-05-22"}
         ]
     
-    return templates.TemplateResponse("dashboard.html", {
+    # Build response context
+    context = {
         "request": request,
-        "os_type": SystemManager.get_os(),
         "radius_status": radius_status,
+        "os_type": "Linux" if os.name != 'nt' else "Windows",
         "uptime": SystemManager.get_uptime(),
+        "recent_users": recent_users,
         "version": VERSION,
-        "recent_users": recent_users
-    })
+        "active_page": "dashboard"
+    }
+    
+    return templates.TemplateResponse("dashboard.html", context)
 
 
 @app.get("/users", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
