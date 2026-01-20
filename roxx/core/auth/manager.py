@@ -127,8 +127,8 @@ class AuthManager:
             conn.execute("UPDATE admins SET last_login = ? WHERE username = ?", (datetime.now(), username))
             conn.commit()
             conn.close()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to update last_login for {username}: {e}")
 
         return True, dict(user)
 

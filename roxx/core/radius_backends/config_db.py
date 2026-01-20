@@ -28,19 +28,51 @@ class RadiusBackendDB:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         
         with sqlite3.connect(DB_PATH) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS radius_backends (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    backend_type TEXT NOT NULL CHECK(backend_type IN ('ldap', 'ntlm', 'sql', 'file')),
-                   name TEXT NOT NULL,
-                    enabled BOOLEAN DEFAULT 1,
-                    priority INTEGER DEFAULT 100,
-                    config_json TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(backend_type, name)
-                )
-            """)
+            # We need to recreate the table to update CHECK constraint if it's old
+            # Check if table exists
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='radius_backends'")
+            if cursor.fetchone():
+                # Table exists. Check if we need to migrate (hacky check: try insert valid new type)
+                try:
+                    conn.execute("INSERT INTO radius_backends (backend_type, name, config_json) VALUES ('radius_server', 'TEST_MIGRATION', '{}')")
+                    conn.execute("DELETE FROM radius_backends WHERE name='TEST_MIGRATION'")
+                except sqlite3.IntegrityError:
+                     # Check constraint failed - Recreate table
+                     logger.info("Migrating radius_backends table schema...")
+                     conn.execute("ALTER TABLE radius_backends RENAME TO radius_backends_old")
+                     
+                     conn.execute("""
+                        CREATE TABLE radius_backends (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            backend_type TEXT NOT NULL,
+                            name TEXT NOT NULL,
+                            enabled BOOLEAN DEFAULT 1,
+                            priority INTEGER DEFAULT 100,
+                            config_json TEXT NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(backend_type, name)
+                        )
+                    """)
+                     
+                     # Copy data (mapping types if needed, or just copy valid ones)
+                     # Old types: ldap, ntlm, sql, file. New types basically string.
+                     conn.execute("INSERT INTO radius_backends (id, backend_type, name, enabled, priority, config_json, created_at, updated_at) SELECT id, backend_type, name, enabled, priority, config_json, created_at, updated_at FROM radius_backends_old")
+                     conn.execute("DROP TABLE radius_backends_old")
+            else:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS radius_backends (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        backend_type TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        enabled BOOLEAN DEFAULT 1,
+                        priority INTEGER DEFAULT 100,
+                        config_json TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(backend_type, name)
+                    )
+                """)
             
             # Create index on priority for faster lookups
             conn.execute("""
@@ -57,7 +89,7 @@ class RadiusBackendDB:
         List all configured backends.
         
         Args:
-            backend_type: Filter by type ('ldap', 'ntlm', 'sql', 'file'). None = all types.
+            backend_type: Filter by type. None = all types.
             enabled_only: If True, return only enabled backends
             
         Returns:
@@ -123,8 +155,9 @@ class RadiusBackendDB:
         Returns:
             (success, message, backend_id)
         """
-        if backend_type not in ['ldap', 'ntlm', 'sql', 'file']:
-            return False, f"Invalid backend type: {backend_type}", None
+        ALLOWED_TYPES = ['radius_server', 'duo_security', 'ldap', 'ntlm', 'sql', 'file']
+        if backend_type not in ALLOWED_TYPES:
+             return False, f"Invalid backend type: {backend_type}. Allowed: {ALLOWED_TYPES}", None
         
         config_json = json.dumps(config_dict)
         

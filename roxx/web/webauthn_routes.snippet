@@ -1,0 +1,62 @@
+
+@app.get("/api/webauthn/login/options")
+async def webauthn_login_options(request: Request):
+    """Get WebAuthn login options"""
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
+        raise HTTPException(status_code=401, detail="Session required")
+    
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+        if status != "mfa_pending":
+             raise HTTPException(status_code=401, detail="Invalid session state")
+    except:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    from roxx.core.auth.webauthn import WebAuthnManager
+    options, state = WebAuthnManager.generate_authentication_options(username)
+    
+    if not options:
+        raise HTTPException(status_code=400, detail="No credentials found")
+        
+    # Store state in session
+    request.session["webauthn_state"] = state
+    
+    return JSONResponse(options)
+
+@app.post("/api/webauthn/login/verify")
+async def webauthn_login_verify(request: Request):
+    """Verify WebAuthn login"""
+    try:
+        data = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+        
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
+        raise HTTPException(status_code=401, detail="Session required")
+        
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+    except:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    state = request.session.get("webauthn_state")
+    if not state:
+        raise HTTPException(status_code=400, detail="State not found")
+        
+    from roxx.core.auth.webauthn import WebAuthnManager
+    success, msg = WebAuthnManager.verify_authentication(username, data, state)
+    
+    if success:
+        # Success!
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        response = JSONResponse({"success": True})
+        response.set_cookie(key="session", value=session_val, httponly=True)
+        request.session.pop("webauthn_state", None)
+        request.session.pop('mfa_username', None)
+        return response
+    else:
+        return JSONResponse({"success": False, "detail": msg}, status_code=400)

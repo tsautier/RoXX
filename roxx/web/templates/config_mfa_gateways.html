@@ -1,0 +1,292 @@
+{% extends "layout.html" %}
+
+{% block title %}MFA Gateway Configuration - RoXX{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1>MFA Gateways</h1>
+        <a href="/config" class="btn btn-outline">Back to Config</a>
+    </div>
+
+    <!-- SMS Gateway Config -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+            <div>
+                <h2>SMS Gateway</h2>
+                <p style="color: var(--text-light);">Configure SMS delivery for OPTs.</p>
+            </div>
+            <div class="toggle-switch">
+                <input type="checkbox" id="smsEnabled" onchange="toggleSmsFields()">
+                <label for="smsEnabled"></label>
+            </div>
+        </div>
+
+        <form id="smsForm" onsubmit="saveConfig(event)">
+            <div class="form-group">
+                <label>Provider Type</label>
+                <select id="smsProviderType" name="provider" onchange="updateSmsFields()"
+                    style="width: 100%; padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <option value="twilio">Twilio</option>
+                    <option value="generic">Generic HTTP</option>
+                </select>
+            </div>
+
+            <!-- Twilio Fields -->
+            <div id="twilioFields">
+                <div class="form-group">
+                    <label>Account SID</label>
+                    <input type="text" id="twilioSid" name="twilio_sid" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Auth Token</label>
+                    <input type="password" id="twilioToken" name="twilio_token" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>From Number</label>
+                    <input type="text" id="twilioFrom" name="twilio_from" class="form-control"
+                        placeholder="+1234567890">
+                </div>
+            </div>
+
+            <!-- Generic Fields -->
+            <div id="genericFields" style="display: none;">
+                <div class="form-group">
+                    <label>Webhook URL</label>
+                    <input type="text" id="genericUrl" name="generic_url" class="form-control"
+                        placeholder="https://api.gateway.com/send">
+                </div>
+                <div class="form-group">
+                    <label>Headers (JSON)</label>
+                    <textarea id="genericHeaders" name="generic_headers" class="form-control" rows="3"
+                        placeholder='{"Authorization": "Bearer ..."}''></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Body Template (JSON)</label>
+                    <p style="font-size: 0.8rem; color: var(--text-light);">Use <code>{phone}</code> and <code>{message}</code> placeholders.</p>
+                    <textarea id="genericBody" name="generic_body_template" class="form-control" rows="3" placeholder='
+                        {"to": "{phone}" , "text" : "{message}" }'></textarea>
+                </div>
+            </div>
+
+            <div class="form-group"
+                style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <label>Test SMS</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="testPhone" placeholder="+1..." style="flex: 1;">
+                    <button type="button" class="btn btn-outline" onclick="testSms()">Send Test</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Email Gateway Config -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+            <div>
+                <h2>Email Provider</h2>
+                <p style="color: var(--text-light);">Configure SMTP for Email OTPs.</p>
+            </div>
+            <div class="toggle-switch">
+                <input type="checkbox" id="emailEnabled" onchange="toggleEmailFields()">
+                <label for="emailEnabled"></label>
+            </div>
+        </div>
+
+        <form id="emailForm" onsubmit="saveConfig(event)">
+            <div class="form-group">
+                <label>SMTP Server</label>
+                <input type="text" id="smtpServer" name="smtp_server" class="form-control" placeholder="smtp.gmail.com">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" id="smtpPort" name="smtp_port" class="form-control" placeholder="587">
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; margin-top: 1.8rem;">
+                    <input type="checkbox" id="smtpTls" name="use_tls" style="margin-right: 0.5rem;" checked>
+                    <label for="smtpTls" style="margin-bottom: 0;">Use TLS</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Username / Email</label>
+                <input type="text" id="smtpUser" name="smtp_user" class="form-control" placeholder="admin@roxx.com">
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="smtpPassword" name="smtp_password" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label>From Address</label>
+                <input type="text" id="smtpFrom" name="from_email" class="form-control" placeholder="noreply@roxx.com">
+            </div>
+
+            <div class="form-group"
+                style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <label>Test Email</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="email" id="testEmail" placeholder="user@example.com" style="flex: 1;">
+                    <button type="button" class="btn btn-outline" onclick="testEmail()">Send Test</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentConfig = {};
+
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config/mfa-gateways');
+            const data = await res.json();
+            currentConfig = data;
+
+            // SMS Config
+            const sms = data.sms || {};
+            if (sms.provider && sms.provider !== 'disabled') {
+                document.getElementById('smsEnabled').checked = true;
+                document.getElementById('smsProviderType').value = sms.provider;
+            } else {
+                document.getElementById('smsEnabled').checked = false;
+            }
+            document.getElementById('twilioSid').value = sms.twilio_sid || '';
+            document.getElementById('twilioToken').value = sms.twilio_token || '';
+            document.getElementById('twilioFrom').value = sms.twilio_from || '';
+            document.getElementById('genericUrl').value = sms.generic_url || '';
+            document.getElementById('genericHeaders').value = sms.generic_headers ? JSON.stringify(sms.generic_headers) : '';
+            document.getElementById('genericBody').value = sms.generic_body_template || '';
+
+            // Email Config
+            const email = data.email || {};
+            document.getElementById('emailEnabled').checked = !!email.enabled;
+            document.getElementById('smtpServer').value = email.smtp_server || '';
+            document.getElementById('smtpPort').value = email.smtp_port || 587;
+            document.getElementById('smtpUser').value = email.smtp_user || '';
+            document.getElementById('smtpPassword').value = email.smtp_password || '';
+            document.getElementById('smtpFrom').value = email.from_email || '';
+            document.getElementById('smtpTls').checked = email.use_tls !== false;
+
+            toggleSmsFields();
+            toggleEmailFields();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function toggleSmsFields() {
+        const enabled = document.getElementById('smsEnabled').checked;
+        const form = document.getElementById('smsForm');
+        const inputs = form.querySelectorAll('input:not(#smsEnabled), select, textarea, button');
+        inputs.forEach(el => el.disabled = !enabled);
+        if (enabled) updateSmsFields();
+    }
+
+    function toggleEmailFields() {
+        const enabled = document.getElementById('emailEnabled').checked;
+        const form = document.getElementById('emailForm');
+        const inputs = form.querySelectorAll('input:not(#emailEnabled), select, textarea, button');
+        inputs.forEach(el => el.disabled = !enabled);
+    }
+
+    function updateSmsFields() {
+        const type = document.getElementById('smsProviderType').value;
+        if (type === 'twilio') {
+            document.getElementById('twilioFields').style.display = 'block';
+            document.getElementById('genericFields').style.display = 'none';
+        } else {
+            document.getElementById('twilioFields').style.display = 'none';
+            document.getElementById('genericFields').style.display = 'block';
+        }
+    }
+
+    async function saveConfig(e) {
+        e.preventDefault();
+
+        // SMS
+        const smsEnabled = document.getElementById('smsEnabled').checked;
+        let smsConfig = { provider: smsEnabled ? document.getElementById('smsProviderType').value : 'disabled' };
+        if (smsEnabled) {
+            if (smsConfig.provider === 'twilio') {
+                smsConfig.twilio_sid = document.getElementById('twilioSid').value;
+                smsConfig.twilio_token = document.getElementById('twilioToken').value;
+                smsConfig.twilio_from = document.getElementById('twilioFrom').value;
+            } else {
+                smsConfig.generic_url = document.getElementById('genericUrl').value;
+                try { smsConfig.generic_headers = JSON.parse(document.getElementById('genericHeaders').value || '{}'); } catch (e) { }
+                smsConfig.generic_body_template = document.getElementById('genericBody').value;
+            }
+        }
+
+        // Email
+        const emailEnabled = document.getElementById('emailEnabled').checked;
+        let emailConfig = { enabled: emailEnabled };
+        if (emailEnabled) {
+            emailConfig.smtp_server = document.getElementById('smtpServer').value;
+            emailConfig.smtp_port = document.getElementById('smtpPort').value;
+            emailConfig.smtp_user = document.getElementById('smtpUser').value;
+            emailConfig.smtp_password = document.getElementById('smtpPassword').value;
+            emailConfig.from_email = document.getElementById('smtpFrom').value;
+            emailConfig.use_tls = document.getElementById('smtpTls').checked;
+        }
+
+        try {
+            const res = await fetch('/api/config/mfa-gateways', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sms: smsConfig, email: emailConfig })
+            });
+            if (res.ok) alert("Configuration Saved!");
+            else alert("Error saving");
+        } catch (e) {
+            alert("Error: " + e.message);
+        }
+    }
+
+    async function testEmail() {
+        const emailAddr = document.getElementById('testEmail').value;
+        if (!emailAddr) return alert("Enter an email");
+
+        // Build temp config
+        const enabled = document.getElementById('emailEnabled').checked;
+        if (!enabled) return alert("Enable Email first");
+
+        const config = {
+            enabled: true,
+            smtp_server: document.getElementById('smtpServer').value,
+            smtp_port: document.getElementById('smtpPort').value,
+            smtp_user: document.getElementById('smtpUser').value,
+            smtp_password: document.getElementById('smtpPassword').value,
+            from_email: document.getElementById('smtpFrom').value,
+            use_tls: document.getElementById('smtpTls').checked
+        };
+
+        try {
+            const res = await fetch('/api/test/email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: emailAddr, config: config })
+            });
+            const d = await res.json();
+            if (d.success) alert("Email Sent Successfully!");
+            else alert("Email Failed. Check logs.");
+        } catch (e) { alert("Error: " + e.message); }
+    }
+
+    loadConfig();
+</script>
+{% endblock %}
