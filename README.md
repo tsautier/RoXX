@@ -5,7 +5,7 @@
 </p>
 
 
-**R**adius **O**pen e**X**tensible e**X**change - Version 1.0.0-beta2
+**R**adius **O**pen e**X**tensible e**X**change - Version 1.0.0-beta5
 
 Modern Python-based RADIUS proxy for Linux with advanced authentication backends.
 
