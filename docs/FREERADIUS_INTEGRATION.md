@@ -1,180 +1,168 @@
-# FreeRADIUS Integration Guide
+# FreeRADIUS Integration with RoXX MFA
 
 ## Overview
-RoXX provides **dual integration** with FreeRADIUS:
-1. **rlm_python** (recommended) - Direct Python module for low latency
-2. **REST API** - HTTP endpoint for flexibility
 
-## Method 1: rlm_python (Recommended)
+This guide explains how to integrate RoXX's MFA/2FA functionality with FreeRADIUS using the Python module (`rlm_python3`). This allows VPN users to authenticate with password+TOTP through FreeRADIUS.
 
-### Installation
+## Architecture
 
-1. **Install FreeRADIUS Python Module**
-   ```bash
-   # Ubuntu/Debian
-   apt-get install freeradius-python3
-   
-   # RHEL/CentOS
-   yum install freeradius-python3
-   ```
+```
+VPN Client → FreeRADIUS Server → rlm_python3 → RoXX Backend → MFA Database
+                                                    ↓
+                                            LDAP/SQL/File Backend
+```
 
-2. **Copy RoXX Module Configuration**
-   ```bash
-   cp /path/to/roxx/freeradius/roxx-module.conf /etc/freeradius/3.0/mods-available/roxx
-   ln -s ../mods-available/roxx /etc/freeradius/3.0/mods-enabled/roxx
-   ```
+**Flow:**
+1. User enters `password+TOTP` in VPN client
+2. FreeRADIUS receives Access-Request
+3. `rlm_python3` module calls RoXX authentication
+4. RoXX extracts TOTP, verifies it
+5. RoXX authenticates base password against backend
+6. Access-Accept or Access-Reject returned
 
-3. **Edit Module Configuration**
-   ```bash
-   nano /etc/freeradius/3.0/mods-enabled/roxx
-   ```
-   
-   Update `mod_path` to point to your RoXX installation:
-   ```
-   python roxx {
-       mod_path = "/opt/roxx"  # or wherever RoXX is installed
-       module = "roxx.integrations.freeradius_module"
-       func_authorize = authorize
-       func_authenticate = authenticate
-       func_post_auth = post_auth
-   }
-   ```
+## Prerequisites
 
-4. **Enable RoXX in Site Configuration**
-   ```bash
-   nano /etc/freeradius/3.0/sites-enabled/default
-   ```
-   
-   Add `roxx` to authorize and authenticate sections:
-   ```
-   authorize {
-       preprocess
-       chap
-       mschap
-       roxx  # Add here
-       ...
-   }
-   
-   authenticate {
-       Auth-Type PAP {
-           roxx  # Add here
-       }
-       Auth-Type CHAP {
-           roxx  # Add here
-       }
-       Auth-Type MS-CHAP {
-           mschap
-       }
-   }
-   ```
+### System Requirements
 
-5. **Restart FreeRadIUS**
-   ```bash
-   systemctl restart freeradius
-   systemctl status freeradius
-   ```
+- **FreeRADIUS 3.0+** with `rlm_python3` module
+- **Python 3.8+**
+- **RoXX** installed and configured
+- **SQLite** for MFA database (already included)
 
-### Testing
+### Install FreeRADIUS with Python Support
+
+#### Ubuntu/Debian
 
 ```bash
-# Test authentication
-radtest testuser testpass localhost 0 testing123
+sudo apt-get update
+sudo apt-get install freeradius freeradius-python3
+```
 
-# Check logs
+#### CentOS/RHEL
+
+```bash
+sudo yum install freeradius freeradius-python3
+```
+
+##Installation
+
+### Step 1: Copy FreeRADIUS Module
+
+The module is already included at `roxx/integrations/freeradius_module.py`.
+
+```bash
+# Copy to FreeRADIUS mods-config
+sudo cp roxx/integrations/freeradius_module.py \
+        /etc/freeradius/3.0/mods-config/python3/roxx_auth.py
+
+# Set permissions
+sudo chown freerad:freerad /etc/freeradius/3.0/mods-config/python3/roxx_auth.py
+sudo chmod 640 /etc/freeradius/3.0/mods-config/python3/roxx_auth.py
+```
+
+### Step 2: Configure Environment
+
+Set ROXX_PATH for FreeRADIUS:
+
+```bash
+# Edit /etc/systemd/system/freeradius.service.d/roxx.conf
+sudo mkdir -p /etc/systemd/system/freeradius.service.d
+sudo tee /etc/systemd/system/freeradius.service.d/roxx.conf << EOF
+[Service]
+Environment="ROXX_PATH=/opt/RoXX"
+EOF
+
+# Reload systemd
+sudo systemctl daemon-reload
+```
+
+### Step 3: Configure Python Module
+
+Edit `/etc/freeradius/3.0/mods-available/python3`:
+
+```
+python3 {
+    mod_instantiate = ${modconfdir}/${.:name}/roxx_auth
+    func_instantiate = instantiate
+
+    mod_authorize = ${modconfdir}/${.:name}/roxx_auth
+    func_authorize = authorize
+
+    mod_authenticate = ${modconfdir}/${.:name}/roxx_auth
+    func_authenticate = authenticate
+
+    mod_post_auth = ${modconfdir}/${.:name}/roxx_auth
+    func_post_auth = post_auth
+}
+```
+
+### Step 4: Enable Module
+
+```bash
+cd /etc/freeradius/3.0/mods-enabled
+sudo ln -s ../mods-available/python3 python3
+```
+
+### Step 5: Configure Site
+
+Edit `/etc/freeradius/3.0/sites-available/default`:
+
+```
+authorize {
+    preprocess
+    python3  # Add RoXX authorization
+    pap
+}
+
+authenticate {
+    python3  # RoXX authentication with MFA support
+}
+
+post-auth {
+    python3  # Optional: MFA usage tracking
+}
+```
+
+## Testing
+
+### Test with radtest
+
+```bash
+# Without MFA
+radtest john.doe MyPassword localhost 1812 testing123
+
+# With MFA (password + TOTP)
+radtest jane.smith SecurePass456789 localhost 1812 testing123
+```
+
+### Debug Mode
+
+```bash
+sudo freeradius -X
+
+# Look for:
+# [RoXX] Instantiating RoXX RADIUS module
+# [RoXX] Loaded 3 RADIUS backends
+# [RoXX] Authenticating user: john.doe
+# [RoXX] TOTP verified for john.doe
+# [RoXX] Authentication successful for john.doe
+```
+
+## Monitoring
+
+### Logs
+
+```bash
 tail -f /var/log/freeradius/radius.log
+
+# Sample:
+# Info: [RoXX] Authenticating user: john.doe
+# Info: [RoXX] TOTP verified for john.doe
+# Info: [RoXX] Authentication successful for john.doe
+# Auth: Login OK: [john.doe] (from client fortig ate port 0)
 ```
 
-## Method 2: REST API
+## See Also
 
-### Configuration
-
-1. **Configure rlm_rest Module**
-   ```bash
-   nano /etc/freeradius/3.0/mods-enabled/rest
-   ```
-   
-   Add RoXX REST configuration:
-   ```
-   rest roxx_rest {
-       uri = "http://localhost:8000/api/radius-auth"
-       method = 'post'
-       body = 'json'
-       
-       authorize {
-           uri = "${...uri}"
-           method = 'post'
-           body = 'json'
-       }
-       
-       authenticate {
-           uri = "${...uri}"
-           method = 'post'
-           body = 'json'
-           
-           # Map RADIUS attributes to JSON
-           data = "{
-               \"username\": \"%{User-Name}\",
-               \"password\": \"%{User-Password}\"
-           }"
-       }
-   }
-   ```
-
-2. **Enable in Site Configuration**
-   ```
-   authenticate {
-       roxx_rest
-   }
-   ```
-
-## Performance Comparison
-
-| Method | Latency | Complexity | Recommended For |
-|--------|---------|------------|-----------------|
-| rlm_python | ~1-2ms | Low | Production |
-| REST API | ~5-10ms | Very Low | Testing, External Systems |
-
-## Troubleshooting
-
-### rlm_python Issues
-
-**Module not loading:**
-```bash
-# Check Python path
-python3 -c "from roxx.integrations.freeradius_module import *; print('OK')"
-
-# Check FreeRADIUS debug
-freeradius -X
-```
-
-**Import errors:**
-```bash
-# Set ROXX_PATH environment variable
-export ROXX_PATH=/opt/roxx
-systemctl restart freeradius
-```
-
-### REST API Issues
-
-**Connection refused:**
-- Ensure RoXX web app is running: `python -m roxx.web.app`
-- Check firewall rules
-
-**Authentication fails:**
-- Check RoXX logs: `tail -f ~/.roxx/logs/roxx.log`
-- Verify backend configuration in web UI
-
-## Security Notes
-
-- **rlm_python** runs in FreeRADIUS process - very secure
-- **REST API** requires authentication - ensure firewall rules
-- Both methods use the same backend manager
-- Backends are tried in priority order
-- Successful authentications are cached (5 min TTL)
-
-## Next Steps
-
-1. Configure RADIUS backends in web UI: http://localhost:8000/config/radius-backends
-2. Test with `radtest`
-3. Monitor authentication logs
-4. Adjust backend priorities as needed
+- [MFA VPN Guide](MFA_VPN_GUIDE.md) - VPN client configuration
+- [Deployment Guide](DEPLOYMENT_GUIDE.md) - Production setup
