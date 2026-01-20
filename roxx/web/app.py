@@ -170,14 +170,17 @@ async def login(request: Request, username: str = Form(...), password: str = For
             response.set_cookie(key="session", value=session_val, httponly=True)
             return response
 
-        # 2. MFA Enabled?
-        if user_data.get("mfa_secret"):
+        # 2. MFA Enabled? Check database
+        mfa_enabled = MFADatabase.is_mfa_enabled(username)
+        if mfa_enabled:
+            # Store username in session for MFA verification
+            request.session['mfa_username'] = username
             session_val = base64.b64encode(f"{username}:mfa_pending".encode("utf-8")).decode("utf-8")
-            response = RedirectResponse(url="/auth/mfa-challenge", status_code=303)
+            response = RedirectResponse(url="/login/mfa", status_code=303)
             response.set_cookie(key="session", value=session_val, httponly=True)
             return response
 
-        # 3. Standard Login
+        # 3. Standard Login (no MFA)
         session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
         response = RedirectResponse(url="/", status_code=303)
         response.set_cookie(key="session", value=session_val, httponly=True)
@@ -188,11 +191,100 @@ async def login(request: Request, username: str = Form(...), password: str = For
         "error": "Invalid username or password"
     })
 
+
 @app.get("/logout")
-async def logout():
+async def logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("session")
+    # Clear MFA session data
+    request.session.pop('mfa_username', None)
     return response
+
+# MFA Verification Routes
+@app.get("/login/mfa", response_class=HTMLResponse)
+async def mfa_verification_page(request: Request):
+    """MFA verification page"""
+    # Check if user has valid mfa_pending session
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+        
+        if status != "mfa_pending":
+            return RedirectResponse(url="/login", status_code=303)
+        
+        return templates.TemplateResponse("mfa_verify.html", {
+            "request": request,
+            "username": username
+        })
+    except:
+        return RedirectResponse(url="/login", status_code=303)
+
+@app.post("/login/mfa/verify")
+async def mfa_verify_login(
+    request: Request,
+    token: str = Form(None),
+    backup_code: str = Form(None)
+):
+    """Verify MFA token or backup code"""
+    # Get username from session
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+        
+        if status != "mfa_pending":
+            return RedirectResponse(url="/login", status_code=303)
+        
+        # Get MFA settings
+        settings = MFADatabase.get_mfa_settings(username)
+        if not settings or not settings.get('mfa_enabled'):
+            return RedirectResponse(url="/login", status_code=303)
+        
+        verified = False
+        error_message = None
+        
+        # Try TOTP token first
+        if token:
+            secret = settings['totp_secret']
+            if MFAManager.verify_totp(secret, token):
+                verified = True
+                MFADatabase.update_last_used(username)
+        
+        # Try backup code if TOTP failed
+        if not verified and backup_code:
+            success, message = MFADatabase.verify_and_consume_backup_code(username, backup_code)
+            if success:
+                verified = True
+            else:
+                error_message = message
+        
+        if verified:
+            # MFA successful - grant full access
+            session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+            response = RedirectResponse(url="/", status_code=303)
+            response.set_cookie(key="session", value=session_val, httponly=True)
+            # Clear MFA session data
+            request.session.pop('mfa_username', None)
+            return response
+        else:
+            # MFA failed
+            return templates.TemplateResponse("mfa_verify.html", {
+                "request": request,
+                "username": username,
+                "error": error_message or "Invalid verification code"
+            })
+    
+    except Exception as e:
+        print(f"[MFA] Verification error: {e}")
+        return RedirectResponse(url="/login", status_code=303)
+
 
 # ------------------------------------------------------------------------------
 # Password & MFA Management

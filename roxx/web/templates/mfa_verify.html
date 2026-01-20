@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}MFA Verification - RoXX{% endblock %}
+
+{% block content %}
+<style>
+    .mfa-verify-container {
+        max-width: 450px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .lock-icon {
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2rem;
+    }
+
+    h2 {
+        text-align: center;
+        color: #1f2937;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #6b7280;
+        margin-bottom: 2rem;
+    }
+
+    .token-input {
+        width: 100%;
+        text-align: center;
+        font-size: 2rem;
+        padding: 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 0.5rem;
+        transition: border-color 0.3s;
+    }
+
+    .token-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn {
+        width: 100%;
+        padding: 1rem;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-bottom: 1rem;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+    }
+
+    .error-message {
+        background: #fef2f2;
+        border-left: 4px solid #ef4444;
+        color: #dc2626;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+
+    .backup-link {
+        text-align: center;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .backup-link a {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .backup-link a:hover {
+        text-decoration: underline;
+    }
+
+    .backup-input {
+        display: none;
+    }
+
+    .backup-input.show {
+        display: block;
+    }
+
+    .hint {
+        text-align: center;
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+
+    .timer {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.75rem;
+        margin-top: 0.5rem;
+    }
+</style>
+
+<div class="mfa-verify-container">
+    <div class="lock-icon">🔒</div>
+
+    <h2>Two-Factor Authentication</h2>
+    <p class="subtitle">Enter the code from your authenticator app</p>
+
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/login/mfa/verify">
+        <div id="totpSection">
+            <input type="text" name="token" id="tokenInput" class="token-input" maxlength="6" placeholder="000000"
+                autofocus autocomplete="off" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+            <p class="hint">Code expires every 30 seconds</p>
+            <p class="timer" id="timer"></p>
+        </div>
+
+        <div id="backupSection" class="backup-input">
+            <p style="text-align: center; margin-bottom: 1rem;">
+                <strong>Using a backup code?</strong><br>
+                <span style="color: #6b7280; font-size: 0.875rem;">Enter it below (8 characters)</span>
+            </p>
+            <input type="text" name="backup_code" id="backupInput" class="token-input" maxlength="8"
+                placeholder="XXXXXXXX" autocomplete="off" style="letter-spacing: 0.3rem;"
+                oninput="this.value = this.value.toUpperCase().replace(/[^A-F0-9]/g, '')">
+            <p class="hint">Each backup code can only be used once</p>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Verify</button>
+        <button type="button" class="btn btn-secondary" onclick="window.location.href='/logout'">Cancel</button>
+    </form>
+
+    <div class="backup-link">
+        <a href="#" id="toggleBackup" onclick="toggleBackupMode(); return false;">
+            <span id="toggleText">Use backup code instead</span>
+        </a>
+    </div>
+</div>
+
+<script>
+    let usingBackup = false;
+
+    function toggleBackupMode() {
+        usingBackup = !usingBackup;
+        const totpSection = document.getElementById('totpSection');
+        const backupSection = document.getElementById('backupSection');
+        const toggleText = document.getElementById('toggleText');
+
+        if (usingBackup) {
+            totpSection.style.display = 'none';
+            backupSection.classList.add('show');
+            toggleText.textContent = 'Use authenticator code instead';
+            document.getElementById('backupInput').focus();
+            // Clear TOTP input when switching to backup
+            document.getElementById('tokenInput').value = '';
+        } else {
+            totpSection.style.display = 'block';
+            backupSection.classList.remove('show');
+            toggleText.textContent = 'Use backup code instead';
+            document.getElementById('tokenInput').focus();
+            // Clear backup input when switching to TOTP
+            document.getElementById('backupInput').value = '';
+        }
+    }
+
+    // Auto-submit when 6 digits entered (TOTP only)
+    document.getElementById('tokenInput').addEventListener('input', function (e) {
+        if (this.value.length === 6) {
+            // Small delay for better UX
+            setTimeout(() => {
+                this.form.submit();
+            }, 300);
+        }
+    });
+
+    // TOTP timer countdown
+    function updateTimer() {
+        const now = Math.floor(Date.now() / 1000);
+        const timeStep = 30;
+        const remaining = timeStep - (now % timeStep);
+
+        const timerEl = document.getElementById('timer');
+        if (remaining <= 5) {
+            timerEl.style.color = '#ef4444';
+            timerEl.textContent = `Code expires in ${remaining}s - Get ready for new code`;
+        } else {
+            timerEl.style.color = '#9ca3af';
+            timerEl.textContent = `Time remaining: ${remaining}s`;
+        }
+    }
+
+    // Update timer every second (only when in TOTP mode)
+    setInterval(() => {
+        if (!usingBackup) {
+            updateTimer();
+        }
+    }, 1000);
+
+    // Initial timer update
+    updateTimer();
+
+    // Focus input on load
+    document.getElementById('tokenInput').focus();
+</script>
+{% endblock %}
