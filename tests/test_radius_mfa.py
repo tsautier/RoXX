@@ -20,16 +20,33 @@ def temp_mfa_db():
     
     import roxx.core.auth.mfa_db as mfa_db_module
     original_path = mfa_db_module.DB_PATH
+    original_conn = mfa_db_module.db_conn
     mfa_db_module.DB_PATH = db_path
     
     MFADatabase.init()
     
     yield db_path
     
+    # Cleanup - close connection first
+    if mfa_db_module.db_conn:
+        mfa_db_module.db_conn.close()
+        mfa_db_module.db_conn = None
+    
     mfa_db_module.DB_PATH = original_path
+    mfa_db_module.db_conn = original_conn
+    
+    # Delete file with retry
+    import time
+    time.sleep(0.1)
     if db_path.exists():
-        db_path.unlink()
-    os.rmdir(temp_dir)
+        try:
+            db_path.unlink()
+        except PermissionError:
+            pass
+    try:
+        os.rmdir(temp_dir)
+    except:
+        pass
 
 
 @pytest.fixture

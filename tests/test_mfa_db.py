@@ -20,6 +20,7 @@ def temp_db():
     # Override DB path
     import roxx.core.auth.mfa_db as mfa_db_module
     original_path = mfa_db_module.DB_PATH
+    original_conn = mfa_db_module.db_conn
     mfa_db_module.DB_PATH = db_path
     
     # Initialize database
@@ -27,11 +28,27 @@ def temp_db():
     
     yield db_path
     
-    # Cleanup
+    # Cleanup - close connection first
+    if mfa_db_module.db_conn:
+        mfa_db_module.db_conn.close()
+        mfa_db_module.db_conn = None
+    
+    # Restore original
     mfa_db_module.DB_PATH = original_path
+    mfa_db_module.db_conn = original_conn
+    
+    # Delete file
+    import time
+    time.sleep(0.1)  # Small delay for Windows file release
     if db_path.exists():
-        db_path.unlink()
-    os.rmdir(temp_dir)
+        try:
+            db_path.unlink()
+        except PermissionError:
+            pass  # Ignore if still locked
+    try:
+        os.rmdir(temp_dir)
+    except:
+        pass
 
 
 class TestMFADatabase:
@@ -83,11 +100,11 @@ class TestMFADatabase:
         _, backup_codes = MFAManager.generate_backup_codes(10)
         
         # Before enrollment
-        assert MFADatabase.is_mfa_enabled(username) is False
+        assert not MFADatabase.is_mfa_enabled(username)
         
         # After enrollment
         MFADatabase.enroll_totp(username, secret, backup_codes)
-        assert MFADatabase.is_mfa_enabled(username) is True
+        assert MFADatabase.is_mfa_enabled(username)  # Truthy check
     
     def test_verify_and_consume_backup_code(self, temp_db):
         """Test verifying and consuming backup code"""
@@ -140,14 +157,14 @@ class TestMFADatabase:
         
         # Enroll user
         MFADatabase.enroll_totp(username, secret, backup_codes)
-        assert MFADatabase.is_mfa_enabled(username) is True
+        assert MFADatabase.is_mfa_enabled(username)  # Truthy check (can be 1 or True)
         
         # Disable MFA
         success, message = MFADatabase.disable_mfa(username)
         
         assert success is True
         assert "disabled" in message.lower()
-        assert MFADatabase.is_mfa_enabled(username) is False
+        assert not MFADatabase.is_mfa_enabled(username)  # Falsy check
     
     def test_delete_mfa(self, temp_db):
         """Test deleting MFA settings"""

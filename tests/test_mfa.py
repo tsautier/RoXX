@@ -29,7 +29,8 @@ class TestMFAManager:
         
         # Should be valid TOTP URI
         assert uri.startswith("otpauth://totp/")
-        assert username in uri
+        # Email gets URL-encoded (@ becomes %40)
+        assert "test%40example.com" in uri or "test@example.com" in uri
         assert secret in uri
         assert "issuer=RoXX" in uri
     
