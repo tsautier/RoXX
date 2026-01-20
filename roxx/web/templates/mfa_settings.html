@@ -299,8 +299,7 @@
                         </div>
                         <button class="btn btn-danger" onclick="disableMFA()">Disable MFA</button>
                     </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn" style="background: #3b82f6; color: white;" onclick="viewBackupCodes()">📋 View Backup Codes</button>
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                         <button class="btn" style="background: #f59e0b; color: white;" onclick="regenerateBackupCodes()">🔄 Regenerate Codes</button>
                     </div>
                 </div>
@@ -440,15 +439,6 @@
         errorDiv.textContent = message;
         errorDiv.classList.remove('hidden');
         setTimeout(() => errorDiv.classList.add('hidden'), 5000);
-    }
-
-    async function viewBackupCodes() {
-        const codes = prompt("Enter an existing backup code or TOTP code to view remaining backup codes:");
-        if (!codes) return;
-
-        // TODO: Validate code before showing backup codes
-        // For now navigate to dedicated page
-        window.location.href = '/settings/mfa/backup-codes';
     }
 
     async function regenerateBackupCodes() {
