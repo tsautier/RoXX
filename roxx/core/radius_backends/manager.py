@@ -97,12 +97,15 @@ class RadiusBackendManager:
         """
         Authenticate user against configured backends.
         
+        Supports MFA: If user has MFA enabled, password should be: password+TOTP
+        Example: "MyPassword123456" where 123456 is the 6-digit TOTP code
+        
         Tries backends in priority order (lower priority number first).
         Uses cache for performance optimization.
         
         Args:
             username: Username to authenticate
-            password: Password to verify
+            password: Password to verify (may include TOTP appended)
             
         Returns:
             (success: bool, radius_attributes: dict or None)
@@ -111,10 +114,42 @@ class RadiusBackendManager:
             logger.warning("Empty username or password")
             return False, None
         
-        # 1. Check cache first
-        cached_result = self.cache.get(username, password)
-        if cached_result is not None:
+        # Check if user has MFA enabled
+        from roxx.core.auth.mfa_db import MFADatabase
+        from roxx.core.auth.mfa import MFAManager
+        
+        mfa_enabled = MFADatabase.is_mfa_enabled(username)
+        actual_password = password
+        totp_verified = False
+        
+        if mfa_enabled:
+            # MFA enabled - expect password+TOTP (last 6 digits)
+            if len(password) > 6:
+                base_password = password[:-6]  # All except last 6 chars
+                totp_token = password[-6:]      # Last 6 chars
+                
+                # Verify TOTP token
+                settings = MFADatabase.get_mfa_settings(username)
+                if settings and settings.get('totp_secret'):
+                    if MFAManager.verify_totp(settings['totp_secret'], totp_token):
+                        actual_password = base_password
+                        totp_verified = True
+                        logger.info(f"TOTP verified for {username}")
+                    else:
+                        logger.warning(f"Invalid TOTP for {username}")
+                        return False, None
+                else:
+                    logger.error(f"MFA enabled but no secret found for {username}")
+                    return False, None
+            else:
+                logger.warning(f"MFA enabled for {username} but password too short for TOTP")
+                return False, None
+        
+        # 1. Check cache first (use base password if MFA)
+        cached_result = self.cache.get(username, actual_password)
+        if cached_result is not None and (not mfa_enabled or totp_verified):
             logger.info(f"Authentication from cache for {username}")
+            MFADatabase.update_last_used(username) if mfa_enabled else None
             return cached_result
         
         # 2. Try each backend in priority order
@@ -128,13 +163,17 @@ class RadiusBackendManager:
             
             try:
                 logger.debug(f"Trying backend: {backend.get_name()}")
-                success, attributes = backend.authenticate(username, password)
+                success, attributes = backend.authenticate(username, actual_password)
                 
                 if success:
                     logger.info(f"Authentication successful via {backend.get_name()} for {username}")
                     
-                    # Cache successful authentication
-                    self.cache.set(username, password, attributes or {})
+                    # Update MFA last used if applicable
+                    if mfa_enabled and totp_verified:
+                        MFADatabase.update_last_used(username)
+                    
+                    # Cache successful authentication (with base password)
+                    self.cache.set(username, actual_password, attributes or {})
                     
                     return True, attributes
                 else:
@@ -150,6 +189,7 @@ class RadiusBackendManager:
         # All backends failed
         logger.warning(f"Authentication failed for {username} (all backends exhausted)")
         return False, None
+
     
     def test_backend(self, backend_type: str, config: dict, test_username: str, test_password: str) -> Tuple[bool, str]:
         """
