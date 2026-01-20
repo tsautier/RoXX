@@ -15,15 +15,14 @@
     <div class="login-card">
         <div class="login-header">
             <img src="/static/img/logo.png" alt="RoXX Logo">
-            <h2>Welcome Back</h2>
-            <p style="color: var(--text-light); font-size: 0.95rem;">Sign in to RoXX Admin Console</p>
+            <h2 id="pageTitle">Welcome Back</h2>
+            <p id="pageSubtitle" style="color: var(--text-light); font-size: 0.95rem;">Sign in to RoXX Admin Console</p>
         </div>
 
-        {% if error %}
-        <div class="alert alert-error">{{ error }}</div>
-        {% endif %}
+        <div id="errorAlert" class="alert alert-error" style="display: none;"></div>
 
-        <form action="/login" method="POST">
+        <!-- Login Form -->
+        <form id="loginForm" onsubmit="handleLogin(event)">
             <div class="form-group" style="text-align: left;">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" placeholder="admin" required autofocus>
@@ -35,10 +34,214 @@
             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Sign In</button>
         </form>
 
+        <!-- MFA Selection Form (Hidden) -->
+        <div id="mfaSelection" style="display: none; text-align: left;">
+            <p style="margin-bottom: 1rem;">Select authentication method:</p>
+            <div id="mfaButtons" style="display: grid; gap: 0.5rem;">
+                <!-- Buttons injected by JS -->
+            </div>
+        </div>
+
+        <!-- OTP Verification Form (Hidden) -->
+        <form id="otpForm" style="display: none;" onsubmit="handleOtp(event)">
+            <div class="form-group" style="text-align: left;">
+                <label id="otpLabel">Enter Code</label>
+                <input type="text" id="otpCode" name="otp" placeholder="123456" autocomplete="off">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Verify</button>
+            <button type="button" onclick="showMfaSelection()" class="btn btn-outline"
+                style="width: 100%; margin-top: 0.5rem;">Back</button>
+        </form>
+
         <div style="margin-top: 2rem; color: var(--text-light); font-size: 0.85rem;">
             &copy; 2026 RoXX Authentication Proxy
         </div>
     </div>
+
+    <script>
+        let currentUsername = '';
+        let availableMethods = [];
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const form = new FormData(e.target);
+            document.getElementById('errorAlert').style.display = 'none';
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    body: form
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.mfa_required) {
+                        currentUsername = data.username;
+                        availableMethods = data.mfa_methods;
+                        showMfaSelection();
+                    } else {
+                        window.location.href = data.redirect;
+                    }
+                } else {
+                    showError(data.error || "Login failed");
+                }
+            } catch (err) {
+                showError("Connection error");
+            }
+        }
+
+        function showMfaSelection() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('otpForm').style.display = 'none';
+            document.getElementById('mfaSelection').style.display = 'block';
+            document.getElementById('pageTitle').textContent = "Two-Factor Auth";
+            document.getElementById('pageSubtitle').textContent = "Verify your identity";
+
+            const container = document.getElementById('mfaButtons');
+            container.innerHTML = '';
+
+            availableMethods.forEach(method => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-outline';
+                btn.style.width = '100%';
+
+                if (method === 'totp') {
+                    btn.innerHTML = '📱 Authenticator App (TOTP)';
+                    btn.onclick = () => showOtpInput('totp');
+                } else if (method === 'sms') {
+                    btn.innerHTML = '💬 SMS Code';
+                    btn.onclick = () => showOtpInput('sms');
+                } else if (method === 'email') {
+                    btn.innerHTML = '✉️ Email Code';
+                    btn.onclick = () => showOtpInput('email');
+                } else if (method === 'webauthn') {
+                    btn.innerHTML = '🔑 Security Key / Passkey';
+                    btn.onclick = () => startWebAuthn();
+                } else if (method === 'client_cert') {
+                    btn.innerHTML = '🎫 Client Certificate';
+                    btn.onclick = () => verifyCert();
+                }
+                container.appendChild(btn);
+            });
+        }
+
+        function showOtpInput(type) {
+            document.getElementById('mfaSelection').style.display = 'none';
+            document.getElementById('otpForm').style.display = 'block';
+            document.getElementById('otpForm').dataset.type = type;
+
+            const label = document.getElementById('otpLabel');
+            if (type === 'sms') label.textContent = "Enter SMS Code";
+            else if (type === 'email') label.textContent = "Enter Email Code";
+            else label.textContent = "Enter Authenticator Code";
+
+            document.getElementById('otpCode').focus();
+
+            // Trigger send if SMS/Email
+            if (type === 'sms' || type === 'email') {
+                triggerSendOtp(type);
+            }
+        }
+
+        async function triggerSendOtp(type) {
+            // Implementation for sending OTP
+            // TODO: Call /api/auth/otp/send
+        }
+
+        async function handleOtp(e) {
+            e.preventDefault();
+            const code = document.getElementById('otpCode').value;
+            const type = e.target.dataset.type;
+
+            try {
+                const res = await fetch('/auth/mfa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: type, code: code })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = "/dashboard";
+                } else {
+                    showError(data.detail || "Verification failed");
+                }
+            } catch (err) { showError(err.message); }
+        }
+
+        async function startWebAuthn() {
+            // Base64URL Decode Helper
+            function bufferDecode(value) {
+                return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+            }
+
+            function bufferEncode(value) {
+                return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+                    .replace(/\+/g, "-")
+                    .replace(/\//g, "_")
+                    .replace(/=/g, "");
+            }
+
+            try {
+                // Get Options
+                const resOpts = await fetch('/api/webauthn/login/options');
+                if (!resOpts.ok) throw new Error("Failed to get options");
+                const options = await resOpts.json();
+
+                // Decode Challenge & Credential IDs
+                options.challenge = bufferDecode(options.challenge);
+                if (options.allowCredentials) {
+                    options.allowCredentials = options.allowCredentials.map(c => {
+                        c.id = bufferDecode(c.id);
+                        return c;
+                    });
+                }
+
+                // Call Navigator
+                const credential = await navigator.credentials.get({ publicKey: options });
+
+                // Encode Response for Server
+                const verificationObj = {
+                    id: credential.id,
+                    rawId: bufferEncode(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        authenticatorData: bufferEncode(credential.response.authenticatorData),
+                        clientDataJSON: bufferEncode(credential.response.clientDataJSON),
+                        signature: bufferEncode(credential.response.signature),
+                        userHandle: credential.response.userHandle ? bufferEncode(credential.response.userHandle) : null
+                    }
+                };
+
+                // Verify
+                const res = await fetch('/api/webauthn/login/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(verificationObj)
+                });
+
+                const data = await res.json();
+                if (data.success) window.location.href = "/dashboard";
+                else showError(data.detail);
+
+            } catch (e) { showError(e.message); }
+        }
+
+        async function verifyCert() {
+            // Call cert verification endpoint
+            try {
+                const res = await fetch('/auth/mfa/cert/verify', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) window.location.href = "/dashboard";
+                else showError(data.detail);
+            } catch (err) { showError(err.message); }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorAlert');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+    </script>
 </body>
 
 </html>

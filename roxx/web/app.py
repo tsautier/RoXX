@@ -3,7 +3,7 @@ RoXX Web Interface - Modern FastAPI Application
 Replaces the old SimpleSAMLphp interface with a modern Python web app
 """
 
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -170,53 +170,75 @@ async def login_page(request: Request):
 
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    # Verify credentials
     success, user_data = AuthManager.verify_credentials(username, password)
     
     if success:
-        # 1. Forced Password Change?
+        # Check Force Change Password
         if user_data.get("must_change_password"):
             session_val = base64.b64encode(f"{username}:force_change".encode("utf-8")).decode("utf-8")
-            response = RedirectResponse(url="/auth/change-password", status_code=303)
+            response = JSONResponse({"success": True, "redirect": "/auth/change-password"})
             response.set_cookie(key="session", value=session_val, httponly=True)
             return response
 
-        # 2. MFA Enabled? Check database
-        mfa_enabled = MFADatabase.is_mfa_enabled(username)
-        if mfa_enabled:
-            # Check if device is trusted (Signed Cookie Verification)
+        # Discovery MFA Methods
+        mfa_methods = []
+        
+        # 1. TOTP / SMS / Email (from MFADatabase)
+        mfa_settings = MFADatabase.get_mfa_settings(username) or {}
+        if mfa_settings.get('mfa_enabled'):
+            # Current DB schema 'mfa_type' is single, but let's be robust
+            m_type = mfa_settings.get('mfa_type', 'totp')
+            mfa_methods.append(m_type)
+            
+        # 2. WebAuthn
+        from roxx.core.auth.webauthn_db import WebAuthnDatabase
+        if WebAuthnDatabase.list_credentials(username):
+            if 'webauthn' not in mfa_methods:
+                mfa_methods.append('webauthn')
+                
+        # 3. Client Certs
+        from roxx.core.auth.cert_db import CertDatabase
+        if CertDatabase.get_user_certs(username):
+            if 'client_cert' not in mfa_methods:
+                mfa_methods.append('client_cert')
+
+        print(f"[DEBUG] Login for {username}: Methods={mfa_methods}, WebAuthnCreds={WebAuthnDatabase.list_credentials(username)}")
+
+        if mfa_methods:
+            # Check Trusted Device
             trusted_cookie = request.cookies.get("mfa_trusted_device")
             if trusted_cookie:
                 try:
-                    # Verify signature and expiration (30 days)
                     trusted_username = cookie_signer.loads(trusted_cookie, max_age=30*24*60*60)
                     if trusted_username == username:
-                        # Device is trusted & signature valid - skip MFA
+                        # Trusted - Skip MFA
                         session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
-                        response = RedirectResponse(url="/", status_code=303)
+                        response = JSONResponse({"success": True, "redirect": "/"})
                         response.set_cookie(key="session", value=session_val, httponly=True)
                         return response
-                except Exception:
-                    # Invalid signature or expired - ignore and require MFA
-                    pass
-            
-            # Not trusted - require MFA
-            # Store username in session for MFA verification
-            request.session['mfa_username'] = username
+                except: pass
+
+            # MFA Required
+            request.session['mfa_username'] = username # Store for verification steps
             session_val = base64.b64encode(f"{username}:mfa_pending".encode("utf-8")).decode("utf-8")
-            response = RedirectResponse(url="/login/mfa", status_code=303)
+            
+            response = JSONResponse({
+                "success": True,
+                "mfa_required": True,
+                "username": username,
+                "mfa_methods": mfa_methods
+            })
             response.set_cookie(key="session", value=session_val, httponly=True)
             return response
 
-        # 3. Standard Login (no MFA)
+        # No MFA - Login
         session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
-        response = RedirectResponse(url="/", status_code=303)
+        response = JSONResponse({"success": True, "redirect": "/dashboard"})
         response.set_cookie(key="session", value=session_val, httponly=True)
         return response
     
-    return templates.TemplateResponse("login.html", {
-        "request": request, 
-        "error": "Invalid username or password"
-    })
+    return JSONResponse({"success": False, "error": "Invalid username or password"}, status_code=401)
 
 
 @app.get("/logout")
@@ -250,95 +272,114 @@ async def mfa_verification_page(request: Request):
     except:
         return RedirectResponse(url="/login", status_code=303)
 
-@app.post("/login/mfa/verify")
-async def mfa_verify_login(
-    request: Request,
-    token: str = Form(None),
-    backup_code: str = Form(None),
-    trust_device: str = Form(None)
-):
-    """Verify MFA token or backup code"""
-    # Get username from session
+@app.post("/auth/mfa/verify")
+async def mfa_verify_unified(request: Request):
+    """Unified MFA Verification (TOTP, SMS, Email, Backup)"""
+    try:
+        data = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+        
+    mfa_type = data.get('type')
+    code = data.get('code')
+    trust_device = data.get('trust_device', False)
+
+    # Validate Session
     session_cookie = request.cookies.get("session")
     if not session_cookie:
-        return RedirectResponse(url="/login", status_code=303)
-    
+        raise HTTPException(status_code=401, detail="Session expired")
     try:
         decoded = base64.b64decode(session_cookie).decode("utf-8")
         username, status = decoded.split(":", 1)
-        
         if status != "mfa_pending":
-            return RedirectResponse(url="/login", status_code=303)
-        
-        # Get MFA settings
+             raise HTTPException(status_code=401, detail="Invalid session state")
+    except:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    # Verification Logic
+    verified = False
+    
+    if mfa_type == 'totp':
         settings = MFADatabase.get_mfa_settings(username)
-        if not settings or not settings.get('mfa_enabled'):
-            return RedirectResponse(url="/login", status_code=303)
-        
-        verified = False
-        error_message = None
-        
-        # Try TOTP token first
-        if token:
-            secret = settings['totp_secret']
-            if MFAManager.verify_totp(secret, token):
+        if settings and settings.get('totp_secret'):
+            if MFAManager.verify_totp(settings['totp_secret'], code):
                 verified = True
                 MFADatabase.update_last_used(username)
-        
-        # Try backup code if TOTP failed
-        if not verified and backup_code:
-            success, message = MFADatabase.verify_and_consume_backup_code(username, backup_code)
-            if success:
-                verified = True
-            else:
-                error_message = message
-        
-        if verified:
-            # MFA successful - grant full access
-            session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
-            response = RedirectResponse(url="/", status_code=303)
-            response.set_cookie(key="session", value=session_val, httponly=True)
-            
-            # Set trust device cookie if requested
-            if trust_device == "yes":
-                # Sign username into cookie
-                signed_cookie = cookie_signer.dumps(username)
                 
-                # Store for 30 days
-                response.set_cookie(
-                    key="mfa_trusted_device",
-                    value=signed_cookie,
-                    max_age=30*24*60*60,  # 30 days
-                    httponly=True,
-                    secure=False,  # Set to True in production with HTTPS
-                    samesite="lax"
-                )
-            
-            # Clear MFA session data
-            request.session.pop('mfa_username', None)
-            return response
-        else:
-            # MFA failed
-            return templates.TemplateResponse("mfa_verify.html", {
-                "request": request,
-                "username": username,
-                "error": error_message or "Invalid verification code"
-            })
+        # Fallback: Check if it's a backup code
+        if not verified:
+             success, msg = MFADatabase.verify_and_consume_backup_code(username, code)
+             if success:
+                 verified = True
+                
+    elif mfa_type == 'backup_code':
+         success, msg = MFADatabase.verify_and_consume_backup_code(username, code)
+         if success:
+             verified = True
+             
+    elif mfa_type in ['sms', 'email']:
+         # Verify OTP against stored secret/cache
+         # Since we don't have a Redis cache in this Phase yet, we check 'mfa_enrollment' or session
+         # But usually for login we generated a code and stored it in session.
+         # TODO: Implement send/verify logic with session storage for code.
+         # For now, placeholder or check static secret? NO.
+         # Let's assume the 'send' endpoint stored it in user session.
+         session_code = request.session.get(f"mfa_code_{mfa_type}")
+         if session_code and session_code == code:
+             verified = True
+             request.session.pop(f"mfa_code_{mfa_type}", None)
+             
+    if verified:
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        response = JSONResponse({"success": True})
+        response.set_cookie(key="session", value=session_val, httponly=True)
+        
+        # Cleanup
+        request.session.pop('mfa_username', None)
+        
+        return response
+
+    return JSONResponse({"success": False, "detail": "Invalid Code"}, status_code=400)
+
+@app.post("/auth/mfa/cert/verify")
+async def mfa_cert_verify(request: Request):
+    """Verify Client Certificate for MFA"""
+    # ... (Session Check as above) ...
+    # Verify Cert
+    from roxx.core.security.cert_auth import CertAuthManager
+    from roxx.core.auth.cert_db import CertDatabase
     
-    except Exception as e:
-        print(f"[MFA] Verification error: {e}")
-        return RedirectResponse(url="/login", status_code=303)
+    session_cookie = request.cookies.get("session")
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+    except: return JSONResponse({"success": False, "detail": "Session Error"}, status_code=401)
+
+    cert_info = CertAuthManager.get_cert_info(request)
+    if not cert_info:
+         return JSONResponse({"success": False, "detail": "No Certificate"}, status_code=400)
+    
+    # Check if this cert is registered to this user
+    stored_user = CertDatabase.get_user_by_fingerprint(cert_info['fingerprint'])
+    
+    if stored_user and stored_user == username:
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        response = JSONResponse({"success": True})
+        response.set_cookie(key="session", value=session_val, httponly=True)
+        return response
+        
+    return JSONResponse({"success": False, "detail": "Certificate not linked to user"}, status_code=403)
 
 
 # ------------------------------------------------------------------------------
 # Password & MFA Management
 # ------------------------------------------------------------------------------
 @app.get("/auth/change-password", response_class=HTMLResponse)
-async def change_password_page(request: Request):
-    username, status = await get_partial_user(request)
-    if not username:
-        return RedirectResponse("/login")
-    return templates.TemplateResponse("change_password.html", {"request": request})
+async def change_password_page(request: Request, current_user: str = Depends(get_current_username)):
+    """Change Password Page"""
+    return templates.TemplateResponse("change_password.html", get_page_context(
+        request, current_user, "password"
+    ))
 
 @app.post("/auth/change-password", response_class=HTMLResponse)
 async def change_password(
@@ -431,6 +472,113 @@ async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(
     return templates.TemplateResponse("error.html", {"request": request, "message": "Invalid code. MFA Setup Failed."}) # Needs error.html or logic
 
 
+# ------------------------------------------------------------------------------
+# WebAuthn Routes
+# ------------------------------------------------------------------------------
+from roxx.core.auth.webauthn import WebAuthnManager
+from fido2.utils import websafe_encode, websafe_decode
+
+@app.on_event("startup")
+async def startup_event():
+    WebAuthnManager.init()
+    from roxx.core.auth.cert_db import CertDatabase
+    CertDatabase.init_db()
+
+@app.get("/api/webauthn/register/options", dependencies=[Depends(get_current_username)])
+async def webauthn_register_options(request: Request):
+    """Generate registration options"""
+    username = await get_current_username(request)
+    # We use username as user_id for simplicity, but ideally should be stable UID
+    options, state = WebAuthnManager.generate_registration_options(username, username)
+    request.session["webauthn_state"] = state
+    return dict(options)
+
+@app.post("/api/webauthn/register/verify", dependencies=[Depends(get_current_username)])
+async def webauthn_register_verify(request: Request):
+    """Verify registration response"""
+    username = await get_current_username(request)
+    state = request.session.get("webauthn_state")
+    if not state:
+        raise HTTPException(status_code=400, detail="State not found")
+        
+    data = await request.json()
+    success, msg = WebAuthnManager.verify_registration(username, data, state)
+    
+    if success:
+        return {"success": True, "message": "Security Key Registered"}
+    else:
+        raise HTTPException(status_code=400, detail=msg)
+
+@app.get("/api/webauthn/authenticate/options")
+async def webauthn_auth_options(request: Request):
+    """Generate auth options"""
+    # We need username. If doing 2FA, we have it in session.
+    # If doing passwordless, we might need to ask username first.
+    # For MFA scenario:
+    session_cookie = request.cookies.get("session")
+    username = None
+    if session_cookie:
+        try:
+            decoded = base64.b64decode(session_cookie).decode("utf-8")
+            username, _ = decoded.split(":", 1)
+        except: pass
+    
+    if not username:
+        # Check mfa_username in session (set during login)
+        username = request.session.get('mfa_username')
+
+    if not username:
+        raise HTTPException(status_code=400, detail="User context missing")
+        
+    options, state = WebAuthnManager.generate_authentication_options(username)
+    if not options:
+         raise HTTPException(status_code=400, detail="No keys found")
+         
+    request.session["webauthn_auth_state"] = state
+    return dict(options)
+
+
+@app.post("/api/webauthn/authenticate/verify")
+async def webauthn_auth_verify(request: Request):
+    """Verify auth response"""
+    state = request.session.get("webauthn_auth_state")
+    # need username again
+    session_cookie = request.cookies.get("session")
+    username = None
+    if session_cookie:
+        try:
+            decoded = base64.b64decode(session_cookie).decode("utf-8")
+            username, _ = decoded.split(":", 1)
+        except: pass
+    if not username:
+        username = request.session.get('mfa_username')
+        
+    if not state or not username:
+        raise HTTPException(status_code=400, detail="State or User missing")
+        
+    data = await request.json()
+    success, msg = WebAuthnManager.verify_authentication(username, data, state)
+    
+    if success:
+        # If successful, we need to log them in fully or set session
+        # If this was MFA step:
+        if request.session.get('mfa_username'):
+             # Perform Login
+             session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+             # We can't set cookie here easily without return Response object?
+             # Actually we return JSON. The Client JS should redirect.
+             # But we need to set the cookie in this response.
+             response = JSONResponse({"success": True, "redirect": "/"})
+             response.set_cookie(key="session", value=session_val, httponly=True)
+             request.session.pop('mfa_username', None)
+             return response
+        else:
+             return {"success": True, "message": "Verified"}
+    else:
+        raise HTTPException(status_code=400, detail=msg)
+
+
+
 
 
 
@@ -439,26 +587,51 @@ async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(
 # API & Pages
 # ------------------------------------------------------------------------------
 
+def get_page_context(request: Request, username: str, active_page: str, **kwargs):
+    """Helper to generate standard page context with sidebar variables"""
+    context = {
+        "request": request,
+        "username": username,
+        "active_page": active_page,
+        "version": VERSION,
+        **kwargs
+    }
+    return context
+
+@app.get("/logs-view", response_class=HTMLResponse)
+async def logs_view_page(request: Request, current_user: str = Depends(get_current_username)):
+    """System Logs Page"""
+    return templates.TemplateResponse("logs.html", get_page_context(
+        request, current_user, "logs",
+        title="System Logs"
+    ))
+
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def home(request: Request):
     """Home page - redirects to dashboard"""
     return RedirectResponse("/dashboard")
 
 
-@app.get("/totp/enroll", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def totp_enroll_page(request: Request):
+@app.get("/totp/enroll", response_class=HTMLResponse)
+async def totp_enroll_page(request: Request, current_user: str = Depends(get_current_username)):
     """TOTP enrollment page"""
-    return templates.TemplateResponse("totp_enroll.html", {
-        "request": request,
-        "title": "TOTP Enrollment",
-        "version": VERSION,
-        "active_page": "mfa" # Sidebar highlight
-    })
+    return templates.TemplateResponse("totp_enroll.html", get_page_context(
+        request, current_user, "mfa",
+        title="TOTP Enrollment"
+    ))
+
+@app.get("/config/mfa-gateways", response_class=HTMLResponse)
+async def config_mfa_gateways_page(request: Request, current_user: str = Depends(get_current_username)):
+    """MFA Gateways Configuration Page"""
+    return templates.TemplateResponse("config_mfa_gateways.html", get_page_context(
+        request, current_user, "config",
+        title="MFA Gateways"
+    ))
 
 # ... (API endpoints remain unchanged) ...
 
-@app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def dashboard(request: Request):
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, current_user: str = Depends(get_current_username)):
     """Dashboard page"""
     import os # Added for os.name check
     import logging # Added for logger.error
@@ -479,7 +652,7 @@ async def dashboard(request: Request):
                 "username": admin.get("username", "N/A"),
                 "role": admin.get("auth_source", "local").title(),
                 "status": "UP",  # Could be enhanced with actual session tracking
-                "last_login": admin.get("created_at", "N/A") # Placeholder as we don't strictly track login time in JSON yet
+                "last_login": admin.get("last_login") or "Never"
             })
     except Exception as e:
         logger.error(f"Error fetching dashboard users: {e}")
@@ -487,22 +660,17 @@ async def dashboard(request: Request):
             {"username": "admin", "role": "Local", "status": "UP", "last_login": "2024-05-22"}
         ]
     
-    # Build response context
-    context = {
-        "request": request,
-        "radius_status": radius_status,
-        "os_type": "Linux" if os.name != 'nt' else "Windows",
-        "uptime": SystemManager.get_uptime(),
-        "recent_users": recent_users,
-        "version": VERSION,
-        "active_page": "dashboard"
-    }
-    
-    return templates.TemplateResponse("dashboard.html", context)
+    return templates.TemplateResponse("dashboard.html", get_page_context(
+        request, current_user, "dashboard",
+        radius_status=radius_status,
+        os_type="Linux" if os.name != 'nt' else "Windows",
+        uptime=SystemManager.get_uptime(),
+        recent_users=recent_users
+    ))
 
 
-@app.get("/users", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def users_page(request: Request):
+@app.get("/users", response_class=HTMLResponse)
+async def users_page(request: Request, current_user: str = Depends(get_current_username)):
     """User management page"""
     # Simple parse of users.conf if it exists
     users_list = []
@@ -519,47 +687,50 @@ async def users_page(request: Request):
     except Exception:
         pass
         
-    return templates.TemplateResponse("users.html", {
-        "request": request,
-        "users": users_list or ["admin (demo)"],
-        "version": VERSION
-    })
+    return templates.TemplateResponse("users.html", get_page_context(
+        request, current_user, "users",
+        users=users_list or ["admin (demo)"]
+    ))
 
 
-@app.get("/config", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def config_page(request: Request):
+@app.get("/config", response_class=HTMLResponse)
+async def config_page(request: Request, current_user: str = Depends(get_current_username)):
     """Configuration page"""
-    return templates.TemplateResponse("config.html", {
-        "request": request,
-        "version": VERSION
-    })
+    return templates.TemplateResponse("config.html", get_page_context(
+        request, current_user, "settings"
+    ))
 
-@app.get("/config/api-tokens", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def api_tokens_page(request: Request):
+@app.get("/config/api-tokens", response_class=HTMLResponse)
+async def api_tokens_page(request: Request, current_user: str = Depends(get_current_username)):
     """API Tokens Management"""
-    return templates.TemplateResponse("api_tokens.html", {"request": request})
+    return templates.TemplateResponse("api_tokens.html", get_page_context(
+        request, current_user, "settings"
+    ))
 
-@app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def mfa_settings_page(request: Request):
+@app.get("/settings/mfa", response_class=HTMLResponse)
+async def mfa_settings_page(request: Request, current_user: str = Depends(get_current_username)):
     """MFA Settings Page"""
-    return templates.TemplateResponse("mfa_settings.html", {"request": request})
+    return templates.TemplateResponse("mfa_settings.html", get_page_context(
+        request, current_user, "mfa"
+    ))
 
 
 # ------------------------------------------------------------------------------
 # Authentication Provider Configuration
 # ------------------------------------------------------------------------------
-@app.get("/config/auth-providers", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def auth_providers_page(request: Request):
+@app.get("/config/auth-providers", response_class=HTMLResponse)
+async def auth_providers_page(request: Request, current_user: str = Depends(get_current_username)):
     """Authentication providers configuration page"""
-    return templates.TemplateResponse("auth_providers.html", {
-        "request": request,
-        "version": VERSION
-    })
+    return templates.TemplateResponse("auth_providers.html", get_page_context(
+        request, current_user, "settings"
+    ))
 
-@app.get("/config/auth-providers/logs", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def auth_providers_logs_page(request: Request):
+@app.get("/config/auth-providers/logs", response_class=HTMLResponse)
+async def auth_providers_logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """Authentication Provider Debug Logs"""
-    return templates.TemplateResponse("auth_providers_logs.html", {"request": request})
+    return templates.TemplateResponse("auth_providers_logs.html", get_page_context(
+        request, current_user, "settings"
+    ))
 
 @app.get("/api/auth-providers", dependencies=[Depends(get_current_username)])
 async def list_auth_providers():
@@ -667,17 +838,18 @@ async def test_auth_provider(request: Request):
 # RADIUS User Authentication Backends
 # ------------------------------------------------------------------------------
 @app.get("/config/radius-backends", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def radius_backends_page(request: Request):
+async def radius_backends_page(request: Request, current_user: str = Depends(get_current_username)):
     """RADIUS backends configuration page"""
-    return templates.TemplateResponse("radius_backends.html", {
-        "request": request,
-        "version": VERSION
-    })
+    return templates.TemplateResponse("radius_backends.html", get_page_context(
+        request, current_user, "settings"
+    ))
 
 @app.get("/config/radius-backends/logs", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def radius_backends_logs_page(request: Request):
+async def radius_backends_logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """RADIUS Backend Debug Logs"""
-    return templates.TemplateResponse("radius_backends_logs.html", {"request": request})
+    return templates.TemplateResponse("radius_backends_logs.html", get_page_context(
+        request, current_user, "settings"
+    ))
 
 @app.get("/api/radius-backends", dependencies=[Depends(get_current_username)])
 async def list_radius_backends():
@@ -853,9 +1025,12 @@ async def generate_api_token(request: Request):
         raise HTTPException(status_code=400, detail=message)
 
 @app.delete("/api/tokens/{token_id}", dependencies=[Depends(get_current_username)])
-async def revoke_api_token(token_id: int):
-    """Revoke an API token"""
-    success, message = APITokenManager.revoke_token(token_id)
+async def revoke_api_token(token_id: int, hard_delete: bool = False):
+    """Revoke or Delete an API token"""
+    if hard_delete:
+        success, message = APITokenManager.delete_token(token_id)
+    else:
+        success, message = APITokenManager.revoke_token(token_id)
     
     if success:
         return {"success": True, "message": message}
@@ -886,17 +1061,16 @@ async def health_check():
 # ------------------------------------------------------------------------------
 # Admin Management API
 # ------------------------------------------------------------------------------
-@app.get("/admins", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
-async def admins_page(request: Request):
+@app.get("/admins", response_class=HTMLResponse)
+async def admins_page(request: Request, current_user: str = Depends(get_current_username)):
     """Admin management page"""
     is_admin = True # Todo: Check if super-admin? For now all admins are equal.
     admins_list = AuthManager.list_admins()
     
-    return templates.TemplateResponse("admins.html", {
-        "request": request,
-        "admins": admins_list,
-        "version": VERSION
-    })
+    return templates.TemplateResponse("admins.html", get_page_context(
+        request, current_user, "users",
+        admins=admins_list
+    ))
 
 @app.post("/api/admins", dependencies=[Depends(get_current_username)])
 async def create_admin(
@@ -1097,9 +1271,298 @@ async def mfa_disable(request: Request, username: str = Depends(get_current_user
 
 
 
+@app.get("/config/ssl", response_class=HTMLResponse)
+async def ssl_settings_page(request: Request, current_user: str = Depends(get_current_username)):
+    """SSL/TLS Settings Page"""
+    return templates.TemplateResponse("ssl_settings.html", get_page_context(
+        request, current_user, "settings"
+    ))
+
+@app.get("/api/system/ssl/status", dependencies=[Depends(get_current_username)])
+async def get_ssl_status():
+    from roxx.core.security.cert_manager import CertManager
+    return CertManager.get_status()
+
+@app.post("/api/system/ssl/upload", dependencies=[Depends(get_current_username)])
+async def upload_ssl_cert(request: Request):
+    from roxx.core.security.cert_manager import CertManager
+    
+    try:
+        # Expecting multipart form or json with content?
+        # Let's support JSON with file content strings for simplicity given textarea input, 
+        # or multipart if file upload. 
+        # The prompt implies "upload", but text area copy-paste is often easier for admins.
+        # Let's support JSON payload with text.
+        
+        data = await request.json()
+        cert_content = data.get('cert_content')
+        key_content = data.get('key_content')
+        
+        if not cert_content or not key_content:
+            raise HTTPException(status_code=400, detail="Missing certificate or key content")
+            
+        success, message = CertManager.upload_cert(cert_content, key_content)
+        
+        if success:
+            return {"success": True, "message": message}
+        else:
+            raise HTTPException(status_code=400, detail=message)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/system/ssl/remove", dependencies=[Depends(get_current_username)])
+async def remove_ssl_cert():
+    from roxx.core.security.cert_manager import CertManager
+    success, msg = CertManager.remove_cert()
+    return {"success": success, "message": msg}
+
+# ------------------------------------------------------------------------------
+# TOTP Routes
+# ------------------------------------------------------------------------------
+@app.post("/api/totp/generate-qr", dependencies=[Depends(get_current_username)])
+async def generate_totp_qr(request: Request):
+    """Generate a new TOTP secret and QR code"""
+    username = await get_current_username(request)
+    form = await request.form()
+    
+    # Optional: verify form['username'] matches current user if stricter security needed
+    # form_user = form.get('username')
+    
+    try:
+        # Generate secret
+        secret, provisioning_uri = AuthManager.setup_mfa(username)
+        
+        # Generate QR Code image
+        import qrcode
+        import io
+        import base64
+        
+        img = qrcode.make(provisioning_uri)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        img_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+        
+        return {
+            "success": True,
+            "qr_code": f"data:image/png;base64,{img_str}",
+            "secret": secret
+        }
+    except Exception as e:
+        logger.error(f"Error generating TOTP: {e}")
+        return {"success": False, "error": str(e)}
+
+
+
+# ------------------------------------------------------------------------------
+# Backend Config (SMS/Email)
+# ------------------------------------------------------------------------------
+from roxx.core.auth.sms import SMSProvider
+
+@app.get("/api/config/mfa-gateways", dependencies=[Depends(get_current_username)])
+async def get_mfa_gateways():
+    # Load from system config (mocked or JSON file)
+    # Ideally should use a proper ConfigManager
+    config_path = SystemManager.get_config_dir() / "mfa_gateways.json"
+    if config_path.exists():
+        return json.loads(config_path.read_text())
+    return {
+        "sms": {"provider": "disabled"},
+        "email": {"enabled": False}
+    }
+
+@app.post("/api/config/mfa-gateways", dependencies=[Depends(get_current_username)])
+async def save_mfa_gateways(request: Request):
+    data = await request.json()
+    config_path = SystemManager.get_config_dir() / "mfa_gateways.json"
+    config_path.write_text(json.dumps(data, indent=2))
+    return {"success": True}
+
+@app.post("/api/test/sms", dependencies=[Depends(get_current_username)])
+async def test_sms(request: Request):
+    data = await request.json()
+    phone = data.get("phone")
+    message = data.get("message", "Test from RoXX")
+    config = data.get("config") # Test with provided config or saved?
+    
+    if not config:
+         # Load saved
+         config_path = SystemManager.get_config_dir() / "mfa_gateways.json"
+         if config_path.exists():
+             full_conf = json.loads(config_path.read_text())
+             config = full_conf.get("sms", {})
+
+    if not config or config.get("provider") == "disabled":
+        return {"success": False, "message": "SMS disabled"}
+
+    result = await SMSProvider.send_sms(phone, message, config)
+    return {"success": result}
+
+@app.post("/api/test/email", dependencies=[Depends(get_current_username)])
+async def test_email(request: Request):
+    from roxx.core.auth.email import EmailProvider
+    data = await request.json()
+    email = data.get("email")
+    subject = data.get("subject", "RoXX Test Email")
+    body = data.get("body", "This is a test email from your RoXX configuration.")
+    config = data.get("config")
+    
+    if not config:
+         config_path = SystemManager.get_config_dir() / "mfa_gateways.json"
+         if config_path.exists():
+             full_conf = json.loads(config_path.read_text())
+             config = full_conf.get("email", {})
+
+    if not config or not config.get("enabled"):
+        return {"success": False, "message": "Email disabled"}
+
+    # Fix types from frontend forms (ports as strings)
+    if 'smtp_port' in config:
+        config['smtp_port'] = int(config['smtp_port'])
+    if 'use_tls' in config:
+        config['use_tls'] = str(config['use_tls']).lower() == 'true'
+
+    result = await EmailProvider.send_email(email, subject, body, config)
+    return {"success": result}
+
+@app.post("/api/mfa/cert/register", dependencies=[Depends(get_current_username)])
+async def register_client_cert(request: Request):
+    from roxx.core.security.cert_auth import CertAuthManager
+    from roxx.core.auth.cert_db import CertDatabase
+    
+    username = await get_current_username(request)
+    cert_info = CertAuthManager.get_cert_info(request)
+    if not cert_info:
+        raise HTTPException(status_code=400, detail="No client certificate presented")
+    existing_user = CertDatabase.get_user_by_fingerprint(cert_info['fingerprint'])
+    if existing_user:
+         raise HTTPException(status_code=400, detail=f"Certificate already registered to {existing_user}")
+    CertDatabase.add_cert(username, cert_info['fingerprint'], cert_info['common_name'], cert_info['issuer'], f"Registered: {datetime.now().strftime('%Y-%m-%d')}")
+    return {"success": True, "message": "Certificate linked successfully"}
+
+@app.get("/api/mfa/cert/list", dependencies=[Depends(get_current_username)])
+async def list_client_certs(request: Request):
+    from roxx.core.auth.cert_db import CertDatabase
+    username = await get_current_username(request)
+    return CertDatabase.get_user_certs(username)
+
+@app.delete("/api/mfa/cert/{cert_id}", dependencies=[Depends(get_current_username)])
+async def delete_client_cert(cert_id: int, request: Request):
+    from roxx.core.auth.cert_db import CertDatabase
+    username = await get_current_username(request)
+    if CertDatabase.delete_cert(username, cert_id):
+        return {"success": True}
+    raise HTTPException(status_code=404, detail="Certificate not found")
+
+@app.post("/api/system/ssl/ca", dependencies=[Depends(get_current_username)])
+async def upload_ca_bundle(file: UploadFile = File(...)):
+    from roxx.core.security.cert_manager import CertManager
+    content = (await file.read()).decode('utf-8')
+    success, msg = CertManager.upload_ca(content)
+    if success:
+        return {"success": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
+
+@app.delete("/api/system/ssl/ca", dependencies=[Depends(get_current_username)])
+async def remove_ca_bundle():
+    from roxx.core.security.cert_manager import CertManager
+    success, msg = CertManager.remove_ca()
+    if success:
+        return {"success": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
+
 def main():
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    from roxx.core.security.cert_manager import CertManager
+    
+    ssl_cert, ssl_key = CertManager.get_cert_paths()
+    ca_bundle = CertManager.get_ca_paths()
+    ssl_enabled = ssl_cert.exists() and ssl_key.exists()
+    
+    config_kwargs = {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "log_level": "info",
+        "app": "roxx.web.app:app"
+    }
+    
+    if ssl_enabled:
+        print(f"[Core] Starting in HTTPS mode with {ssl_cert}")
+        config_kwargs["ssl_certfile"] = str(ssl_cert)
+        config_kwargs["ssl_keyfile"] = str(ssl_key)
+        
+        if ca_bundle.exists():
+            print(f"[Core] Enabling Client Certificate Auth with CA: {ca_bundle}")
+            config_kwargs["ssl_ca_certs"] = str(ca_bundle)
+            config_kwargs["ssl_cert_reqs"] = ssl.CERT_OPTIONAL
+    else:
+        print("[Core] No SSL Certificates found. Starting in HTTP mode.")
+
+    uvicorn.run(**config_kwargs)
+
+
+
+@app.get("/api/webauthn/login/options")
+async def webauthn_login_options(request: Request):
+    """Get WebAuthn login options"""
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
+        raise HTTPException(status_code=401, detail="Session required")
+    
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+        if status != "mfa_pending":
+             raise HTTPException(status_code=401, detail="Invalid session state")
+    except:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    from roxx.core.auth.webauthn import WebAuthnManager
+    options, state = WebAuthnManager.generate_authentication_options(username)
+    
+    if not options:
+        raise HTTPException(status_code=400, detail="No credentials found")
+        
+    # Store state in session
+    request.session["webauthn_state"] = state
+    
+    return JSONResponse(options)
+
+@app.post("/api/webauthn/login/verify")
+async def webauthn_login_verify(request: Request):
+    """Verify WebAuthn login"""
+    try:
+        data = await request.json()
+    except:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+        
+    session_cookie = request.cookies.get("session")
+    if not session_cookie:
+        raise HTTPException(status_code=401, detail="Session required")
+        
+    try:
+        decoded = base64.b64decode(session_cookie).decode("utf-8")
+        username, status = decoded.split(":", 1)
+    except:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    state = request.session.get("webauthn_state")
+    if not state:
+        raise HTTPException(status_code=400, detail="State not found")
+        
+    from roxx.core.auth.webauthn import WebAuthnManager
+    success, msg = WebAuthnManager.verify_authentication(username, data, state)
+    
+    if success:
+        # Success!
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        response = JSONResponse({"success": True})
+        response.set_cookie(key="session", value=session_val, httponly=True)
+        request.session.pop("webauthn_state", None)
+        request.session.pop('mfa_username', None)
+        return response
+    else:
+        return JSONResponse({"success": False, "detail": msg}, status_code=400)
 
 
 if __name__ == "__main__":
