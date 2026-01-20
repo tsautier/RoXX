@@ -1,208 +1,187 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Management - RoXX</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            width: 100%;
-        }
+{% block title %}Admin Management - RoXX{% endblock %}
 
-        th {
-            background: #f8fafc;
-            color: var(--text-light);
-            font-weight: 600;
-            text-align: left;
-            padding: 1rem;
-            border-bottom: 2px solid var(--border-color);
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+{% block extra_head %}
+<style>
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+    }
 
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-main);
-        }
+    th {
+        background: #f8fafc;
+        color: var(--text-light);
+        font-weight: 600;
+        text-align: left;
+        padding: 1rem;
+        border-bottom: 2px solid var(--border-color);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
-        tr:last-child td {
-            border-bottom: none;
-        }
+    td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
 
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: var(--radius-sm);
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
+    tr:last-child td {
+        border-bottom: none;
+    }
 
-        .badge-local {
-            background: #dcfce7;
-            color: #166534;
-        }
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
 
-        .badge-ldap {
-            background: #e0f2fe;
-            color: #0369a1;
-        }
+    .badge-local {
+        background: #dcfce7;
+        color: #166534;
+    }
 
-        .badge-saml {
-            background: #f3e8ff;
-            color: #6b21a8;
-        }
-    </style>
-</head>
+    .badge-ldap {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
 
-<body>
-    <header class="app-header">
-        <div class="brand">
-            <img src="/static/img/logo.png" alt="RoXX Logo">
-            <span>Admin Management</span>
+    .badge-saml {
+        background: #f3e8ff;
+        color: #6b21a8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 2rem;">
+    <h2 style="margin-bottom: 1.5rem;">Add New Admin</h2>
+    <form id="addAdminForm"
+        style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1.5rem; align-items: end;">
+        <div>
+            <label>Username</label>
+            <input type="text" name="username" required placeholder="admin2">
         </div>
         <div>
-            <a href="/" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back</a>
-        </div>
-    </header>
-
-    <main class="main-container">
-        <div class="card" style="margin-bottom: 2rem;">
-            <h2 style="margin-bottom: 1.5rem;">Add New Admin</h2>
-            <form id="addAdminForm"
-                style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1.5rem; align-items: end;">
-                <div>
-                    <label>Username</label>
-                    <input type="text" name="username" required placeholder="admin2">
-                </div>
-                <div>
-                    <label>Auth Source</label>
-                    <div class="select-wrapper">
-                        <select name="auth_source" id="authSourceSelect">
-                            <option value="local">Local Database</option>
-                            <option value="ldap">LDAP / AD</option>
-                            <option value="saml">SAML SSO</option>
-                            <option value="radius">RADIUS</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="passwordField">
-                    <label>Password</label>
-                    <input type="password" name="password" placeholder="Min 12 chars...">
-                </div>
-                <button type="submit" class="btn btn-primary">Create Admin</button>
-            </form>
-        </div>
-
-        <div class="card">
-            <h2 style="margin-bottom: 1rem;">Admin Accounts</h2>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Source</th>
-                            <th>Last Login</th>
-                            <th style="text-align: right;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="userTableBody">
-                        {% for user in admins %}
-                        <tr>
-                            <td style="font-weight: 500;">{{ user.username }}</td>
-                            <td>
-                                <span class="badge badge-{{ user.auth_source }}">{{ user.auth_source|upper }}</span>
-                            </td>
-                            <td>{{ user.last_login or 'Never' }}</td>
-                            <td style="text-align: right;">
-                                {% if user.username != 'admin' %}
-                                <button onclick="deleteAdmin('{{ user.username }}')"
-                                    style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s;">
-                                    Delete
-                                </button>
-                                {% else %}
-                                <span style="color: #94a3b8; font-size: 0.85rem;">System</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <label>Auth Source</label>
+            <div class="select-wrapper">
+                <select name="auth_source" id="authSourceSelect">
+                    <option value="local">Local Database</option>
+                    <option value="ldap">LDAP / AD</option>
+                    <option value="saml">SAML SSO</option>
+                    <option value="radius">RADIUS</option>
+                </select>
             </div>
         </div>
-    </main>
+        <div id="passwordField">
+            <label>Password</label>
+            <input type="password" name="password" placeholder="Min 12 chars...">
+        </div>
+        <button type="submit" class="btn btn-primary">Create Admin</button>
+    </form>
+</div>
 
-    <script>
-        const sourceSelect = document.getElementById('authSourceSelect');
-        const passwordField = document.getElementById('passwordField');
-        const passwordInput = passwordField.querySelector('input');
+<div class="card">
+    <h2 style="margin-bottom: 1rem;">Admin Accounts</h2>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Source</th>
+                    <th>Last Login</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody">
+                {% for user in admins %}
+                <tr>
+                    <td style="font-weight: 500;">{{ user.username }}</td>
+                    <td>
+                        <span class="badge badge-{{ user.auth_source }}">{{ user.auth_source|upper }}</span>
+                    </td>
+                    <td>{{ user.last_login or 'Never' }}</td>
+                    <td style="text-align: right;">
+                        {% if user.username != 'admin' %}
+                        <button onclick="deleteAdmin('{{ user.username }}')"
+                            style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s;">
+                            Delete
+                        </button>
+                        {% else %}
+                        <span style="color: #94a3b8; font-size: 0.85rem;">System</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
 
-        sourceSelect.addEventListener('change', (e) => {
-            if (e.target.value === 'local') {
-                passwordField.style.opacity = '1';
-                passwordField.style.pointerEvents = 'auto';
-                passwordInput.required = true;
-                passwordInput.disabled = false;
-            } else {
-                passwordField.style.opacity = '0.5';
-                passwordField.style.pointerEvents = 'none';
-                passwordInput.required = false;
-                passwordInput.disabled = true;
-                passwordInput.value = '';
-            }
-        });
+{% block scripts %}
+<script>
+    const sourceSelect = document.getElementById('authSourceSelect');
+    const passwordField = document.getElementById('passwordField');
+    const passwordInput = passwordField.querySelector('input');
 
-        document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            try {
-                const response = await fetch('/api/admins', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    alert('Failed: ' + data.detail);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Error submitting form');
-            }
-        });
-
-        async function deleteAdmin(username) {
-            if (!confirm(`Are you sure you want to delete admin ${username}?`)) return;
-
-            try {
-                const response = await fetch(`/api/admins/${username}`, {
-                    method: 'DELETE'
-                });
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    alert('Failed to delete admin');
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Error deleting admin');
-            }
+    sourceSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'local') {
+            passwordField.style.opacity = '1';
+            passwordField.style.pointerEvents = 'auto';
+            passwordInput.required = true;
+            passwordInput.disabled = false;
+        } else {
+            passwordField.style.opacity = '0.5';
+            passwordField.style.pointerEvents = 'none';
+            passwordInput.required = false;
+            passwordInput.disabled = true;
+            passwordInput.value = '';
         }
-    </script>
-    <footer class="app-footer">
-        roxx v{{ version }}
-    </footer>
-</body>
+    });
 
-</html>
+    document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+            const response = await fetch('/api/admins', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed: ' + data.detail);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error submitting form');
+        }
+    });
+
+    async function deleteAdmin(username) {
+        if (!confirm(`Are you sure you want to delete admin ${username}?`)) return;
+
+        try {
+            const response = await fetch(`/api/admins/${username}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to delete admin');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error deleting admin');
+        }
+    }
+</script>
+{% endblock %}

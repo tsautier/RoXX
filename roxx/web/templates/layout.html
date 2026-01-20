@@ -52,7 +52,7 @@
 
             <div class="sidebar-footer">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span>{{ request.user.username if request.user else 'Admin' }}</span>
+                    <span>{{ username if username else 'Admin' }}</span>
                     <a href="/logout" style="color: var(--danger-color);" title="Logout">⏻</a>
                 </div>
                 <div style="font-size: 0.75rem; opacity: 0.7;">

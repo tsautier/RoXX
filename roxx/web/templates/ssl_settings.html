@@ -1,0 +1,259 @@
+{% extends "layout.html" %}
+
+{% block title %}SSL/TLS Security - RoXX{% endblock %}
+
+{% block content %}
+<style>
+    .ssl-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .status-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .status-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #cbd5e1;
+    }
+
+    .status-dot.active {
+        background: #10b981;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+    }
+
+    .status-dot.inactive {
+        background: #ef4444;
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+    }
+
+    textarea {
+        width: 100%;
+        min-height: 200px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        padding: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        background: #f8fafc;
+        resize: vertical;
+    }
+
+    .info-alert {
+        background: #eff6ff;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        color: #1e40af;
+        border-radius: 4px;
+        margin-bottom: 2rem;
+    }
+</style>
+
+<div class="ssl-container">
+    <h1 style="margin-bottom: 0.5rem; color: var(--primary-color);">SSL/TLS Security</h1>
+    <p style="color: var(--text-light); margin-bottom: 2rem;">Configure HTTPS secure access for the web interface.</p>
+
+    <div class="status-card">
+        <div class="status-indicator">
+            <div id="statusDot" class="status-dot"></div>
+            <div>
+                <h3 id="statusText" style="margin: 0; font-size: 1.2rem;">Checking...</h3>
+                <p id="statusSubtext" style="margin: 0; color: var(--text-light); font-size: 0.9rem;">Analysing server
+                    configuration</p>
+            </div>
+        </div>
+        <div id="actionArea">
+            <!-- Dynamic Buttons -->
+        </div>
+    </div>
+
+    <div class="info-alert" id="restartWarning" style="display:none;">
+        <strong>Server Restart Required:</strong> Changing SSL certificates requires a manual service restart to take
+        effect.
+        <br>Run `Restart-Service roxx` (Windows) or `systemctl restart roxx` (Linux).
+    </div>
+
+    <div class="card">
+        <h2 style="margin-bottom: 1.5rem;">Upload New Certificate</h2>
+        <form id="sslForm">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div>
+                    <label>Certificate Code (PEM format)</label>
+                    <textarea name="cert_content" placeholder="-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----" required></textarea>
+                    <small style="color: var(--text-light);">Include the full chain if needed.</small>
+                </div>
+                <div>
+                    <label>Private Key (PEM format)</label>
+                    <textarea name="key_content" placeholder="-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----" required></textarea>
+                    <small style="color: var(--text-light);">Unencrypted keys only.</small>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem; gap: 1rem;">
+                <button type="submit" class="btn btn-primary" id="saveBtn">Save & Validate</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Client Auth CA Bundle -->
+    <div class="card" style="margin-top: 2rem;">
+        <h2 style="margin-bottom: 1rem;">Client Authentication (mTLS)</h2>
+        <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+            Upload a CA Bundle (PEM) to verify client certificates.
+            <br>
+            <small>If enabled, the server will request a client certificate during handshake.</small>
+        </p>
+
+        <form id="caUploadForm" style="display: grid; gap: 1rem;">
+            <div>
+                <label>CA Bundle Content (PEM)</label>
+                <textarea name="ca_content" rows="6" class="form-control"
+                    placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary">Upload CA</button>
+                <button type="button" onclick="removeCA()" class="btn btn-outline"
+                    style="color: #ef4444; border-color: #ef4444;">Remove CA</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Existing SSL Status logic...
+    // Add CA logic
+
+    document.getElementById('caUploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const content = e.target.ca_content.value;
+        if (!content) return alert("Paste CA content");
+
+        const formData = new FormData();
+        const blob = new Blob([content], { type: "text/plain" });
+        formData.append("file", blob, "ca_bundle.crt");
+
+        try {
+            const res = await fetch('/api/system/ssl/ca', { method: 'POST', body: formData });
+            const d = await res.json();
+            if (d.success) alert("CA Uploaded. Restart required.");
+            else alert("Error: " + d.detail);
+        } catch (e) { alert("Error: " + e.message); }
+    });
+
+    async function removeCA() {
+        if (!confirm("Remove CA Bundle? Client Auth will be disabled.")) return;
+        try {
+            const res = await fetch('/api/system/ssl/ca', { method: 'DELETE' });
+            if (res.ok) alert("CA Removed. Restart required.");
+        } catch (e) { alert("Error: " + e.message); }
+    }
+</script>
+
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const statusSubtext = document.getElementById('statusSubtext');
+const actionArea = document.getElementById('actionArea');
+const restartWarning = document.getElementById('restartWarning');
+
+async function loadStatus() {
+try {
+const res = await fetch('/api/system/ssl/status');
+const data = await res.json();
+
+if (data.enabled) {
+statusDot.className = 'status-dot active';
+statusText.textContent = 'HTTPS Enabled';
+statusSubtext.textContent = 'Server is configured for secure access.';
+
+actionArea.innerHTML = `
+<button onclick="removeCert()" class="btn btn-outline" style="color: #ef4444; border-color: #fecaca;">Remove
+    Certificate</button>
+`;
+} else {
+statusDot.className = 'status-dot inactive';
+statusText.textContent = 'HTTPS Disabled';
+statusSubtext.textContent = 'Running in basic HTTP mode.';
+actionArea.innerHTML = '';
+}
+} catch (e) {
+console.error(e);
+}
+}
+
+document.getElementById('sslForm').onsubmit = async (e) => {
+e.preventDefault();
+const btn = document.getElementById('saveBtn');
+btn.textContent = "Validating...";
+btn.disabled = true;
+
+const formData = new FormData(e.target);
+const payload = {
+cert_content: formData.get('cert_content'),
+key_content: formData.get('key_content')
+};
+
+try {
+const res = await fetch('/api/system/ssl/upload', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(payload)
+});
+const data = await res.json();
+
+if (res.ok) {
+alert("Success: " + data.message);
+restartWarning.style.display = 'block';
+e.target.reset();
+loadStatus();
+} else {
+alert("Error: " + data.detail);
+}
+} catch (err) {
+alert("Error uploading certificate");
+console.error(err);
+} finally {
+btn.textContent = "Save & Validate";
+btn.disabled = false;
+}
+};
+
+async function removeCert() {
+if (!confirm("Disable HTTPS? This will verify certificate removal.")) return;
+try {
+const res = await fetch('/api/system/ssl/remove', { method: 'POST' });
+if (res.ok) {
+alert("Certificates removed. Restart server to revert to HTTP.");
+restartWarning.style.display = 'block';
+loadStatus();
+}
+} catch (e) {
+alert("Error");
+}
+}
+
+loadStatus();
+</script>
+{% endblock %}
