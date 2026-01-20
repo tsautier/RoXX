@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from starlette.middleware.sessions import SessionMiddleware
 import qrcode
 import io
 import base64
@@ -46,6 +47,15 @@ app = FastAPI(
     title="RoXX Admin Interface",
     description="Modern web interface for RoXX RADIUS Authentication Proxy",
     version=VERSION
+)
+
+# Add SessionMiddleware for MFA enrollment (needs to be before routes)
+import secrets
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=secrets.token_hex(32),  # Generate random secret key
+    max_age=3600,  # Session expires after 1 hour
+    session_cookie="roxx_session"
 )
 
 # Templates directory
@@ -388,6 +398,11 @@ async def config_page(request: Request):
 async def api_tokens_page(request: Request):
     """API Tokens Management"""
     return templates.TemplateResponse("api_tokens.html", {"request": request})
+
+@app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+async def mfa_settings_page(request: Request):
+    """MFA Settings Page"""
+    return templates.TemplateResponse("mfa_settings.html", {"request": request})
 
 
 # ------------------------------------------------------------------------------
