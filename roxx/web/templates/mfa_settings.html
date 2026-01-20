@@ -288,15 +288,21 @@
 
             if (data.enabled) {
                 statusDiv.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span class="status-badge status-enabled">✓ Enabled</span>
-                        <p style="margin-top: 1rem;">
-                            Type: ${data.type.toUpperCase()}<br>
-                            Backup codes remaining: ${data.backup_codes_remaining}
-                        </p>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <div>
+                            <span class="status-badge status-enabled">✓ Enabled</span>
+                            <p style="margin-top: 1rem;">
+                                Type: ${data.type.toUpperCase()}<br>
+                                Backup codes remaining: ${data.backup_codes_remaining}
+                            </p>
+                        </div>
+                        <button class="btn btn-danger" onclick="disableMFA()">Disable MFA</button>
                     </div>
-                    <button class="btn btn-danger" onclick="disableMFA()">Disable MFA</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn" style="background: #3b82f6; color: white;" onclick="viewBackupCodes()">📋 View Backup Codes</button>
+                        <button class="btn" style="background: #f59e0b; color: white;" onclick="regenerateBackupCodes()">🔄 Regenerate Codes</button>
+                    </div>
                 </div>
             `;
             } else {
@@ -434,6 +440,47 @@
         errorDiv.textContent = message;
         errorDiv.classList.remove('hidden');
         setTimeout(() => errorDiv.classList.add('hidden'), 5000);
+    }
+
+    async function viewBackupCodes() {
+        const codes = prompt("Enter an existing backup code or TOTP code to view remaining backup codes:");
+        if (!codes) return;
+
+        // TODO: Validate code before showing backup codes
+        // For now navigate to dedicated page
+        window.location.href = '/settings/mfa/backup-codes';
+    }
+
+    async function regenerateBackupCodes() {
+        if (!confirm('Are you sure? This will invalidate all existing backup codes and generate new ones.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/mfa/regenerate-backup-codes', { method: 'POST' });
+            const data = await response.json();
+
+            if (response.ok) {
+                // Show codes in popup
+                const codesText = data.backup_codes.join('\\n');
+                alert(`New Backup Codes:\\n\\n${codesText}\\n\\nSave these in a secure location!`);
+
+                // Download automatically
+                const blob = new Blob([`RoXX MFA Backup Codes (Regenerated)\\n\\n${codesText}\\n\\nSave these codes in a secure location.`], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'roxx-backup-codes-new.txt';
+                a.click();
+
+                // Reload status
+                loadMFAStatus();
+            } else {
+                alert('Failed to regenerate codes');
+            }
+        } catch (error) {
+            alert('Failed to regenerate backup codes: ' + error.message);
+        }
     }
 </script>
 {% endblock %}
