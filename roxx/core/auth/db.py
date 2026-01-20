@@ -46,6 +46,11 @@ class AdminDatabase:
             cursor.execute("ALTER TABLE admins ADD COLUMN external_id TEXT")
         except sqlite3.OperationalError:
             pass
+            
+        try:
+            cursor.execute("ALTER TABLE admins ADD COLUMN phone_number TEXT")
+        except sqlite3.OperationalError:
+            pass
         
         conn.commit()
         conn.close()

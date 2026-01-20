@@ -1,560 +1,251 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RADIUS Backends - RoXX</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        .backend-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
+{% block title %}RADIUS Backends - RoXX{% endblock %}
 
-        .backend-card {
-            background: white;
-            border: 2px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 1.5rem;
-            transition: all 0.2s;
-            position: relative;
-        }
+{% block extra_head %}
+<style>
+    .backend-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
 
-        .backend-card:hover {
-            border-color: var(--accent-color);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
+    .backend-card {
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        transition: all 0.2s;
+        position: relative;
+    }
 
-        .backend-card.disabled {
-            opacity: 0.6;
-            background: #f8f9fa;
-        }
+    .backend-card:hover {
+        border-color: var(--accent-color);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
 
-        .priority-badge {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: var(--accent-color);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
+    .backend-card.disabled {
+        opacity: 0.6;
+        background: #f8f9fa;
+    }
 
-        .backend-type {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin-bottom: 0.5rem;
-        }
+    .priority-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: var(--accent-color);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
 
-        .backend-type.ldap {
-            color: #0891b2;
-        }
+    .backend-type {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-light);
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
 
-        .backend-type.ntlm {
-            color: #7c3aed;
-        }
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
 
-        .backend-type.sql {
-            color: #059669;
-        }
+    .modal-content {
+        background: white;
+        border-radius: var(--radius-lg);
+        width: 600px;
+        max-width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 2rem;
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+{% endblock %}
 
-        .backend-type.file {
-            color: #f59e0b;
-        }
-
-        .status-toggle {
-            background: #10b981;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .status-toggle.disabled {
-            background: #94a3b8;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-        }
-
-        .modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: var(--radius-md);
-            max-width: 600px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            padding: 2rem;
-        }
-    </style>
-</head>
-
-<body>
-    <header class="app-header">
-        <div class="brand">
-            <img src="/static/img/logo.png" alt="RoXX Logo">
-            <span>RADIUS Backends</span>
-        </div>
-        <div>
-            <a href="/config" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back</a>
-        </div>
-    </header>
-
-    <main class="main-container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-            <h2>RADIUS User Authentication Backends</h2>
-            <div style="display: flex; gap: 0.75rem;">
-                <button onclick="window.location.href='/config/radius-backends/logs'" class="btn btn-outline">
-                    📊 View Logs
-                </button>
-                <button onclick="showAddModal()" class="btn btn-primary">+ Add Backend</button>
-            </div>
-        </div>
-
-        <div id="backendGrid" class="backend-grid">
-            <!-- Backend cards will be inserted here -->
-        </div>
-
-        <div class="card" style="background: #eff6ff; border: 1px solid #dbeafe;">
-            <p style="margin: 0; color: #1e40af;">
-                <strong>Note:</strong> Configure authentication backends for RADIUS users (WiFi, VPN, etc.).
-                Backends are tried in priority order (lower number = higher priority).
-            </p>
-        </div>
-    </main>
-
-    <!-- Add/Edit Backend Modal -->
-    <div id="backendModal" class="modal">
-        <div class="modal-content">
-            <h2 id="modalTitle">Add RADIUS Backend</h2>
-            <form id="backendForm">
-                <input type="hidden" id="backendId">
-
-                <div class="form-group">
-                    <label>Backend Type</label>
-                    <select id="backendType" onchange="updateFormFields()" required>
-                        <option value="">Select Type...</option>
-                        <option value="ldap">LDAP / Active Directory</option>
-                        <option value="ntlm">NTLM (Windows)</option>
-                        <option value="sql">SQL Database</option>
-                        <option value="file">File (users.conf)</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Backend Name</label>
-                    <input type="text" id="backendName" placeholder="e.g., Corporate LDAP" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Priority (lower = higher priority)</label>
-                    <input type="number" id="backendPriority" value="100" min="1" max="999">
-                </div>
-
-                <!-- LDAP/NTLM Fields -->
-                <div id="ldapFields" style="display: none;">
-                    <div class="form-group">
-                        <label>LDAP Server URL</label>
-                        <input type="text" id="ldapServer" placeholder="ldap://ldap.company.com:389">
-                    </div>
-                    <div class="form-group">
-                        <label>Bind DN Format</label>
-                        <input type="text" id="ldapBindDn" placeholder="uid={},ou=users,dc=company,dc=com">
-                        <small style="color: var(--text-light);">Use {} as placeholder for username</small>
-                    </div>
-                    <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="ldapUseTls" style="width: auto;">
-                            <span>Use TLS/SSL</span>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label>Search Base (optional)</label>
-                        <input type="text" id="ldapSearchBase" placeholder="ou=users,dc=company,dc=com">
-                    </div>
-                </div>
-
-                <!-- SQL Fields -->
-                <div id="sqlFields" style="display: none;">
-                    <div class="form-group">
-                        <label>Database Type</label>
-                        <select id="sqlDbType">
-                            <option value="mysql">MySQL</option>
-                            <option value="postgresql">PostgreSQL</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Host</label>
-                        <input type="text" id="sqlHost" placeholder="localhost">
-                    </div>
-                    <div class="form-group">
-                        <label>Port</label>
-                        <input type="number" id="sqlPort" value="3306">
-                    </div>
-                    <div class="form-group">
-                        <label>Database Name</label>
-                        <input type="text" id="sqlDatabase" placeholder="radius">
-                    </div>
-                    <div class="form-group">
-                        <label>Username</label>
-                        <input type="text" id="sqlUsername" placeholder="radius_user">
-                    </div>
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" id="sqlPassword">
-                    </div>
-                    <div class="form-group">
-                        <label>Password Hash Type</label>
-                        <select id="sqlPasswordType">
-                            <option value="bcrypt">BCrypt (recommended)</option>
-                            <option value="sha256">SHA-256</option>
-                            <option value="sha1">SHA-1</option>
-                            <option value="md5">MD5</option>
-                            <option value="plain">Plain (not recommended)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- File Fields -->
-                <div id="fileFields" style="display: none;">
-                    <div class="form-group">
-                        <label>Users File Path</label>
-                        <input type="text" id="filePath" value="/etc/roxx/users.conf">
-                    </div>
-                    <div class="form-group">
-                        <label>Password Type</label>
-                        <select id="filePasswordType">
-                            <option value="bcrypt">BCrypt</option>
-                            <option value="plain">Plain Text</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Test Section -->
-                <div class="test-section">
-                    <h4 style="margin-top: 0;">Test Backend</h4>
-                    <div class="form-group">
-                        <label>Test Username</label>
-                        <input type="text" id="testUsername" placeholder="test.user">
-                    </div>
-                    <div class="form-group">
-                        <label>Test Password</label>
-                        <input type="password" id="testPassword">
-                    </div>
-                    <button type="button" onclick="testBackend()" class="btn btn-outline">Test Connection</button>
-                    <div id="testResult" style="margin-top: 0.5rem; font-weight: 600;"></div>
-                </div>
-
-                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                    <button type="submit" class="btn btn-primary">Save Backend</button>
-                    <button type="button" onclick="closeModal()" class="btn btn-outline">Cancel</button>
-                </div>
-            </form>
-        </div>
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h1 style="margin-bottom: 0.5rem;">RADIUS Backends</h1>
+        <p style="color: var(--text-light);">Configure upstream RADIUS servers (e.g. Duo, Okta) for proxying.</p>
     </div>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/config/radius-backends/logs" class="btn btn-outline"
+            style="color: var(--text-main); border-color: var(--border-color);">View Debug Logs</a>
+        <button onclick="openAddModal()" class="btn btn-primary">+ Add Backend</button>
+    </div>
+</div>
 
-    <footer class="app-footer">
-        roxx v{{ version }}
-    </footer>
+<div id="backendsList" class="backend-grid">
+    <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-light);">
+        Loading backends...
+    </div>
+</div>
 
-    <script>
-        let backends = [];
+<!-- Add Backend Modal -->
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 1.5rem;">Add RADIUS Backend</h2>
+        <form id="addBackendForm">
+            <div class="form-group">
+                <label>Type</label>
+                <select name="backend_type" id="backendTypeSelect" onchange="updateFormFields()">
+                    <option value="radius_server">Standard RADIUS Server</option>
+                    <option value="duo_security">Duo Security Proxy</option>
+                </select>
+            </div>
 
-        async function loadBackends() {
-            try {
-                const response = await fetch('/api/radius-backends');
-                backends = await response.json();
-                renderBackends();
-            } catch (err) {
-                console.error('Failed to load backends:', err);
-            }
-        }
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="name" placeholder="e.g. Okta Primary" required>
+            </div>
 
-        function renderBackends() {
-            const grid = document.getElementById('backendGrid');
+            <div class="form-group">
+                <label>Priority (Lower = Higher Priority)</label>
+                <input type="number" name="priority" value="100" min="1" max="999">
+            </div>
 
-            if (backends.length === 0) {
-                grid.innerHTML = `
-                    <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
-                        <p style="color: var(--text-light); margin: 0;">No RADIUS backends configured.</p>
-                        <p style="color: var(--text-light); margin-top: 0.5rem;">Click "Add Backend" to get started.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = backends.map(backend => `
-                <div class="backend-card ${backend.enabled ? '' : 'disabled'}">
-                    <div class="priority-badge">Priority: ${backend.priority}</div>
-                    <div class="backend-type ${backend.backend_type}">${backend.backend_type.toUpperCase()}</div>
-                    <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.5rem;">${backend.name}</div>
-                    <div class="provider-info" style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">
-                        ${getBackendInfo(backend)}
-                    </div>
-                    <span class="status-toggle ${backend.enabled ? '' : 'disabled'}">
-                        ${backend.enabled ? '● Enabled' : '○ Disabled'}
-                    </span>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                        <button onclick="editBackend(${backend.id})" class="btn btn-outline" style="flex: 1; font-size: 0.85rem;">Edit</button>
-                        <button onclick="toggleBackend(${backend.id})" class="btn btn-outline" style="flex: 1; font-size: 0.85rem;">
-                            ${backend.enabled ? 'Disable' : 'Enable'}
-                        </button>
-                        <button onclick="deleteBackend(${backend.id})" style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; padding: 0.5rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
-                            Delete
-                        </button>
-                    </div>
+            <div id="radiusFields">
+                <div class="form-group">
+                    <label>Server Host/IP</label>
+                    <input type="text" name="server_host" placeholder="192.168.1.50">
                 </div>
-            `).join('');
+                <div class="form-group">
+                    <label>Auth Port</label>
+                    <input type="number" name="auth_port" value="1812">
+                </div>
+                <div class="form-group">
+                    <label>Shared Secret</label>
+                    <input type="password" name="secret">
+                </div>
+                <div class="form-group">
+                    <label>Retries</label>
+                    <input type="number" name="retries" value="3">
+                </div>
+                <div class="form-group">
+                    <label>Timeout (s)</label>
+                    <input type="number" name="timeout" value="5">
+                </div>
+            </div>
+
+            <!-- Test Connection Button -->
+            <div style="margin-bottom: 1.5rem;">
+                <button type="button" onclick="testConnection()" class="btn btn-outline"
+                    style="width: 100%; color: var(--accent-color); border-color: var(--accent-color);">Test
+                    Connectivity</button>
+                <div id="testResult" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                <button type="button" onclick="closeModal('addModal')" class="btn btn-outline"
+                    style="color: var(--text-main); border-color: var(--border-color);">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Backend</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadBackends() {
+        try {
+            const res = await fetch('/api/radius-backends');
+            if (!res.ok) throw new Error("Failed to load");
+            const backends = await res.json();
+            renderBackends(backends);
+        } catch (e) {
+            document.getElementById('backendsList').innerHTML = `<div style="color: #ef4444;">Error loading backends: ${e.message}</div>`;
+        }
+    }
+
+    function renderBackends(backends) {
+        const container = document.getElementById('backendsList');
+        if (backends.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 3rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">📡</div>
+                    <h3>No Backends Configured</h3>
+                    <p style="color: #64748b;">Add an upstream RADIUS server to enable proxying.</p>
+                </div>`;
+            return;
         }
 
-        function getBackendInfo(backend) {
-            const config = backend.config;
-            switch (backend.backend_type) {
-                case 'ldap':
-                case 'ntlm':
-                    return `Server: ${config.server || 'Not configured'}`;
-                case 'sql':
-                    return `${config.db_type || 'SQL'}: ${config.host || 'localhost'}:${config.port || '3306'}`;
-                case 'file':
-                    return `File: ${config.file_path || '/etc/roxx/users.conf'}`;
-                default:
-                    return '';
+        container.innerHTML = backends.map(b => `
+            <div class="backend-card ${b.enabled ? '' : 'disabled'}">
+                <span class="priority-badge">Pri: ${b.priority}</span>
+                <div class="backend-type">${(b.backend_type || b.type || 'unknown').replace('_', ' ')}</div>
+                <h3 style="margin-bottom: 0.5rem; padding-right: 3rem;">${b.name}</h3>
+                <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    ${b.config.server_host || 'No Host'} : ${b.config.auth_port || 1812}
+                </p>
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                     <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.85rem; color: #64748b; border-color: #e2e8f0;" onclick="deleteBackend(${b.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function openAddModal() { document.getElementById('addModal').style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    document.getElementById('addBackendForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = {
+            backend_type: formData.get('backend_type'),
+            name: formData.get('name'),
+            priority: parseInt(formData.get('priority')),
+            enabled: true,
+            config: {
+                server_host: formData.get('server_host'),
+                auth_port: parseInt(formData.get('auth_port')),
+                secret: formData.get('secret'),
+                retries: parseInt(formData.get('retries')),
+                timeout: parseInt(formData.get('timeout'))
             }
-        }
+        };
 
-        function showAddModal() {
-            document.getElementById('modalTitle').textContent = 'Add RADIUS Backend';
-            document.getElementById('backendForm').reset();
-            document.getElementById('backendId').value = '';
-            document.getElementById('testResult').innerHTML = '';
-            document.getElementById('backendModal').classList.add('active');
-        }
-
-        function closeModal() {
-            document.getElementById('backendModal').classList.remove('active');
-        }
-
-        function updateFormFields() {
-            const type = document.getElementById('backendType').value;
-            document.getElementById('ldapFields').style.display = (type === 'ldap' || type === 'ntlm') ? 'block' : 'none';
-            document.getElementById('sqlFields').style.display = type === 'sql' ? 'block' : 'none';
-            document.getElementById('fileFields').style.display = type === 'file' ? 'block' : 'none';
-
-            // Update port default based on SQL type
-            if (type === 'sql') {
-                const dbType = document.getElementById('sqlDbType').value;
-                document.getElementById('sqlPort').value = dbType === 'postgresql' ? 5432 : 3306;
+        try {
+            const res = await fetch('/api/radius-backends', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                closeModal('addModal');
+                loadBackends();
+                e.target.reset();
+            } else {
+                const errData = await res.json();
+                alert("Error creating backend: " + (errData.detail || "Unknown error"));
             }
-        }
+        } catch (err) { console.error(err); alert("Error"); }
+    };
 
-        document.getElementById('sqlDbType').addEventListener('change', () => {
-            const dbType = document.getElementById('sqlDbType').value;
-            document.getElementById('sqlPort').value = dbType === 'postgresql' ? 5432 : 3306;
-        });
-
-        async function testBackend() {
-            const type = document.getElementById('backendType').value;
-            const testUsername = document.getElementById('testUsername').value;
-            const testPassword = document.getElementById('testPassword').value;
-            const resultDiv = document.getElementById('testResult');
-
-            if (!testUsername || !testPassword) {
-                resultDiv.innerHTML = '<span style="color: #f59e0b;">Enter test credentials</span>';
-                return;
-            }
-
-            const config = getConfigFromForm();
-            resultDiv.innerHTML = '<span style="color: #3b82f6;">Testing...</span>';
-
-            try {
-                const response = await fetch('/api/radius-backends/test', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        backend_type: type,
-                        config: config,
-                        test_username: testUsername,
-                        test_password: testPassword
-                    })
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    resultDiv.innerHTML = `<span style="color: #10b981;">✓ ${data.message}</span>`;
-                } else {
-                    resultDiv.innerHTML = `<span style="color: #ef4444;">✗ ${data.message}</span>`;
-                }
-            } catch (err) {
-                resultDiv.innerHTML = `<span style="color: #ef4444;">✗ Test failed: ${err.message}</span>`;
-            }
-        }
-
-        function getConfigFromForm() {
-            const type = document.getElementById('backendType').value;
-
-            if (type === 'ldap' || type === 'ntlm') {
-                return {
-                    server: document.getElementById('ldapServer').value,
-                    bind_dn_format: document.getElementById('ldapBindDn').value,
-                    use_tls: document.getElementById('ldapUseTls').checked,
-                    search_base: document.getElementById('ldapSearchBase').value
-                };
-            } else if (type === 'sql') {
-                return {
-                    db_type: document.getElementById('sqlDbType').value,
-                    host: document.getElementById('sqlHost').value,
-                    port: parseInt(document.getElementById('sqlPort').value),
-                    database: document.getElementById('sqlDatabase').value,
-                    username: document.getElementById('sqlUsername').value,
-                    password: document.getElementById('sqlPassword').value,
-                    password_type: document.getElementById('sqlPasswordType').value
-                };
-            } else if (type === 'file') {
-                return {
-                    file_path: document.getElementById('filePath').value,
-                    password_type: document.getElementById('filePasswordType').value
-                };
-            }
-            return {};
-        }
-
-        document.getElementById('backendForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const backendId = document.getElementById('backendId').value;
-            const type = document.getElementById('backendType').value;
-            const name = document.getElementById('backendName').value;
-            const priority = parseInt(document.getElementById('backendPriority').value);
-            const config = getConfigFromForm();
-
-            const method = backendId ? 'PUT' : 'POST';
-            const url = backendId ? `/api/radius-backends/${backendId}` : '/api/radius-backends';
-
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        backend_type: type,
-                        name: name,
-                        priority: priority,
-                        config: config
-                    })
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    closeModal();
-                    loadBackends();
-                } else {
-                    alert('Error: ' + (data.detail || data.message));
-                }
-            } catch (err) {
-                alert('Failed to save backend: ' + err.message);
-            }
-        });
-
-        async function editBackend(id) {
-            const backend = backends.find(b => b.id === id);
-            if (!backend) return;
-
-            document.getElementById('modalTitle').textContent = 'Edit RADIUS Backend';
-            document.getElementById('backendId').value = backend.id;
-            document.getElementById('backendType').value = backend.backend_type;
-            document.getElementById('backendName').value = backend.name;
-            document.getElementById('backendPriority').value = backend.priority;
-
-            updateFormFields();
-
-            const config = backend.config;
-            if (backend.backend_type === 'ldap' || backend.backend_type === 'ntlm') {
-                document.getElementById('ldapServer').value = config.server || '';
-                document.getElementById('ldapBindDn').value = config.bind_dn_format || '';
-                document.getElementById('ldapUseTls').checked = config.use_tls || false;
-                document.getElementById('ldapSearchBase').value = config.search_base || '';
-            } else if (backend.backend_type === 'sql') {
-                document.getElementById('sqlDbType').value = config.db_type || 'mysql';
-                document.getElementById('sqlHost').value = config.host || '';
-                document.getElementById('sqlPort').value = config.port || 3306;
-                document.getElementById('sqlDatabase').value = config.database || '';
-                document.getElementById('sqlUsername').value = config.username || '';
-                document.getElementById('sqlPassword').value = config.password || '';
-                document.getElementById('sqlPasswordType').value = config.password_type || 'bcrypt';
-            } else if (backend.backend_type === 'file') {
-                document.getElementById('filePath').value = config.file_path || '';
-                document.getElementById('filePasswordType').value = config.password_type || 'bcrypt';
-            }
-
-            document.getElementById('testResult').innerHTML = '';
-            document.getElementById('backendModal').classList.add('active');
-        }
-
-        async function toggleBackend(id) {
-            const backend = backends.find(b => b.id === id);
-            if (!backend) return;
-
-            try {
-                const response = await fetch(`/api/radius-backends/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enabled: !backend.enabled })
-                });
-
-                if (response.ok) {
-                    loadBackends();
-                } else {
-                    alert('Failed to toggle backend');
-                }
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
-
-        async function deleteBackend(id) {
-            if (!confirm('Are you sure you want to delete this backend?')) return;
-
-            try {
-                const response = await fetch(`/api/radius-backends/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    loadBackends();
-                } else {
-                    alert('Failed to delete backend');
-                }
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
-
-        // Load backends on page load
+    async function deleteBackend(id) {
+        if (!confirm("Delete this backend?")) return;
+        await fetch(`/api/radius-backends/${id}`, { method: 'DELETE' });
         loadBackends();
-    </script>
-</body>
+    }
 
-</html>
+    // Future: impl testConnection()
+
+    loadBackends();
+</script>
+{% endblock %}

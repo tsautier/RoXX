@@ -1,107 +1,81 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuration - RoXX</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        .file-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
+{% block title %}Configuration - RoXX{% endblock %}
 
-        .file-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f8fafc;
-            padding: 1rem 1.5rem;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border-color);
-            transition: border-color 0.2s;
-        }
+{% block content %}
+<h1 style="margin-bottom: 2rem; color: var(--primary-color);">Configuration</h1>
 
-        .file-item:hover {
-            border-color: var(--accent-color);
-        }
-
-        .file-name {
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .file-path {
-            font-family: 'Consolas', 'Monaco', monospace;
-            color: var(--text-light);
-            background: #eee;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-    </style>
-</head>
-
-<body>
-    <header class="app-header">
-        <div class="brand">
-            <img src="/static/img/logo.png" alt="RoXX Logo">
-            <span>Configuration</span>
+<div class="config-grid">
+    <!-- Auth Providers -->
+    <a href="/config/auth-providers" class="config-card">
+        <div class="icon-wrapper" style="background: #e0f2fe; color: #0284c7;">
+            🔐
         </div>
-        <div style="display: flex; gap: 1rem; align-items: center;">
-            <a href="/admins" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Manage Admins</a>
-            <a href="/" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back</a>
+        <div class="config-info">
+            <h3>Auth Providers</h3>
+            <p>Configure LDAP, Active Directory, and other identity sources.</p>
         </div>
-    </header>
+        <div class="arrow">→</div>
+    </a>
 
-    <main class="main-container">
-        <div class="card">
-            <h2 style="margin-bottom: 2rem;">Configuration Files</h2>
-            <div class="file-list">
-                <div class="file-item">
-                    <span class="file-name">Main Configuration</span>
-                    <span class="file-path">/etc/roxx/roxx.conf</span>
-                </div>
-                <div class="file-item">
-                    <span class="file-name">Users Database</span>
-                    <span class="file-path">/etc/roxx/users.conf</span>
-                </div>
-                <div class="file-item">
-                    <span class="file-name">RADIUS Clients</span>
-                    <span class="file-path">/etc/roxx/radius_clients.conf</span>
-                </div>
-                <div class="file-item" style="cursor: pointer;" onclick="window.location.href='/config/auth-providers'">
-                    <span class="file-name">Authentication Providers</span>
-                    <span class="file-path">LDAP / SAML / RADIUS for Admin Panel</span>
-                </div>
-                <div class="file-item" style="cursor: pointer;"
-                    onclick="window.location.href='/config/radius-backends'">
-                    <span class="file-name">RADIUS Backends</span>
-                    <span class="file-path">User Authentication: LDAP / SQL / File</span>
-                </div>
-                <div class="file-item" style="cursor: pointer;" onclick="window.location.href='/config/api-tokens'">
-                    <span class="file-name">API Tokens</span>
-                    <span class="file-path">Manage API access tokens for integrations</span>
-                </div>
-            </div>
-
-            <div class="alert"
-                style="background: #eff6ff; border: 1px solid #dbeafe; color: #1e40af; margin-top: 2rem;">
-                <strong>Note:</strong> Advanced system configuration (network, RADIUS clients) is currently managed via
-                CLI or file editing.
-                User management is available <a href="/users">here</a>.
-            </div>
+    <!-- Radius Backends (New) -->
+    <a href="/config/radius-backends" class="config-card">
+        <div class="icon-wrapper" style="background: #e0f2fe; color: #0284c7;">
+            📡
         </div>
-    </main>
+        <div class="config-info">
+            <h3>RADIUS Backends</h3>
+            <p>Configure backend RADIUS servers (e.g. Duo, Okta) for proxying.</p>
+        </div>
+        <div class="arrow">→</div>
+    </a>
 
-    <footer class="app-footer">
-        roxx v{{ version }}
-    </footer>
-</body>
 
-</html>
+    <!-- API Tokens -->
+    <a href="/config/api-tokens" class="config-card">
+        <div class="icon-wrapper" style="background: #fef3c7; color: #d97706;">
+            🔑
+        </div>
+        <div class="config-info">
+            <h3>API Tokens</h3>
+            <p>Manage API access tokens for external integrations.</p>
+        </div>
+        <div class="arrow">→</div>
+    </a>
+
+    <!-- System Settings -->
+    <a href="/config/ssl" class="config-card">
+        <div class="icon-wrapper" style="background: #f1f5f9; color: #64748b;">
+            🔒
+        </div>
+        <div class="config-info">
+            <h3>SSL/TLS Security</h3>
+            <p>Configure HTTPS certificates for secure access.</p>
+        </div>
+        <div class="arrow">→</div>
+    </a>
+
+    <!-- MFA Gateways -->
+    <a href="/config/mfa-gateways" class="config-card">
+        <div class="icon-wrapper" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+            📨
+        </div>
+        <div class="config-info">
+            <h3>MFA Gateways</h3>
+            <p>Configure SMS (Twilio) and Email (SMTP)</p>
+        </div>
+        <div class="arrow">→</div>
+    </a>
+
+    <!-- General Settings -->
+    <div class="config-card disabled">
+        <div class="icon-wrapper" style="background: #f1f5f9; color: #64748b;">
+            ⚙️
+        </div>
+        <div class="config-info">
+            <h3>System Settings</h3>
+            <p>General server configuration (Coming Soon)</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
