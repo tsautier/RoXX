@@ -173,6 +173,18 @@ async def login(request: Request, username: str = Form(...), password: str = For
         # 2. MFA Enabled? Check database
         mfa_enabled = MFADatabase.is_mfa_enabled(username)
         if mfa_enabled:
+            # Check if device is trusted
+            trusted_cookie = request.cookies.get("mfa_trusted_device")
+            if trusted_cookie and ":" in trusted_cookie:
+                trusted_username, trusted_hash = trusted_cookie.split(":", 1)
+                if trusted_username == username:
+                    # Device is trusted - skip MFA
+                    session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+                    response = RedirectResponse(url="/", status_code=303)
+                    response.set_cookie(key="session", value=session_val, httponly=True)
+                    return response
+            
+            # Not trusted - require MFA
             # Store username in session for MFA verification
             request.session['mfa_username'] = username
             session_val = base64.b64encode(f"{username}:mfa_pending".encode("utf-8")).decode("utf-8")
@@ -227,7 +239,8 @@ async def mfa_verification_page(request: Request):
 async def mfa_verify_login(
     request: Request,
     token: str = Form(None),
-    backup_code: str = Form(None)
+    backup_code: str = Form(None),
+    trust_device: str = Form(None)
 ):
     """Verify MFA token or backup code"""
     # Get username from session
@@ -270,6 +283,25 @@ async def mfa_verify_login(
             session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
             response = RedirectResponse(url="/", status_code=303)
             response.set_cookie(key="session", value=session_val, httponly=True)
+            
+            # Set trust device cookie if requested
+            if trust_device == "yes":
+                import secrets
+                import hashlib
+                # Generate unique device token
+                device_token = secrets.token_hex(32)
+                # Hash username+token for verification
+                trust_value = hashlib.sha256(f"{username}:{device_token}".encode()).hexdigest()
+                # Store for 30 days
+                response.set_cookie(
+                    key="mfa_trusted_device",
+                    value=f"{username}:{trust_value}",
+                    max_age=30*24*60*60,  # 30 days
+                    httponly=True,
+                    secure=False,  # Set to True in production with HTTPS
+                    samesite="lax"
+                )
+            
             # Clear MFA session data
             request.session.pop('mfa_username', None)
             return response
