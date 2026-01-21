@@ -128,7 +128,7 @@
                 <label>Type</label>
                 <select name="provider_type" id="providerTypeSelect" onchange="updateFormFields()">
                     <option value="ldap">LDAP / Active Directory</option>
-                    <!-- Future: <option value="saml">SAML 2.0</option> -->
+                    <option value="saml">SAML 2.0</option>
                     <!-- Future: <option value="oauth">OAuth / OIDC</option> -->
                 </select>
             </div>
@@ -138,7 +138,7 @@
                 <input type="text" name="name" placeholder="e.g. Corporate AD" required>
             </div>
 
-            <div id="ldapFields">
+            <div id="ldapFields" style="display: none;">
                 <div class="form-group">
                     <label>Server URL</label>
                     <input type="text" name="server_url" placeholder="ldap://dc.example.com:389">
@@ -158,6 +158,32 @@
                 <div class="form-group">
                     <label>User Search Filter</label>
                     <input type="text" name="search_filter" value="(&(objectClass=person)(sAMAccountName={0}))">
+                </div>
+            </div>
+
+            <div id="samlFields" style="display: none;">
+                <div class="form-group">
+                    <label>IdP Entity ID</label>
+                    <input type="text" name="idp_entity_id" placeholder="https://idp.example.com">
+                </div>
+                <div class="form-group">
+                    <label>IdP SSO URL</label>
+                    <input type="text" name="idp_sso_url" placeholder="https://idp.example.com/sso">
+                </div>
+                <div class="form-group">
+                    <label>IdP x509 Certificate</label>
+                    <textarea name="idp_x509_cert" rows="6" placeholder="-----BEGIN CERTIFICATE-----
+MIIDdDCCAlygAwIBAgIJALoZ...
+-----END CERTIFICATE-----"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>SP Entity ID</label>
+                    <input type="text" name="sp_entity_id" value="https://roxx.local"
+                        placeholder="https://your-domain.com">
+                </div>
+                <div class="form-group">
+                    <label>Attribute Mapping (Username)</label>
+                    <input type="text" name="attr_username" value="uid" placeholder="uid or email">
                 </div>
             </div>
 
@@ -227,8 +253,15 @@
         `).join('');
     }
 
+    function updateFormFields() {
+        const type = document.getElementById('providerTypeSelect').value;
+        document.getElementById('ldapFields').style.display = type === 'ldap' ? 'block' : 'none';
+        document.getElementById('samlFields').style.display = type === 'saml' ? 'block' : 'none';
+    }
+
     function openAddModal() {
         document.getElementById('addModal').style.display = 'flex';
+        updateFormFields();
     }
 
     function closeModal(id) {
@@ -238,19 +271,33 @@
     document.getElementById('addProviderForm').onsubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
+        const providerType = formData.get('provider_type');
 
-        // Convert to JSON
-        const data = {
-            provider_type: formData.get('provider_type'),
-            name: formData.get('name'),
-            enabled: true,
-            config: {
+        // Build config based on provider type
+        let config = {};
+        if (providerType === 'ldap') {
+            config = {
                 server_url: formData.get('server_url'),
                 base_dn: formData.get('base_dn'),
                 bind_dn: formData.get('bind_dn'),
                 bind_password: formData.get('bind_password'),
                 search_filter: formData.get('search_filter')
-            }
+            };
+        } else if (providerType === 'saml') {
+            config = {
+                idp_entity_id: formData.get('idp_entity_id'),
+                idp_sso_url: formData.get('idp_sso_url'),
+                idp_x509_cert: formData.get('idp_x509_cert'),
+                sp_entity_id: formData.get('sp_entity_id'),
+                attr_username: formData.get('attr_username') || 'uid'
+            };
+        }
+
+        const data = {
+            provider_type: providerType,
+            name: formData.get('name'),
+            enabled: true,
+            config: config
         };
 
         try {
