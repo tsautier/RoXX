@@ -9,6 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.middleware.sessions import SessionMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from roxx.core.security.rate_limit import limiter, rate_limit_custom_handler
 import qrcode
 import io
 import base64
@@ -48,6 +51,10 @@ app = FastAPI(
     description="Modern web interface for RoXX RADIUS Authentication Proxy",
     version=VERSION
 )
+
+# Initialize Rate Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_custom_handler)
 
 # Add SessionMiddleware for MFA enrollment (needs to be before routes)
 import secrets
@@ -169,6 +176,7 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login")
+@limiter.limit("5/minute")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     # Verify credentials
     success, user_data = AuthManager.verify_credentials(username, password)
@@ -273,6 +281,7 @@ async def mfa_verification_page(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
 @app.post("/auth/mfa/verify")
+@limiter.limit("5/minute")
 async def mfa_verify_unified(request: Request):
     """Unified MFA Verification (TOTP, SMS, Email, Backup)"""
     try:
