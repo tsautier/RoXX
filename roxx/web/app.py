@@ -9,9 +9,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.middleware.sessions import SessionMiddleware
+from roxx.core.audit.manager import AuditManager
+from roxx.core.audit.db import AuditDatabase
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from roxx.core.security.rate_limit import limiter, rate_limit_custom_handler
+from roxx.core.security.rate_limit import limiter
 import qrcode
 import io
 import base64
@@ -54,7 +56,31 @@ app = FastAPI(
 
 # Initialize Rate Limiter
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_custom_handler)
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
+    """
+    Custom handler for RateLimitExceeded using Jinja2 templates and logging
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning(f"RATE LIMIT EXCEEDED: {client_ip} tried to access {request.url.path} - {exc.detail}")
+    
+    AuditManager.log(
+        request=request, 
+        action="RATE_LIMIT_EXCEEDED", 
+        severity="WARNING", 
+        details={"path": request.url.path, "limit": str(exc.detail)}
+    )
+    
+    # API / Auth endpoints -> JSON
+    if request.url.path.startswith("/api") or request.url.path.startswith("/auth"):
+         return JSONResponse(
+            {"success": False, "detail": f"Rate limit exceeded: {exc.detail}"}, 
+            status_code=429
+        )
+    
+    # HTML Pages -> Template
+    return templates.TemplateResponse("429.html", {"request": request}, status_code=429)
 
 # Add SessionMiddleware for MFA enrollment (needs to be before routes)
 import secrets
@@ -115,6 +141,9 @@ RadiusBackendDB.init()
 # Initialize MFA database
 from roxx.core.auth.mfa_db import MFADatabase
 MFADatabase.init()
+
+# Initialize Audit database
+AuditDatabase.init_db()
 
 async def get_current_username(request: Request):
     """
@@ -224,6 +253,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
                         session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
                         response = JSONResponse({"success": True, "redirect": "/"})
                         response.set_cookie(key="session", value=session_val, httponly=True)
+                        AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "trusted_device"}, username=username)
                         return response
                 except: pass
 
@@ -238,21 +268,26 @@ async def login(request: Request, username: str = Form(...), password: str = For
                 "mfa_methods": mfa_methods
             })
             response.set_cookie(key="session", value=session_val, httponly=True)
+            AuditManager.log(request, "LOGIN_MFA_REQUIRED", "INFO", {"username": username, "mfa_methods": mfa_methods}, username=username)
             return response
 
         # No MFA - Login
         session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
         response = JSONResponse({"success": True, "redirect": "/dashboard"})
         response.set_cookie(key="session", value=session_val, httponly=True)
+        AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "password_only"}, username=username)
         return response
     
-    return JSONResponse({"success": False, "error": "Invalid username or password"}, status_code=401)
+    AuditManager.log(request, "LOGIN_FAILED", "WARNING", {"username": username, "reason": "invalid_credentials"}, username=username)
+    return JSONResponse(status_code=401, content={"success": False, "detail": "Invalid credentials"})
 
 
 @app.get("/logout")
 async def logout(request: Request):
-    response = RedirectResponse(url="/login", status_code=303)
+    response = RedirectResponse(url="/login")
     response.delete_cookie("session")
+    AuditManager.log(request, "LOGOUT", "INFO", username=request.session.get("username"))
+    request.session.clear() # Clear specific session storage if used
     # Clear MFA session data
     request.session.pop('mfa_username', None)
     return response
@@ -346,8 +381,10 @@ async def mfa_verify_unified(request: Request):
         # Cleanup
         request.session.pop('mfa_username', None)
         
+        AuditManager.log(request, "MFA_SUCCESS", "INFO", {"username": username, "method": mfa_type}, username=username)
         return response
 
+    AuditManager.log(request, "MFA_FAILED", "WARNING", {"username": username, "method": mfa_type, "reason": "invalid_code"}, username=username)
     return JSONResponse({"success": False, "detail": "Invalid Code"}, status_code=400)
 
 @app.post("/auth/mfa/cert/verify")
@@ -375,8 +412,10 @@ async def mfa_cert_verify(request: Request):
         session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
         response = JSONResponse({"success": True})
         response.set_cookie(key="session", value=session_val, httponly=True)
+        AuditManager.log(request, "MFA_SUCCESS", "INFO", {"username": username, "method": "client_cert", "fingerprint": cert_info['fingerprint']}, username=username)
         return response
         
+    AuditManager.log(request, "MFA_FAILED", "WARNING", {"username": username, "method": "client_cert", "reason": "cert_mismatch", "fingerprint": cert_info['fingerprint']}, username=username)
     return JSONResponse({"success": False, "detail": "Certificate not linked to user"}, status_code=403)
 
 
@@ -1005,6 +1044,28 @@ async def radius_authenticate(request: Request):
     except Exception as e:
         logger.error(f"RADIUS auth error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ------------------------------------------------------------------------------
+# Audit Logs
+# ------------------------------------------------------------------------------
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request, current_user: str = Depends(get_current_username)):
+    """Audit Logs Viewer"""
+    return templates.TemplateResponse("logs.html", get_page_context(request, current_user, "logs"))
+
+@app.get("/api/logs")
+async def get_audit_logs(
+    request: Request, 
+    limit: int = 100, 
+    offset: int = 0,
+    search: str = None,
+    current_user: str = Depends(get_current_username)
+):
+    """API to retrieve audit logs"""
+    logs = AuditDatabase.get_logs(limit, offset, search)
+    return {"logs": logs}
 
 
 

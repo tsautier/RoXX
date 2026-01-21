@@ -19,6 +19,17 @@
             <span>{% block header_title %}RoXX{% endblock %}</span>
         </div>
         <div>
+            <a class="nav-link {% if active_page == 'mfa' %}active{% endif %}" href="/auth/mfa/settings">
+                <div class="sb-nav-link-icon"><i class="fas fa-shield-alt"></i></div>
+                MFA Settings
+            </a>
+
+            <a class="nav-link {% if active_page == 'logs' %}active{% endif %}" href="/logs">
+                <div class="sb-nav-link-icon"><i class="fas fa-list-alt"></i></div>
+                Audit Logs
+            </a>
+
+            <div class="sb-sidenav-menu-heading">System</div>
             <a href="/config" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back to
                 Config</a>
         </div>

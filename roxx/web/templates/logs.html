@@ -1,109 +1,76 @@
-{% extends "layout.html" %}
+{% extends "base.html" %}
 
-{% block title %}System Logs - RoXX{% endblock %}
+{% block title %}System Audit Logs - RoXX{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <h1>System Logs</h1>
-    <div class="status-badge" id="connectionBadge">Disconnected</div>
-</div>
-
-<div class="card"
-    style="display: flex; flex-direction: column; height: calc(100vh - 200px); padding: 0; overflow: hidden;">
-    <div
-        style="padding: 1rem; background: #1e1e1e; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
-        <span style="color: #fff; font-weight: bold;">Live Stream</span>
-        <div style="display: flex; gap: 0.5rem;">
-            <button onclick="clearLogs()" class="btn btn-outline"
-                style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border-color: #444; color: #aaa;">Clear</button>
-            <button onclick="toggleFollow()" id="followBtn" class="btn btn-outline"
-                style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border-color: #444; color: #10b981;">Auto-Scroll:
-                ON</button>
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">System Audit Logs</h6>
+                <div class="dropdown no-arrow">
+                    <button class="btn btn-sm btn-primary shadow-sm" onclick="fetchLogs()">
+                        <i class="fas fa-sync-alt fa-sm text-white-50"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="logsTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Timestamp (UTC)</th>
+                                <th>Severity</th>
+                                <th>Action</th>
+                                <th>Username</th>
+                                <th>IP Address</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <!-- Logs here -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Pagination Control could go here -->
+            </div>
         </div>
     </div>
-
-    <div id="logConsole"
-        style="flex: 1; background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; padding: 1rem; overflow-y: auto; font-size: 0.9rem; white-space: pre-wrap;">
-        <div style="color: #666; font-style: italic;">Connecting to log stream...</div>
-    </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-    const logConsole = document.getElementById('logConsole');
-    const statusBadge = document.getElementById('connectionBadge');
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
-    let socket;
-    let autoScroll = true;
+    async function fetchLogs() {
+        try {
+            const response = await fetch('/api/logs?limit=50');
+            const data = await response.json();
 
-    function connect() {
-        socket = new WebSocket(wsUrl);
+            const tbody = document.getElementById('logsTableBody');
+            tbody.innerHTML = '';
 
-        socket.onopen = () => {
-            statusBadge.textContent = 'Connected';
-            statusBadge.style.backgroundColor = '#d1fae5';
-            statusBadge.style.color = '#065f46';
-            logConsole.textContent = ''; // Clear initial
-            addLog("System", "Connected to log stream");
-        };
+            data.logs.forEach(log => {
+                const row = document.createElement('tr');
 
-        socket.onmessage = (event) => {
-            const line = document.createElement('div');
-            line.style.padding = "2px 0";
-            line.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
-            line.textContent = event.data;
+                let severityBadge = 'badge-secondary';
+                if (log.severity === 'WARNING') severityBadge = 'badge-warning';
+                if (log.severity === 'ERROR') severityBadge = 'badge-danger';
+                if (log.severity === 'INFO') severityBadge = 'badge-info';
 
-            // Color coding
-            if (event.data.includes('[Info]') || event.data.includes('SUCCESS')) {
-                line.style.color = '#10B981';
-            } else if (event.data.includes('[Warn]') || event.data.includes('WARNING')) {
-                line.style.color = '#F59E0B';
-            } else if (event.data.includes('[Error]') || event.data.includes('FAILED')) {
-                line.style.color = '#EF4444';
-            }
-
-            logConsole.appendChild(line);
-
-            if (autoScroll) {
-                logConsole.scrollTop = logConsole.scrollHeight;
-            }
-        };
-
-        socket.onclose = () => {
-            statusBadge.textContent = 'Disconnected';
-            statusBadge.style.backgroundColor = '#fee2e2';
-            statusBadge.style.color = '#991b1b';
-            addLog("System", "Connection lost. Reconnecting in 3s...");
-            setTimeout(connect, 3000);
-        };
-    }
-
-    function addLog(source, msg) {
-        const div = document.createElement('div');
-        div.style.color = '#666';
-        div.textContent = `[${source}] ${msg}`;
-        logConsole.appendChild(div);
-    }
-
-    function clearLogs() {
-        logConsole.innerHTML = '';
-    }
-
-    function toggleFollow() {
-        autoScroll = !autoScroll;
-        const btn = document.getElementById('followBtn');
-        if (autoScroll) {
-            btn.textContent = "Auto-Scroll: ON";
-            btn.style.color = "#10b981";
-            logConsole.scrollTop = logConsole.scrollHeight;
-        } else {
-            btn.textContent = "Auto-Scroll: OFF";
-            btn.style.color = "#aaa";
+                row.innerHTML = `
+                <td>${log.timestamp}</td>
+                <td><span class="badge ${severityBadge}">${log.severity}</span></td>
+                <td>${log.action}</td>
+                <td>${log.username}</td>
+                <td>${log.ip_address}</td>
+                <td><small>${JSON.stringify(log.details)}</small></td>
+            `;
+                tbody.appendChild(row);
+            });
+        } catch (e) {
+            console.error("Failed to load logs", e);
         }
     }
 
-    connect();
+    // Load on start
+    document.addEventListener('DOMContentLoaded', fetchLogs);
 </script>
 {% endblock %}
