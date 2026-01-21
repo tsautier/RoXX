@@ -1203,6 +1203,9 @@ async def delete_user(username: str):
 # Real-time Logs (WebSocket)
 # ------------------------------------------------------------------------------
 
+# Track active WebSocket connections for log streaming
+active_log_websockets: List[WebSocket] = []
+
 async def get_current_username_ws(websocket: WebSocket):
     """Verifies Basic Auth for WebSocket manually"""
     # Browser cannot send custom headers on WS connect easily.
@@ -1529,7 +1532,8 @@ async def remove_ca_bundle():
 # ------------------------------------------------------------------------------
 # SAML Authentication Routes
 # ------------------------------------------------------------------------------
-from roxx.core.auth.saml_provider import SAMLProvider
+# NOTE: SAML imports are lazy-loaded due to xmlsec dependency issues
+# from roxx.core.auth.saml_provider import SAMLProvider
 from roxx.core.auth.config_db import ConfigManager
 from fastapi.responses import Response
 
@@ -1541,6 +1545,11 @@ async def saml_metadata(provider_id: int):
     Args:
         provider_id: ID of the SAML provider configuration
     """
+    try:
+        from roxx.core.auth.saml_provider import SAMLProvider
+    except ImportError as e:
+        raise HTTPException(status_code=503, detail=f"SAML not available: {e}")
+    
     provider = ConfigManager.get_provider(provider_id)
     if not provider or provider['provider_type'] != 'saml':
         raise HTTPException(status_code=404, detail="SAML provider not found")

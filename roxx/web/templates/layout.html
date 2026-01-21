@@ -5,64 +5,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RoXX{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Fonts and Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 4 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+
     {% block extra_head %}{% endblock %}
 </head>
 
 <body>
-    <div class="app-shell">
+    <div class="app-layout">
         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <img src="/static/img/logo.png" alt="Logo">
-                <span class="sidebar-brand">Ro<span style="color: var(--accent-color);">XX</span></span>
+        <aside class="app-sidebar">
+            <div class="brand">
+                <img src="/static/img/logo.png" alt="RoXX">
+                <span>RoXX Admin</span>
             </div>
 
             <nav class="sidebar-nav">
+                <div class="nav-category">Core</div>
                 <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
-                    <span>📊</span> Dashboard
-                </a>
-                <a href="/admins" class="nav-item {% if active_page == 'users' %}active{% endif %}">
-                    <span>👥</span> User Management
-                </a>
-                <a href="/config" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
-                    <span>⚙️</span> Configuration
+                    <i class="fas fa-home"></i> Dashboard
                 </a>
 
-                <div style="margin: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.1);"></div>
-
-                <div
-                    style="padding: 0.5rem 1.5rem; font-size: 0.75rem; color: rgba(255,255,255,0.4); text-transform: uppercase;">
-                    Security
-                </div>
-
+                <div class="nav-category">Security</div>
                 <a href="/settings/mfa" class="nav-item {% if active_page == 'mfa' %}active{% endif %}">
-                    <span>🔐</span> MFA Settings
+                    <i class="fas fa-shield-alt"></i> MFA Settings
                 </a>
-                <a href="/auth/change-password" class="nav-item {% if active_page == 'password' %}active{% endif %}">
-                    <span>🔑</span> Change Password
+                <a href="/logs" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
+                    <i class="fas fa-list-alt"></i> Audit Logs
                 </a>
-                <a href="/logs-view" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
-                    <span>📝</span> System Logs
+                <a href="/config/api-tokens" class="nav-item {% if active_page == 'tokens' %}active{% endif %}">
+                    <i class="fas fa-key"></i> API Tokens
+                </a>
+
+                <div class="nav-category">System</div>
+                <a href="/config" class="nav-item">
+                    <i class="fas fa-cog"></i> Config
+                </a>
+                <a href="/logout" class="nav-item text-danger">
+                    <i class="fas fa-sign-out-alt"></i> Logout
                 </a>
             </nav>
-
-            <div class="sidebar-footer">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span>{{ username if username else 'Admin' }}</span>
-                    <a href="/logout" style="color: var(--danger-color);" title="Logout">⏻</a>
-                </div>
-                <div style="font-size: 0.75rem; opacity: 0.7;">
-                    v{{ version }}
-                </div>
-            </div>
         </aside>
 
-        <!-- Main Content Wrapper -->
-        <div class="main-wrapper">
+        <!-- Main Content -->
+        <div class="app-main">
             <!-- Optional Top Header -->
             <header class="content-header">
                 <div style="display: flex; align-items: center; gap: 1rem;">
