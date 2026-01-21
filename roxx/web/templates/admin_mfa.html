@@ -226,7 +226,7 @@
 
         } catch (err) {
             console.error('Error loading credentials:', err);
-            alert('Failed to load credentials');
+            showError('Error', 'Failed to load credentials. Please refresh the page.');
         }
     }
 
@@ -241,16 +241,16 @@
             });
 
             if (response.ok) {
-                alert('Credential deleted successfully');
+                showSuccess('Success!', 'Security key deleted successfully');
                 loadCredentials();
                 loadMFAStatus();
             } else {
                 const data = await response.json();
-                alert('Failed to delete credential: ' + (data.detail || 'Unknown error'));
+                showError('Failed', 'Could not delete credential: ' + (data.detail || 'Unknown error'));
             }
         } catch (err) {
             console.error('Error deleting credential:', err);
-            alert('Error deleting credential');
+            showError('Error', 'Network error while deleting credential');
         }
     }
 
@@ -265,15 +265,15 @@
             });
 
             if (response.ok) {
-                alert('TOTP reset successfully. User must re-configure their authenticator app.');
+                showSuccess('TOTP Reset!', 'User must re-configure their authenticator app');
                 loadMFAStatus();
             } else {
                 const data = await response.json();
-                alert('Failed to reset TOTP: ' + (data.detail || 'Unknown error'));
+                showError('Failed', 'Could not reset TOTP: ' + (data.detail || 'Unknown error'));
             }
         } catch (err) {
             console.error('Error resetting TOTP:', err);
-            alert('Error resetting TOTP');
+            showError('Error', 'Network error while resetting TOTP');
         }
     }
 
