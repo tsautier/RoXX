@@ -5,11 +5,89 @@
 {% block content %}
 <h1 style="margin-bottom: 2rem; color: var(--primary-color);">Dashboard</h1>
 
+<!-- Stats Row -->
+<div class="row mb-4">
+    <!-- OS -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            System ({{ os_type }})</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ cpu.percent }}% CPU</div>
+                        <div class="text-xs text-muted">{{ cpu.count }} Cores</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-server fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RAM -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Memory</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ memory.percent }}%</div>
+                        <div class="text-xs text-muted">{{ memory.used }}GB / {{ memory.total }}GB</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-memory fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disk -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Disk (/)</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ disk.percent }}%</div>
+                        <div class="text-xs text-muted">{{ disk.free }}GB Free</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-hdd fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uptime -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Uptime</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ uptime }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Two Column Grid: System Status + User Management -->
 <div class="dashboard-grid">
-    <!-- Left: System Status -->
+    <!-- Left: RADIUS Status -->
     <div class="status-card">
-        <h3>System Status</h3>
+        <h3>FreeRADIUS Status</h3>
 
         <!-- Large UP/DOWN Badge -->
         <div class="status-badge-large {% if radius_status != 'UP' %}down{% endif %}">
@@ -17,93 +95,7 @@
             <div class="status-text">{{ radius_status }}</div>
         </div>
 
-        <!-- Info Items -->
-        <div class="info-items">
-            <div class="info-item">
-                <div class="info-icon">🔐</div>
-                <div>
-                    <div class="info-label">FreeRADIUS</div>
-                </div>
-                <div class="info-value">{{ radius_status }}</div>
-            </div>
-            <!-- Core Stats Cards -->
-            <div class="row">
-                <!-- OS / CPU -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-primary shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                        System Resources ({{ os_type }})</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ cpu.percent }}% CPU</div>
-                                    <div class="text-xs text-muted">{{ cpu.count }} Cores</div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-microchip fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- RAM -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-success shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                        Memory Usage</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ memory.percent }}%</div>
-                                    <div class="text-xs text-muted">{{ memory.used }}GB / {{ memory.total }}GB</div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-memory fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Disk -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-info shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                        Disk Usage (/)</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ disk.percent }}%</div>
-                                    <div class="text-xs text-muted">{{ disk.free }}GB Free</div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-hdd fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Uptime -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-warning shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                        Uptime</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ uptime }}</div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-clock fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <p class="text-center mt-3 text-muted">Core Authentication Service</p>
     </div>
 
     <!-- Right: User Management -->
