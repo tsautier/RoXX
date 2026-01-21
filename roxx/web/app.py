@@ -713,6 +713,9 @@ async def dashboard(request: Request, current_user: str = Depends(get_current_us
         radius_status=radius_status,
         os_type="Linux" if os.name != 'nt' else "Windows",
         uptime=SystemManager.get_uptime(),
+        cpu=SystemManager.get_cpu_info(),
+        memory=SystemManager.get_memory_info(),
+        disk=SystemManager.get_disk_info(),
         recent_users=recent_users
     ))
 

@@ -33,193 +33,199 @@
         <h1>MFA Settings</h1>
     </div>
 
-    <!-- WebAuthn Section -->
-    <div class="status-card">
-        <div class="section-title">
-            <span>🔑</span> Security Keys & Passkeys
+    <div class="row">
+        <!-- WebAuthn Section -->
+        <div class="col-md-6">
+            <div class="status-card h-100">
+                <div class="section-title">
+                    <span>🔑</span> Security Keys & Passkeys
+                </div>
+                <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                    Use a YubiKey, TouchID, or Windows Hello to authenticate.
+                </p>
+
+                <div id="webauthn-area">
+                    <button id="registerKeyBtn" class="btn btn-primary btn-block" onclick="registerWebAuthn()">Register
+                        New Security Key</button>
+                    <div id="webauthn-status" style="margin-top: 1rem; font-size: 0.9rem;"></div>
+                </div>
+            </div>
         </div>
-        <p style="color: var(--text-light); margin-bottom: 1.5rem;">
-            Use a YubiKey, TouchID, or Windows Hello to authenticate.
-        </p>
 
-        <div id="webauthn-area">
-            <button id="registerKeyBtn" class="btn btn-primary" onclick="registerWebAuthn()">Register New Security
-                Key</button>
-            <div id="webauthn-status" style="margin-top: 1rem; font-size: 0.9rem;"></div>
+        <!-- Client Cert Section -->
+        <div class="col-md-6">
+            <div class="status-card h-100">
+                <div class="section-title">
+                    <span>🎫</span> Client Certificates (mTLS)
+                </div>
+                <p style="color: var(--text-light); margin-bottom: 1rem;">
+                    Authenticate using a personal certificate installed in your browser.
+                </p>
+
+                <div id="certList"
+                    style="margin-bottom: 1rem; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; min-height: 50px;">
+                    <!-- Certs load here -->
+                </div>
+
+                <button onclick="registerCert()" class="btn btn-outline btn-block">Link Current Browser
+                    Certificate</button>
+            </div>
+        </div>
+
+        <!-- SMS Section -->
+        <div class="col-md-6 mt-4">
+            <div class="status-card h-100">
+                <div class="section-title">
+                    <span>💬</span> SMS Authentication
+                </div>
+                <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                    Receive OTP codes via SMS.
+                </p>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="text" id="userPhone" placeholder="+1234567890" class="form-control">
+                    <button onclick="savePhone()" class="btn btn-outline">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOTP Section -->
+        <div class="col-md-6 mt-4">
+            <div class="status-card h-100">
+                <div class="section-title">
+                    <span>📱</span> Authenticator App (TOTP)
+                </div>
+                <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                    Google Authenticator, Authy, etc.
+                </p>
+                <a href="/totp/enroll" class="btn btn-outline btn-block"
+                    style="border-color: var(--border-color); color: var(--text-main);">Configure TOTP</a>
+            </div>
         </div>
     </div>
-</div>
+    {% endblock %}
 
-<!-- Client Cert Section -->
-<div class="status-card">
-    <div class="section-title">
-        <span>🎫</span> Client Certificates (mTLS)
-    </div>
-    <p style="color: var(--text-light); margin-bottom: 1rem;">
-        Authenticate using a personal certificate installed in your browser.
-    </p>
-
-    <div id="certList"
-        style="margin-bottom: 1rem; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem;">
-        <!-- Certs load here -->
-    </div>
-
-    <button onclick="registerCert()" class="btn btn-outline" style="width: 100%;">Link Current Browser
-        Certificate</button>
-</div>
-
-<!-- SMS Section -->
-<div class="status-card">
-    <div class="section-title">
-        <span>💬</span> SMS Authentication
-    </div>
-    <p style="color: var(--text-light); margin-bottom: 1.5rem;">
-        Receive OTP codes via SMS.
-    </p>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <input type="text" id="userPhone" placeholder="+1234567890"
-            style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; flex: 1; max-width: 200px;">
-        <button onclick="savePhone()" class="btn btn-outline">Save</button>
-    </div>
-</div>
-
-<!-- TOTP Section -->
-<div class="status-card">
-    <div class="section-title">
-        <span>📱</span> Authenticator App (TOTP)
-    </div>
-    <p style="color: var(--text-light); margin-bottom: 1.5rem;">
-        Google Authenticator, Authy, etc.
-    </p>
-    <a href="/totp/enroll" class="btn btn-outline"
-        style="border-color: var(--border-color); color: var(--text-main);">Configure TOTP</a>
-</div>
-
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Helper to decode base64url to Uint8Array
-    function bufferDecode(value) {
-        return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
-    }
-
-    // Helper to encode ArrayBuffer to base64url
-    function bufferEncode(value) {
-        return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
-            .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-    }
-
-    async function registerWebAuthn() {
-        const status = document.getElementById('webauthn-status');
-        status.innerHTML = "Requesting registration options...";
-        status.style.color = "var(--text-light)";
-
-        try {
-            // 1. Get options from server
-            const resp = await fetch('/api/webauthn/register/options');
-            if (!resp.ok) throw new Error("Failed to get options");
-            const options = await resp.json();
-
-            // 2. Decode options for navigator
-            options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
-            options.publicKey.user.id = bufferDecode(options.publicKey.user.id);
-            if (options.publicKey.excludeCredentials) {
-                for (var i = 0; i < options.publicKey.excludeCredentials.length; i++) {
-                    options.publicKey.excludeCredentials[i].id = bufferDecode(options.publicKey.excludeCredentials[i].id);
-                }
-            }
-
-            status.innerHTML = "Insert/Touch your security key...";
-
-            // 3. Create credential
-            const credential = await navigator.credentials.create({ publicKey: options.publicKey });
-
-            // 4. Encode response
-            const credentialObj = {
-                id: credential.id,
-                rawId: bufferEncode(credential.rawId),
-                type: credential.type,
-                response: {
-                    attestationObject: bufferEncode(credential.response.attestationObject),
-                    clientDataJSON: bufferEncode(credential.response.clientDataJSON),
-                }
-            };
-            // transports hint if avail
-            if (credential.response.getTransports) {
-                credentialObj.response.transports = credential.response.getTransports();
-            }
-
-            // 5. Send to server
-            status.innerHTML = "Verifying with server...";
-            const verifyResp = await fetch('/api/webauthn/register/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(credentialObj)
-            });
-
-            if (verifyResp.ok) {
-                status.innerHTML = "✅ Security Key Registered Successfully!";
-                status.style.color = "green";
-            } else {
-                const err = await verifyResp.json();
-                throw new Error(err.detail);
-            }
-
-        } catch (e) {
-            console.error(e);
-            status.innerHTML = "❌ Error: " + e.message;
-            status.style.color = "red";
+    {% block scripts %}
+    <script>
+        // Helper to decode base64url to Uint8Array
+        function bufferDecode(value) {
+            return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
         }
-    }
 
-    // mTLS Logic
-    async function loadCerts() {
-        const container = document.getElementById('certList');
-        if (!container) return;
-        try {
-            const res = await fetch('/api/mfa/cert/list');
-            const certs = await res.json();
-            container.innerHTML = certs.length ? '' : '<div style="color:var(--text-light);font-style:italic;">No certificates linked.</div>';
+        // Helper to encode ArrayBuffer to base64url
+        function bufferEncode(value) {
+            return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+                .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+        }
 
-            certs.forEach(cert => {
-                const el = document.createElement('div');
-                el.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border-color);";
-                el.innerHTML = `
+        async function registerWebAuthn() {
+            const status = document.getElementById('webauthn-status');
+            status.innerHTML = "Requesting registration options...";
+            status.style.color = "var(--text-light)";
+
+            try {
+                // 1. Get options from server
+                const resp = await fetch('/api/webauthn/register/options');
+                if (!resp.ok) throw new Error("Failed to get options");
+                const options = await resp.json();
+
+                // 2. Decode options for navigator
+                options.publicKey.challenge = bufferDecode(options.publicKey.challenge);
+                options.publicKey.user.id = bufferDecode(options.publicKey.user.id);
+                if (options.publicKey.excludeCredentials) {
+                    for (var i = 0; i < options.publicKey.excludeCredentials.length; i++) {
+                        options.publicKey.excludeCredentials[i].id = bufferDecode(options.publicKey.excludeCredentials[i].id);
+                    }
+                }
+
+                status.innerHTML = "Insert/Touch your security key...";
+
+                // 3. Create credential
+                const credential = await navigator.credentials.create({ publicKey: options.publicKey });
+
+                // 4. Encode response
+                const credentialObj = {
+                    id: credential.id,
+                    rawId: bufferEncode(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        attestationObject: bufferEncode(credential.response.attestationObject),
+                        clientDataJSON: bufferEncode(credential.response.clientDataJSON),
+                    }
+                };
+                // transports hint if avail
+                if (credential.response.getTransports) {
+                    credentialObj.response.transports = credential.response.getTransports();
+                }
+
+                // 5. Send to server
+                status.innerHTML = "Verifying with server...";
+                const verifyResp = await fetch('/api/webauthn/register/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(credentialObj)
+                });
+
+                if (verifyResp.ok) {
+                    status.innerHTML = "✅ Security Key Registered Successfully!";
+                    status.style.color = "green";
+                } else {
+                    const err = await verifyResp.json();
+                    throw new Error(err.detail);
+                }
+
+            } catch (e) {
+                console.error(e);
+                status.innerHTML = "❌ Error: " + e.message;
+                status.style.color = "red";
+            }
+        }
+
+        // mTLS Logic
+        async function loadCerts() {
+            const container = document.getElementById('certList');
+            if (!container) return;
+            try {
+                const res = await fetch('/api/mfa/cert/list');
+                const certs = await res.json();
+                container.innerHTML = certs.length ? '' : '<div style="color:var(--text-light);font-style:italic;">No certificates linked.</div>';
+
+                certs.forEach(cert => {
+                    const el = document.createElement('div');
+                    el.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border-color);";
+                    el.innerHTML = `
                     <div>
                         <div style="font-weight:600;">${cert.common_name}</div>
                         <div style="font-size:0.8rem;color:var(--text-light);">${cert.issuer}</div>
                     </div>
                     <button onclick="deleteCert(${cert.id})" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
                 `;
-                container.appendChild(el);
-            });
-        } catch (e) { console.error(e); }
-    }
+                    container.appendChild(el);
+                });
+            } catch (e) { console.error(e); }
+        }
 
-    async function registerCert() {
-        if (!confirm("Please ensure your personal certificate is selected in the browser. Continue?")) return;
-        try {
-            const res = await fetch('/api/mfa/cert/register', { method: 'POST' });
-            const d = await res.json();
-            if (d.success) {
-                alert("Certificate Linked!");
+        async function registerCert() {
+            if (!confirm("Please ensure your personal certificate is selected in the browser. Continue?")) return;
+            try {
+                const res = await fetch('/api/mfa/cert/register', { method: 'POST' });
+                const d = await res.json();
+                if (d.success) {
+                    alert("Certificate Linked!");
+                    loadCerts();
+                } else {
+                    alert("Failed: " + d.detail);
+                }
+            } catch (e) { alert("Error: " + e.message); }
+        }
+
+        async function deleteCert(id) {
+            if (!confirm("Remove this certificate?")) return;
+            try {
+                await fetch('/api/mfa/cert/' + id, { method: 'DELETE' });
                 loadCerts();
-            } else {
-                alert("Failed: " + d.detail);
-            }
-        } catch (e) { alert("Error: " + e.message); }
-    }
+            } catch (e) { console.error(e); }
+        }
 
-    async function deleteCert(id) {
-        if (!confirm("Remove this certificate?")) return;
-        try {
-            await fetch('/api/mfa/cert/' + id, { method: 'DELETE' });
-            loadCerts();
-        } catch (e) { console.error(e); }
-    }
-
-    loadCerts();
-</script>
-{% endblock %}
+        loadCerts();
+    </script>
+    {% endblock %}

@@ -36,10 +36,47 @@ class SystemManager:
         try:
             boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
             uptime = datetime.datetime.now() - boot_time
-            # Format: "2 days, 4:32:01"
+            # Format: "2 days, 4:32"
             return str(uptime).split('.')[0]
         except:
             return "Unknown"
+
+    @staticmethod
+    def get_cpu_info() -> dict:
+        """Returns CPU usage and count"""
+        try:
+            return {
+                "percent": psutil.cpu_percent(interval=None),
+                "count": psutil.cpu_count()
+            }
+        except:
+            return {"percent": 0, "count": 1}
+
+    @staticmethod
+    def get_memory_info() -> dict:
+        """Returns RAM usage"""
+        try:
+            mem = psutil.virtual_memory()
+            return {
+                "total": round(mem.total / (1024**3), 1), # GB
+                "used": round(mem.used / (1024**3), 1),   # GB
+                "percent": mem.percent
+            }
+        except:
+            return {"total": 0, "used": 0, "percent": 0}
+
+    @staticmethod
+    def get_disk_info() -> dict:
+        """Returns Disk usage for /"""
+        try:
+            disk = psutil.disk_usage('/')
+            return {
+                "total": round(disk.total / (1024**3), 1),
+                "free": round(disk.free / (1024**3), 1),
+                "percent": disk.percent
+            }
+        except:
+            return {"total": 0, "free": 0, "percent": 0}
 
     @staticmethod
     def is_service_running(service_name: str) -> bool:
