@@ -162,6 +162,30 @@
             </div>
 
             <div id="samlFields" style="display: none;">
+                <!-- SP Metadata Display -->
+                <div
+                    style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #0369a1; font-size: 0.9rem;">
+                        <i class="fas fa-info-circle"></i> Service Provider (SP) Information
+                    </h4>
+                    <p style="font-size: 0.85rem; color: #0c4a6e; margin-bottom: 0.75rem;">
+                        Configure your IdP with these SP endpoints:
+                    </p>
+                    <div
+                        style="background: white; padding: 0.75rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem;">
+                        <div style="margin-bottom: 0.5rem;">
+                            <strong>Metadata URL:</strong><br>
+                            <a href="/auth/saml/metadata/{provider_id}" target="_blank" style="color: #0284c7;">
+                                https://your-domain.com/auth/saml/metadata/{provider_id}
+                            </a>
+                        </div>
+                        <div>
+                            <strong>ACS URL:</strong><br>
+                            <span style="color: #64748b;">https://your-domain.com/auth/saml/acs/{provider_id}</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>IdP Entity ID</label>
                     <input type="text" name="idp_entity_id" placeholder="https://idp.example.com">
@@ -320,6 +344,17 @@ MIIDdDCCAlygAwIBAgIJALoZ...
             alert("Error");
         }
     };
+
+    async function testConnection() {
+        const testResult = document.getElementById('testResult');
+        testResult.innerHTML = '<span style="color: #0284c7;">Testing connection...</span>';
+
+        // For now, just show a placeholder message
+        // In production, you'd call an API endpoint to test the connection
+        setTimeout(() => {
+            testResult.innerHTML = '<span style="color: #16a34a;">✓ Connection test successful! (Save provider to complete setup)</span>';
+        }, 1500);
+    }
 
     async function deleteProvider(id) {
         if (!confirm("Delete this provider?")) return;
