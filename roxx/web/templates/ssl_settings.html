@@ -143,9 +143,91 @@
 
 {% block scripts %}
 <script>
-    // Existing SSL Status logic...
-    // Add CA logic
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const statusSubtext = document.getElementById('statusSubtext');
+    const actionArea = document.getElementById('actionArea');
+    const restartWarning = document.getElementById('restartWarning');
 
+    async function loadStatus() {
+        try {
+            const res = await fetch('/api/system/ssl/status');
+            const data = await res.json();
+
+            if (data.enabled) {
+                statusDot.className = 'status-dot active';
+                statusText.textContent = 'HTTPS Enabled';
+                statusSubtext.textContent = 'Server is configured for secure access.';
+                actionArea.innerHTML = `<button class="btn btn-danger btn-block" onclick="removeCert()">Remove Certificate</button>`;
+            } else {
+                statusDot.className = 'status-dot inactive';
+                statusText.textContent = 'HTTPS Disabled';
+                statusSubtext.textContent = 'Running in basic HTTP mode.';
+                actionArea.innerHTML = '';
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    document.getElementById('sslForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('saveBtn');
+        btn.textContent = "Validating...";
+        btn.disabled = true;
+
+        const formData = new FormData(e.target);
+
+        // Revised payload logic to match user expectations from previous context
+        const payload = {
+            cert_content: formData.get('cert_content'),
+            key_content: formData.get('key_content')
+        };
+
+        try {
+            const res = await fetch('/api/system/ssl/upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                alert("Success: " + data.message);
+                restartWarning.style.display = 'block';
+                e.target.reset();
+                loadStatus();
+            } else {
+                alert("Error: " + data.detail);
+            }
+        } catch (err) {
+            alert("Error uploading certificate");
+            console.error(err);
+        } finally {
+            btn.textContent = "Save & Validate";
+            btn.disabled = false;
+        }
+    };
+
+    async function removeCert() {
+        if (!confirm("Disable HTTPS? This will verify certificate removal.")) return;
+
+        try {
+            const res = await fetch('/api/system/ssl/remove', { method: 'POST' });
+            if (res.ok) {
+                alert("Certificates removed. Restart server to revert to HTTP.");
+                restartWarning.style.display = 'block';
+                loadStatus();
+            }
+        } catch (e) {
+            alert("Error");
+        }
+    }
+
+    // CA Upload Logic
     document.getElementById('caUploadForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const content = e.target.ca_content.value;
@@ -170,90 +252,7 @@
             if (res.ok) alert("CA Removed. Restart required.");
         } catch (e) { alert("Error: " + e.message); }
     }
-</script>
 
-const statusDot = document.getElementById('statusDot');
-const statusText = document.getElementById('statusText');
-const statusSubtext = document.getElementById('statusSubtext');
-const actionArea = document.getElementById('actionArea');
-const restartWarning = document.getElementById('restartWarning');
-
-async function loadStatus() {
-try {
-const res = await fetch('/api/system/ssl/status');
-const data = await res.json();
-
-if (data.enabled) {
-statusDot.className = 'status-dot active';
-statusText.textContent = 'HTTPS Enabled';
-statusSubtext.textContent = 'Server is configured for secure access.';
-
-actionArea.innerHTML = `
-<button onclick="removeCert()" class="btn btn-outline" style="color: #ef4444; border-color: #fecaca;">Remove
-    Certificate</button>
-`;
-} else {
-statusDot.className = 'status-dot inactive';
-statusText.textContent = 'HTTPS Disabled';
-statusSubtext.textContent = 'Running in basic HTTP mode.';
-actionArea.innerHTML = '';
-}
-} catch (e) {
-console.error(e);
-}
-}
-
-document.getElementById('sslForm').onsubmit = async (e) => {
-e.preventDefault();
-const btn = document.getElementById('saveBtn');
-btn.textContent = "Validating...";
-btn.disabled = true;
-
-const formData = new FormData(e.target);
-const payload = {
-cert_content: formData.get('cert_content'),
-key_content: formData.get('key_content')
-};
-
-try {
-const res = await fetch('/api/system/ssl/upload', {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify(payload)
-});
-const data = await res.json();
-
-if (res.ok) {
-alert("Success: " + data.message);
-restartWarning.style.display = 'block';
-e.target.reset();
-loadStatus();
-} else {
-alert("Error: " + data.detail);
-}
-} catch (err) {
-alert("Error uploading certificate");
-console.error(err);
-} finally {
-btn.textContent = "Save & Validate";
-btn.disabled = false;
-}
-};
-
-async function removeCert() {
-if (!confirm("Disable HTTPS? This will verify certificate removal.")) return;
-try {
-const res = await fetch('/api/system/ssl/remove', { method: 'POST' });
-if (res.ok) {
-alert("Certificates removed. Restart server to revert to HTTP.");
-restartWarning.style.display = 'block';
-loadStatus();
-}
-} catch (e) {
-alert("Error");
-}
-}
-
-loadStatus();
+    loadStatus();
 </script>
 {% endblock %}

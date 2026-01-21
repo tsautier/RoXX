@@ -711,7 +711,8 @@ async def dashboard(request: Request, current_user: str = Depends(get_current_us
     return templates.TemplateResponse("dashboard.html", get_page_context(
         request, current_user, "dashboard",
         radius_status=radius_status,
-        os_type="Linux" if os.name != 'nt' else "Windows",
+        os_type=SystemManager.get_os(),
+        kernel_version=SystemManager.get_kernel_version(),
         uptime=SystemManager.get_uptime(),
         cpu=SystemManager.get_cpu_info(),
         memory=SystemManager.get_memory_info(),
@@ -1246,38 +1247,15 @@ async def websocket_endpoint(websocket: WebSocket):
     # But usually it relies on Cookies.
     # Given we set up Basic Auth, we can try to validate. If missing, we warn but allow connection for now 
     # to avoid breaking the Dashboard which might not send the header explicitly in JS.
-    # The dashboard.html JS does NOT send headers.
-    
-    # SECURITY NOTE: For MVP/Beta, we might relax WS auth or rely on Cookie if we had session Auth.
-    # With strict Basic Auth, the Dashboard JS changes needed to transmit creds are complex (passed via URL query param).
-    # Let's simply ALLOW the WS connection but verify logic works.
-    # The previous crash was due to HTTPBasic() failing. Now it's removed from global dependencies.
-    
+    active_log_websockets.append(websocket)
     try:
-        log_file = SystemManager.get_radius_log_file()
-        
-        # If file doesn't exist (e.g. dev env without radius), simulate logs
-        if not log_file.exists():
-            await websocket.send_text(f"Log file not found at {log_file} - Simulating logs...")
-            while True:
-                await asyncio.sleep(2)
-                await websocket.send_text(f"SIMULATED LOG: Heartbeat... {secrets.token_hex(4)}")
-                
-        # Tail the file
-        # Simple implementation: read from end
-        with open(log_file, "r") as f:
-            f.seek(0, 2) # Go to end
-            while True:
-                line = f.readline()
-                if line:
-                    await websocket.send_text(line.strip())
-                else:
-                    await asyncio.sleep(0.5)
-                    
-    except WebSocketDisconnect:
-        print("Client disconnected")
-    except Exception as e:
-        await websocket.send_text(f"Error: {str(e)}")
+        await websocket.send_text("Connected to Real-Time System Logs...")
+        while True:
+            # Keep connection alive
+            await websocket.receive_text()
+    except:
+        if websocket in active_log_websockets:
+            active_log_websockets.remove(websocket)
 
 
 # ------------------------------------------------------------------------------

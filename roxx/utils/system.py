@@ -31,6 +31,14 @@ class SystemManager:
             return "Linux (Unknown)"
             
     @staticmethod
+    def get_kernel_version() -> str:
+        """Returns the kernel version"""
+        try:
+            return platform.release()
+        except:
+            return "Unknown"
+
+    @staticmethod
     def get_uptime() -> str:
         """Returns system uptime string"""
         try:
