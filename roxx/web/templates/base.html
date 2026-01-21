@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RoXX{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,35 +14,59 @@
 </head>
 
 <body>
-    <header class="app-header">
-        <div class="brand">
-            <img src="/static/img/logo.png" alt="RoXX Logo">
-            <span>{% block header_title %}RoXX{% endblock %}</span>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="app-sidebar">
+            <div class="brand">
+                <img src="/static/img/logo.png" alt="RoXX">
+                <span>RoXX Admin</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-category">Core</div>
+                <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+
+                <div class="nav-category">Security</div>
+                <a href="/auth/mfa/settings" class="nav-item {% if active_page == 'mfa' %}active{% endif %}">
+                    <i class="fas fa-shield-alt"></i> MFA Settings
+                </a>
+                <a href="/logs" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
+                    <i class="fas fa-list-alt"></i> Audit Logs
+                </a>
+                <a href="/api-tokens" class="nav-item {% if active_page == 'tokens' %}active{% endif %}">
+                    <i class="fas fa-key"></i> API Tokens
+                </a>
+
+                <div class="nav-category">System</div>
+                <a href="/config" class="nav-item">
+                    <i class="fas fa-cog"></i> Config
+                </a>
+                <a href="/logout" class="nav-item text-danger">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="app-main">
+            <header class="top-bar">
+                <h2 class="page-title">{% block header_title %}Overview{% endblock %}</h2>
+                <div class="user-menu">
+                    <!-- User info or actions -->
+                </div>
+            </header>
+
+            <main class="content-wrapper">
+                {% block content %}{% endblock %}
+            </main>
+
+            <footer class="app-footer">
+                roxx v1.0.0-beta5
+            </footer>
         </div>
-        <div>
-            <a class="nav-link {% if active_page == 'mfa' %}active{% endif %}" href="/auth/mfa/settings">
-                <div class="sb-nav-link-icon"><i class="fas fa-shield-alt"></i></div>
-                MFA Settings
-            </a>
-
-            <a class="nav-link {% if active_page == 'logs' %}active{% endif %}" href="/logs">
-                <div class="sb-nav-link-icon"><i class="fas fa-list-alt"></i></div>
-                Audit Logs
-            </a>
-
-            <div class="sb-sidenav-menu-heading">System</div>
-            <a href="/config" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back to
-                Config</a>
-        </div>
-    </header>
-
-    <main class="main-container">
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="app-footer">
-        roxx v1.0.0-beta4
-    </footer>
+    </div>
 
     {% block scripts %}{% endblock %}
 </body>
