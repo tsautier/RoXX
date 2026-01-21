@@ -46,7 +46,7 @@ logger = logging.getLogger("roxx.web")
 # App Initialization
 # ------------------------------------------------------------------------------
 
-VERSION = "1.0.0-beta5"
+VERSION = "1.0.0-beta6"
 
 app = FastAPI(
     title="RoXX Admin Interface",
