@@ -1523,6 +1523,160 @@ async def remove_ca_bundle():
         return {"success": True, "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
+    return {"status": "healthy", "service": "roxx-web"}
+
+
+# ------------------------------------------------------------------------------
+# SAML Authentication Routes
+# ------------------------------------------------------------------------------
+from roxx.core.auth.saml_provider import SAMLProvider
+from roxx.core.auth.config_db import ConfigManager
+from fastapi.responses import Response
+
+@app.get("/auth/saml/metadata/{provider_id}")
+async def saml_metadata(provider_id: int):
+    """
+    Generate and return SAML SP metadata XML
+    
+    Args:
+        provider_id: ID of the SAML provider configuration
+    """
+    provider = ConfigManager.get_provider(provider_id)
+    if not provider or provider['provider_type'] != 'saml':
+        raise HTTPException(status_code=404, detail="SAML provider not found")
+    
+    try:
+        # Add SP ACS URL to config (generated from app URL)
+        config = provider['config']
+        if 'sp_acs_url' not in config:
+            config['sp_acs_url'] = f"http://localhost:8000/auth/saml/acs/{provider_id}"
+        
+        saml = SAMLProvider(config)
+        metadata_xml = saml.get_metadata()
+        
+        return Response(content=metadata_xml, media_type="application/xml")
+    except Exception as e:
+        logger.error(f"Error generating SAML metadata: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/auth/saml/login/{provider_id}")
+async def saml_login(provider_id: int, request: Request, relay_state: str = None):
+    """
+    Initiate SAML SSO login flow
+    
+    Args:
+        provider_id: ID of the SAML provider
+        relay_state: Optional URL to redirect after successful auth
+    """
+    provider = ConfigManager.get_provider(provider_id)
+    if not provider or provider['provider_type'] != 'saml':
+        raise HTTPException(status_code=404, detail="SAML provider not found")
+    
+    if not provider['enabled']:
+        raise HTTPException(status_code=403, detail="Provider is disabled")
+    
+    try:
+        # Prepare request data for python3-saml
+        request_data = {
+            'https': 'on' if request.url.scheme == 'https' else 'off',
+            'http_host': request.url.hostname,
+            'script_name': request.url.path,
+            'server_port': request.url.port or (443 if request.url.scheme == 'https' else 80),
+            'get_data': dict(request.query_params),
+            'post_data': {}
+        }
+        
+        config = provider['config']
+        if 'sp_acs_url' not in config:
+            config['sp_acs_url'] = f"{request.url.scheme}://{request.url.hostname}:{request.url.port or 8000}/auth/saml/acs/{provider_id}"
+        
+        saml = SAMLProvider(config)
+        redirect_url = saml.initiate_sso(request_data, relay_state=relay_state or "/dashboard")
+        
+        # Store provider_id in session for ACS callback
+        request.session['saml_provider_id'] = provider_id
+        
+        return {"redirect_url": redirect_url}
+    except Exception as e:
+        logger.error(f"Error initiating SAML SSO: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/auth/saml/acs/{provider_id}")
+async def saml_acs(provider_id: int, request: Request):
+    """
+    SAML Assertion Consumer Service - handles IdP response
+    
+    Args:
+        provider_id: ID of the SAML provider
+    """
+    provider = ConfigManager.get_provider(provider_id)
+    if not provider or provider['provider_type'] != 'saml':
+        raise HTTPException(status_code=404, detail="SAML provider not found")
+    
+    try:
+        # Prepare request data
+        form_data = await request.form()
+        request_data = {
+            'https': 'on' if request.url.scheme == 'https' else 'off',
+            'http_host': request.url.hostname,
+            'script_name': request.url.path,
+            'server_port': request.url.port or (443 if request.url.scheme == 'https' else 80),
+            'get_data': {},
+            'post_data': {
+                'SAMLResponse': form_data.get('SAMLResponse'),
+                'RelayState': form_data.get('RelayState', '')
+            }
+        }
+        
+        config = provider['config']
+        if 'sp_acs_url' not in config:
+            config['sp_acs_url'] = str(request.url)
+        
+        saml = SAMLProvider(config)
+        success, user_data, error = saml.process_response(request_data)
+        
+        if not success:
+            logger.error(f"SAML authentication failed: {error}")
+            raise HTTPException(status_code=401, detail=error)
+        
+        # Create or update user from SAML attributes
+        from roxx.core.auth.manager import AuthManager
+        username = user_data['username']
+        
+        # Check if user exists, create if needed
+        try:
+            auth_success, _ = AuthManager.verify_credentials(username, None)
+            if not auth_success:
+                # Create user with external auth source
+                AuthManager.create_admin(username, None, auth_source='saml')
+        except:
+            AuthManager.create_admin(username, None, auth_source='saml')
+        
+        # Set session
+        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        
+        # Redirect to original target or dashboard
+        redirect_to = form_data.get('RelayState', '/dashboard')
+        response = RedirectResponse(url=redirect_to, status_code=303)
+        response.set_cookie(key="session", value=session_val, httponly=True)
+        
+        AuditManager.log(request, "SAML_LOGIN_SUCCESS", "INFO", 
+                        {"username": username, "provider": provider['name']}, 
+                        username=username)
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing SAML response: {e}")
+        AuditManager.log(request, "SAML_LOGIN_FAILED", "ERROR", 
+                        {"error": str(e), "provider": provider['name']})
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def main():
     import uvicorn
     from roxx.core.security.cert_manager import CertManager
