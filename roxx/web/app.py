@@ -1177,6 +1177,81 @@ async def delete_admin(username: str, current_user: str = Depends(get_current_us
         raise HTTPException(status_code=400, detail=message)
 
 # ------------------------------------------------------------------------------
+# MFA Credential Management API
+# ------------------------------------------------------------------------------
+@app.get("/admins/{username}/mfa", response_class=HTMLResponse)
+async def admin_mfa_page(username: str, request: Request, current_user: str = Depends(get_current_username)):
+    """MFA management page for a specific admin user"""
+    return templates.TemplateResponse("admin_mfa.html", get_page_context(
+        request, current_user, "users",
+        managed_username=username
+    ))
+
+@app.get("/api/admins/{username}/mfa/credentials", dependencies=[Depends(get_current_username)])
+async def list_user_mfa_credentials(username: str):
+    """List all WebAuthn credentials for a user"""
+    from roxx.core.auth.webauthn_db import WebAuthnDatabase
+    try:
+        creds = WebAuthnDatabase.list_credentials(username)
+        # Convert binary fields to base64 for JSON serialization
+        import base64
+        for cred in creds:
+            if 'credential_id' in cred and isinstance(cred['credential_id'], bytes):
+                cred['credential_id'] = base64.b64encode(cred['credential_id']).decode('utf-8')
+            if 'public_key' in cred and isinstance(cred['public_key'], bytes):
+                cred['public_key'] = base64.b64encode(cred['public_key']).decode('utf-8')
+        return {"credentials": creds}
+    except Exception as e:
+        logger.error(f"Error listing credentials: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/admins/{username}/mfa/webauthn/{credential_id}", dependencies=[Depends(get_current_username)])
+async def delete_webauthn_credential(username: str, credential_id: int):
+    """Delete a specific WebAuthn credential"""
+    from roxx.core.auth.webauthn_db import WebAuthnDatabase
+    try:
+        success = WebAuthnDatabase.delete_credential(credential_id, username)
+        if success:
+            return {"success": True, "message": "Credential deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Credential not found")
+    except Exception as e:
+        logger.error(f"Error deleting credential: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/admins/{username}/mfa/totp/reset", dependencies=[Depends(get_current_username)])
+async def reset_user_totp(username: str):
+    """Reset TOTP MFA for a user"""
+    from roxx.core.auth.db import AdminDatabase
+    try:
+        success = AdminDatabase.reset_totp(username)
+        if success:
+            return {"success": True, "message": "TOTP reset successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to reset TOTP")
+    except Exception as e:
+        logger.error(f"Error resetting TOTP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/admins/{username}/mfa/status", dependencies=[Depends(get_current_username)])
+async def get_user_mfa_status(username: str):
+    """Get MFA status for a user"""
+    from roxx.core.auth.db import AdminDatabase
+    from roxx.core.auth.webauthn_db import WebAuthnDatabase
+    try:
+        totp_status = AdminDatabase.get_mfa_status(username)
+        webauthn_creds = WebAuthnDatabase.list_credentials(username)
+        
+        return {
+            "totp_enabled": totp_status.get("totp_enabled", False),
+            "sms_enabled": totp_status.get("sms_enabled", False),
+            "webauthn_count": len(webauthn_creds)
+        }
+    except Exception as e:
+        logger.error(f"Error getting MFA status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ------------------------------------------------------------------------------
 # User Management API
 # ------------------------------------------------------------------------------
 @app.post("/api/users", dependencies=[Depends(get_current_username)])

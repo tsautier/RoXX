@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+{% extends "base.html" %}
 
 {% block title %}Admin Management - RoXX{% endblock %}
 
@@ -107,6 +107,10 @@
                     </td>
                     <td>{{ user.last_login or 'Never' }}</td>
                     <td style="text-align: right;">
+                        <a href="/admins/{{ user.username }}/mfa"
+                            style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem; display: inline-block; margin-right: 0.5rem; transition: all 0.2s;">
+                            <i class="fas fa-shield-alt"></i> Manage MFA
+                        </a>
                         {% if user.username != 'admin' %}
                         <button onclick="deleteAdmin('{{ user.username }}')"
                             style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s;">

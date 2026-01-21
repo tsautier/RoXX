@@ -1,7 +1,10 @@
 import sqlite3
 import datetime
+import logging
 from pathlib import Path
 from roxx.utils.system import SystemManager
+
+logger = logging.getLogger("roxx.auth.db")
 
 class AdminDatabase:
     """
@@ -59,3 +62,37 @@ class AdminDatabase:
     def get_connection(cls):
         """Get a database connection"""
         return sqlite3.connect(cls.get_db_path())
+    
+    @classmethod
+    def reset_totp(cls, username: str) -> bool:
+        """Reset TOTP MFA for a user by clearing mfa_secret"""
+        try:
+            conn = cls.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE admins SET mfa_secret = NULL WHERE username = ?", (username,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error resetting TOTP for {username}: {e}")
+            return False
+    
+    @classmethod
+    def get_mfa_status(cls, username: str) -> dict:
+        """Get MFA status for a user"""
+        conn = cls.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT mfa_secret, phone_number FROM admins WHERE username = ?", 
+            (username,)
+        ).fetchone()
+        conn.close()
+        
+        if not row:
+            return {"totp_enabled": False, "sms_enabled": False}
+        
+        return {
+            "totp_enabled": bool(row['mfa_secret']),
+            "sms_enabled": bool(row['phone_number'])
+        }

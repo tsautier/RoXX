@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}MFA Management - {{ managed_username }} - RoXX{% endblock %}
+
+{% block extra_head %}
+<style>
+    .mfa-section {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
+    }
+
+    .mfa-section h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: var(--text-main);
+        font-size: 1.1rem;
+    }
+
+    .credentials-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .credentials-table th {
+        background: #f8fafc;
+        color: var(--text-light);
+        font-weight: 600;
+        text-align: left;
+        padding: 0.75rem 1rem;
+        border-bottom: 2px solid var(--border-color);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+    }
+
+    .credentials-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .credentials-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-enabled {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-disabled {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .btn-danger {
+        background: #fee2e2;
+        color: #ef4444;
+        border: 1px solid #fecaca;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+
+    .btn-danger:hover {
+        background: #fecaca;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-light);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2 style="margin: 0;">MFA Management - {{ managed_username }}</h2>
+        <a href="/admins" class="btn" style="text-decoration: none;">← Back to Users</a>
+    </div>
+
+    <!-- MFA Status Overview -->
+    <div class="mfa-section">
+        <h3><i class="fas fa-info-circle"></i> MFA Status</h3>
+        <div id="mfaStatus" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+            <div style="padding: 1rem; background: #f9fafb; border-radius: 6px;">
+                <div style="color: var(--text-light); font-size: 0.85rem; margin-bottom: 0.5rem;">TOTP/Authenticator
+                </div>
+                <div id="totpStatus" class="status-badge status-disabled">Checking...</div>
+            </div>
+            <div style="padding: 1rem; background: #f9fafb; border-radius: 6px;">
+                <div style="color: var(--text-light); font-size: 0.85rem; margin-bottom: 0.5rem;">WebAuthn Keys</div>
+                <div id="webauthnCount" style="font-size: 1.5rem; font-weight: 600; color: var(--text-main);">-</div>
+            </div>
+            <div style="padding: 1rem; background: #f9fafb; border-radius: 6px;">
+                <div style="color: var(--text-light); font-size: 0.85rem; margin-bottom: 0.5rem;">SMS MFA</div>
+                <div id="smsStatus" class="status-badge status-disabled">Checking...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebAuthn Credentials -->
+    <div class="mfa-section">
+        <h3><i class="fas fa-key"></i> Security Keys & Passkeys (WebAuthn)</h3>
+        <div id="credentialsContainer">
+            <table class="credentials-table" id="credentialsTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Created</th>
+                        <th>Last Used</th>
+                        <th>Transports</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="credentialsBody"></tbody>
+            </table>
+            <div id="emptyCredentials" class="empty-state">
+                <i class="fas fa-key" style="font-size: 3rem; color: #d1d5db; margin-bottom: 1rem;"></i>
+                <p>No WebAuthn credentials registered</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOTP Management -->
+    <div class="mfa-section">
+        <h3><i class="fas fa-mobile-alt"></i> TOTP/Authenticator App</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <p style="margin: 0; color: var(--text-light);">Reset the TOTP secret for this user. They will need to
+                    set up their authenticator app again.</p>
+            </div>
+            <button id="resetTotpBtn" class="btn-danger" onclick="resetTotp()">
+                <i class="fas fa-redo"></i> Reset TOTP
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const username = "{{ managed_username }}";
+
+    async function loadMFAStatus() {
+        try {
+            const response = await fetch(`/api/admins/${username}/mfa/status`);
+            const data = await response.json();
+
+            // Update status badges
+            const totpBadge = document.getElementById('totpStatus');
+            totpBadge.textContent = data.totp_enabled ? 'Enabled' : 'Disabled';
+            totpBadge.className = `status-badge ${data.totp_enabled ? 'status-enabled' : 'status-disabled'}`;
+
+            const smsBadge = document.getElementById('smsStatus');
+            smsBadge.textContent = data.sms_enabled ? 'Enabled' : 'Disabled';
+            smsBadge.className = `status-badge ${data.sms_enabled ? 'status-enabled' : 'status-disabled'}`;
+
+            document.getElementById('webauthnCount').textContent = data.webauthn_count || 0;
+
+            // Enable/disable reset button based on TOTP status
+            document.getElementById('resetTotpBtn').disabled = !data.totp_enabled;
+
+        } catch (err) {
+            console.error('Error loading MFA status:', err);
+        }
+    }
+
+    async function loadCredentials() {
+        try {
+            const response = await fetch(`/api/admins/${username}/mfa/credentials`);
+            const data = await response.json();
+
+            const tbody = document.getElementById('credentialsBody');
+            const table = document.getElementById('credentialsTable');
+            const emptyState = document.getElementById('emptyCredentials');
+
+            tbody.innerHTML = '';
+
+            if (data.credentials && data.credentials.length > 0) {
+                table.style.display = 'table';
+                emptyState.style.display = 'none';
+
+                data.credentials.forEach(cred => {
+                    const row = document.createElement('tr');
+
+                    const createdDate = cred.created_at ? new Date(cred.created_at).toLocaleDateString() : 'Unknown';
+                    const lastUsed = cred.last_used_at ? new Date(cred.last_used_at).toLocaleDateString() : 'Never';
+                    const transports = cred.transports && cred.transports.length > 0
+                        ? cred.transports.join(', ')
+                        : 'N/A';
+
+                    row.innerHTML = `
+                    <td style="font-weight: 500;">${cred.credential_name || 'Unnamed Key'}</td>
+                    <td>${createdDate}</td>
+                    <td>${lastUsed}</td>
+                    <td><span style="font-size: 0.85rem; color: var(--text-light);">${transports}</span></td>
+                    <td style="text-align: right;">
+                        <button onclick="deleteCredential(${cred.id})" class="btn-danger">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </td>
+                `;
+
+                    tbody.appendChild(row);
+                });
+            } else {
+                table.style.display = 'none';
+                emptyState.style.display = 'block';
+            }
+
+        } catch (err) {
+            console.error('Error loading credentials:', err);
+            alert('Failed to load credentials');
+        }
+    }
+
+    async function deleteCredential(credId) {
+        if (!confirm('Are you sure you want to delete this security key? The user will not be able to use it for authentication.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admins/${username}/mfa/webauthn/${credId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                alert('Credential deleted successfully');
+                loadCredentials();
+                loadMFAStatus();
+            } else {
+                const data = await response.json();
+                alert('Failed to delete credential: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('Error deleting credential:', err);
+            alert('Error deleting credential');
+        }
+    }
+
+    async function resetTotp() {
+        if (!confirm('Are you sure you want to reset TOTP for this user? They will need to set up their authenticator app again.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admins/${username}/mfa/totp/reset`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                alert('TOTP reset successfully. User must re-configure their authenticator app.');
+                loadMFAStatus();
+            } else {
+                const data = await response.json();
+                alert('Failed to reset TOTP: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('Error resetting TOTP:', err);
+            alert('Error resetting TOTP');
+        }
+    }
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadMFAStatus();
+        loadCredentials();
+    });
+</script>
+{% endblock %}
