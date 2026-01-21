@@ -1,214 +1,304 @@
-{% extends "layout.html" %}
-
-{% block title %}Dashboard - RoXX{% endblock %}
+{% extends "base.html" %}
 
 {% block content %}
-<h1 style="margin-bottom: 2rem; color: var(--primary-color);">Dashboard</h1>
+<!-- ApexCharts -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
-<!-- Stats Row -->
-<div class="row mb-4">
-    <!-- OS -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-primary shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                            System ({{ os_type }} {{ kernel_version }})</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ cpu.percent }}% CPU</div>
-                        <div class="text-xs text-muted">{{ cpu.count }} Cores</div>
+<div class="container-fluid">
+    <!-- Header Row -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">System Monitor</h1>
+        <a href="#" onclick="window.location.reload();"
+            class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+            <i class="fas fa-sync-alt fa-sm text-white-50"></i> Refresh
+        </a>
+    </div>
+
+    <!-- Top Stats Row (Alerts/Uptime) -->
+    <div class="row mb-4">
+        <!-- Alerts / Load -->
+        <div class="col-md-3">
+            <div class="card shadow h-100 py-2 border-left-danger">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Current Load (1m)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ adv.load_1m }}</div>
+                            <div class="text-xs text-muted">Processes: {{ adv.process_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-bell fa-2x text-gray-300"></i>
+                        </div>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-server fa-2x text-gray-300"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Uptime -->
+        <div class="col-md-5">
+            <div class="card shadow h-100 py-2 border-left-info">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">System Uptime</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ uptime }}</div>
+                            <div class="text-xs text-muted">{{ os_type }} {{ kernel_version }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radius Status (Replaces 'Events') -->
+        <div class="col-md-4">
+            <div
+                class="card shadow h-100 py-2 {% if radius_status == 'Running' %}border-left-success{% else %}border-left-danger{% endif %}">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">FreeRADIUS Service
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ radius_status }}</div>
+                            <div class="text-xs text-muted">Core Auth Service</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-auth fa-2x text-gray-300"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- RAM -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-success shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                            Memory</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ memory.percent }}%</div>
-                        <div class="text-xs text-muted">{{ memory.used }}GB / {{ memory.total }}GB</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-memory fa-2x text-gray-300"></i>
+    <!-- At-A-Glance (Gauges) -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-white">
+            <h6 class="m-0 font-weight-bold text-primary">At-A-Glance: Health & Utilization</h6>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <!-- CPU -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">CPU Utilization</h6>
+                    <div id="chart-cpu" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ cpu.percent }}%</div>
+                </div>
+                <!-- RAM -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">Memory Used</h6>
+                    <div id="chart-ram" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ memory.percent }}%</div>
+                    <small>{{ memory.used }}GB / {{ memory.total }}GB</small>
+                </div>
+                <!-- Disk -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">Disk Space</h6>
+                    <div id="chart-disk" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ disk.percent }}%</div>
+                    <small>Free: {{ disk.free }}GB</small>
+                </div>
+                <!-- Disk IO (Simulation of 'Busy') -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">Load Indicator</h6>
+                    <div id="chart-io" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ adv.load_5m }} (5m)</div>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- Metrics Row -->
+            <div class="row text-center mt-4">
+                <div class="col-md-3">
+                    <div class="text-xs font-weight-bold text-uppercase text-muted mb-1">Process Count</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800 bg-info text-white py-1 rounded">{{
+                        adv.process_count }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-xs font-weight-bold text-uppercase text-muted mb-1">Disk Read (MB)</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800 bg-info text-white py-1 rounded">{{
+                        adv.disk_read_mb }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-xs font-weight-bold text-uppercase text-muted mb-1">Disk Write (MB)</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800 bg-info text-white py-1 rounded">{{
+                        adv.disk_write_mb }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-xs font-weight-bold text-uppercase text-muted mb-1">CPU Cores</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800 bg-info text-white py-1 rounded">{{ cpu.count }}
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Disk -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-info shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                            Disk (/)</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ disk.percent }}%</div>
-                        <div class="text-xs text-muted">{{ disk.free }}GB Free</div>
+    <!-- Bottom Section: Config & Logs -->
+    <div class="row">
+        <!-- Configuration Table -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4 h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">System Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm" width="100%" cellspacing="0">
+                            <tbody>
+                                <tr>
+                                    <td class="font-weight-bold bg-light" width="40%">OS Name</td>
+                                    <td>{{ os_type }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">Kernel</td>
+                                    <td>{{ kernel_version }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">Physical Memory</td>
+                                    <td>{{ memory.total }} GB</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">App Directory</td>
+                                    <td>/opt/roxx</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">RADIUS Status</td>
+                                    <td><span class="badge badge-success">{{ radius_status }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-hdd fa-2x text-gray-300"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Logs (Replaces KPI) -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4 h-100">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Live Logs</h6>
+                    <span id="logStatus" class="badge badge-warning">Connecting...</span>
+                </div>
+                <div class="card-body">
+                    <div id="logViewer"
+                        style="height: 300px; overflow-y: scroll; background-color: #1a1a1a; color: #00ff00; padding: 10px; font-family: monospace; font-size: 0.8rem; border-radius: 4px;">
+                        <div><span class="text-muted">Waiting for logs...</span></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Uptime -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-warning shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                            Uptime</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ uptime }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-clock fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Previous User Table (Hidden/Moved) - Keeping commented if needed, or we can add a Tabs view later -->
+    <!-- The user wanted the specific monitoring view, so minimizing unrelated noise -->
+
 </div>
 
-<!-- Two Column Grid: System Status + User Management -->
-<div class="dashboard-grid">
-    <!-- Left: RADIUS Status -->
-    <div class="status-card">
-        <h3>FreeRADIUS Status</h3>
-
-        <!-- Large UP/DOWN Badge -->
-        <div class="status-badge-large {% if radius_status != 'UP' %}down{% endif %}">
-            <div class="status-icon">{% if radius_status == 'UP' %}✓{% else %}✕{% endif %}</div>
-            <div class="status-text">{{ radius_status }}</div>
-        </div>
-
-        <p class="text-center mt-3 text-muted">Core Authentication Service</p>
-    </div>
-
-    <!-- Right: User Management -->
-    <div class="user-table-container">
-        <h3>User Management</h3>
-        <table class="user-table">
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Last Login</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if recent_users %}
-                {% for user in recent_users %}
-                <tr>
-                    <td style="font-weight: 600;">{{ user.username }}</td>
-                    <td>{{ user.role }}</td>
-                    <td>
-                        <span class="status-badge">{{ user.status }}</span>
-                    </td>
-                    <td>{{ user.last_login }}</td>
-                    <td>
-                        <button class="btn-action" onclick="editUser('{{ user.username }}')">Edit</button>
-                    </td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-light);">No users found</td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Live Logs Section -->
-<div class="log-section">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0;">Live Logs</h3>
-        <div style="font-size: 0.9rem; font-weight: 600;">
-            <span id="connectionStatus" style="color: #f59e0b;">Connecting...</span>
-        </div>
-    </div>
-
-    <div id="logConsole"
-        style="background: #1e1e1e; color: #d4d4d4; font-family: 'Consolas', 'Monaco', monospace; padding: 1rem; border-radius: var(--radius-md); height: 400px; overflow-y: auto; font-size: 0.9rem; white-space: pre-wrap; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);">
-        <div style="color: #666; font-style: italic;">Waiting for logs...</div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
+<!-- ApexChart Logic -->
 <script>
-    const logConsole = document.getElementById('logConsole');
-    const statusSpan = document.getElementById('connectionStatus');
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs`;
+    function createGauge(id, value, color) {
+        var options = {
+            series: [value],
+            chart: {
+                height: 250,
+                type: 'radialBar',
+                offsetY: -10
+            },
+            plotOptions: {
+                radialBar: {
+                    startAngle: -135,
+                    endAngle: 135,
+                    dataLabels: {
+                        name: {
+                            fontSize: '16px',
+                            color: undefined,
+                            offsetY: 120
+                        },
+                        value: {
+                            offsetY: 76,
+                            fontSize: '22px',
+                            color: undefined,
+                            formatter: function (val) {
+                                return val + "%";
+                            }
+                        }
+                    }
+                }
+            },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shade: 'dark',
+                    shadeIntensity: 0.15,
+                    inverseColors: false,
+                    opacityFrom: 1,
+                    opacityTo: 1,
+                    stops: [0, 50, 65, 91]
+                },
+            },
+            stroke: {
+                dashArray: 4
+            },
+            labels: [''],
+            colors: [color]
+        };
+
+        var chart = new ApexCharts(document.querySelector("#" + id), options);
+        chart.render();
+    }
+
+    // Initialize Gauges
+    document.addEventListener("DOMContentLoaded", () => {
+        createGauge("chart-cpu", {{ cpu.percent }}, "#36a2eb");
+    createGauge("chart-ram", {{ memory.percent }}, "#ffcd56");
+    createGauge("chart-disk", {{ disk.percent }}, "#4bc0c0");
+    // Load metric scaled 0-100 just for visualization usually
+    // Assume load_1m max is ~4 for this visual
+    var loadVal = Math.min({{ adv.load_1m }} * 25, 100);
+    createGauge("chart-io", loadVal, "#ff6384"); 
+    });
+
+    // WebSocket Logic
+    const logViewer = document.getElementById('logViewer');
+    const logStatus = document.getElementById('logStatus');
+    let ws;
 
     function connect() {
-        const ws = new WebSocket(wsUrl);
+        // Use wss if https, ws if http
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs`);
 
         ws.onopen = () => {
-            statusSpan.textContent = '● Live';
-            statusSpan.style.color = '#10B981'; // Green
-            logConsole.innerHTML = ''; // Clear initial message
+            logStatus.textContent = "Live";
+            logStatus.className = "badge badge-success";
+            logViewer.innerHTML += `<div><span style="color: grey">[System] Connected to log stream...</span></div>`;
         };
 
         ws.onmessage = (event) => {
             const line = document.createElement('div');
             line.textContent = event.data;
+            logViewer.appendChild(line);
+            logViewer.scrollTop = logViewer.scrollHeight;
 
-            // Enhanced color highlighting based on log level
-            if (event.data.includes('[Info]') || event.data.includes('SUCCESS')) {
-                line.style.color = '#10B981'; // Green
-            } else if (event.data.includes('[Warn]') || event.data.includes('WARNING')) {
-                line.style.color = '#F59E0B'; // Orange
-            } else if (event.data.includes('[Error]') || event.data.includes('FAILED')) {
-                line.style.color = '#EF4444'; // Red
-            } else if (event.data.includes('Access-Accept')) {
-                line.style.color = '#10B981';
-            } else if (event.data.includes('Access-Reject')) {
-                line.style.color = '#EF4444';
+            // Limit scrollback
+            if (logViewer.childElementCount > 500) {
+                logViewer.removeChild(logViewer.firstChild);
             }
-
-            logConsole.appendChild(line);
-            logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll
         };
 
         ws.onclose = () => {
-            statusSpan.textContent = '○ Disconnected (Reconnecting...)';
-            statusSpan.style.color = '#EF4444';
-            setTimeout(connect, 2000);
+            logStatus.textContent = "Disconnected (Reconnecting...)";
+            logStatus.className = "badge badge-danger";
+            setTimeout(connect, 3000);
         };
-
         ws.onerror = (err) => {
-            console.error('WebSocket error:', err);
+            console.error(err);
             ws.close();
-        };
-    }
-
-    function editUser(username) {
-        window.location.href = `/admins`;
-    }
-
-    // Smooth scroll to logs when clicking Logs tab (handled by sidebar now via ID if needed, or direct link)
-    // Sidebar link is /logs-view or similar, so this listener might be redundant but keeping for compatibility
-    if (window.location.hash === '#logs') {
-        document.querySelector('.log-section').scrollIntoView({ behavior: 'smooth' });
+        }
     }
 
     connect();

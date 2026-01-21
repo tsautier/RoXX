@@ -87,6 +87,45 @@ class SystemManager:
             return {"total": 0, "free": 0, "percent": 0}
 
     @staticmethod
+    def get_advanced_metrics() -> dict:
+        """Returns IO counters and Load averages"""
+        try:
+            # IO Counters
+            io = psutil.disk_io_counters()
+            net = psutil.net_io_counters()
+            
+            # Load Avg (Unix only usually, but psutil handles basic)
+            # On Windows getloadavg might not work, fallback to cpu percent
+            try:
+                if hasattr(os, 'getloadavg'):
+                    load = os.getloadavg()
+                else:
+                    load = (psutil.cpu_percent(), 0, 0)
+            except:
+                load = (0, 0, 0)
+
+            return {
+                "disk_read_mb": round(io.read_bytes / (1024**2), 2),
+                "disk_write_mb": round(io.write_bytes / (1024**2), 2),
+                "net_sent_mb": round(net.bytes_sent / (1024**2), 2),
+                "net_recv_mb": round(net.bytes_recv / (1024**2), 2),
+                "load_1m": load[0],
+                "load_5m": load[1],
+                "process_count": len(psutil.pids()),
+                # "Disk Busy" is hard to calculate instantly without interval, 
+                # but we can use a placeholder or recent CPU wait if available.
+                # For now, we'll return raw counters and let frontend diff them or show stat.
+            }
+        except Exception as e:
+            print(f"Metrics Error: {e}")
+            return {
+                "disk_read_mb": 0, "disk_write_mb": 0,
+                "net_sent_mb": 0, "net_recv_mb": 0,
+                "load_1m": 0, "load_5m": 0,
+                "process_count": 0
+            }
+
+    @staticmethod
     def is_service_running(service_name: str) -> bool:
         """Checks if a process is running"""
         try:

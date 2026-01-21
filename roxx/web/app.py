@@ -717,6 +717,7 @@ async def dashboard(request: Request, current_user: str = Depends(get_current_us
         cpu=SystemManager.get_cpu_info(),
         memory=SystemManager.get_memory_info(),
         disk=SystemManager.get_disk_info(),
+        adv=SystemManager.get_advanced_metrics(),
         recent_users=recent_users
     ))
 
