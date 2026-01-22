@@ -12,7 +12,19 @@ class TestAPITokens:
     @classmethod
     def setup_class(cls):
         """Initialize token manager before tests"""
+        # Use temp DB
+        from pathlib import Path
+        import tempfile
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        cls.db_path = Path(cls.temp_dir.name) / "test_api_tokens.db"
+        
+        APITokenManager.set_db_path(cls.db_path)
         APITokenManager.init()
+
+    @classmethod
+    def teardown_class(cls):
+        """Clean up temp dir"""
+        cls.temp_dir.cleanup()
     
     def test_generate_token(self):
         """Test API token generation"""

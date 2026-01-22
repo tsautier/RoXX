@@ -16,7 +16,13 @@ from typing import Optional, Tuple, List
 logger = logging.getLogger("roxx.api_tokens")
 
 # Database path
-DB_PATH = Path.home() / ".roxx" / "api_tokens.db"
+# Database path settings
+_DEFAULT_DB_PATH = Path.home() / ".roxx" / "api_tokens.db"
+DB_PATH = _DEFAULT_DB_PATH
+
+
+
+
 
 
 class APITokenManager:
@@ -30,6 +36,12 @@ class APITokenManager:
     - Revocable
     """
     
+    @staticmethod
+    def set_db_path(path: Path):
+        """Set database path (for testing)"""
+        global DB_PATH
+        DB_PATH = path
+
     @staticmethod
     def init():
         """Initialize API tokens database"""

@@ -49,8 +49,8 @@ All notable changes to RoXX will be documented in this file.
 ### 🔒 Security Enhancements
 
 #### Rate Limiting
-- **slowapi integration** for endpoint protection
-- Configured rate limits by endpoint type:
+- **CI/CD**: Fixed GitHub Actions release workflow by synchronizing `pyproject.toml` dependencies with `requirements.txt`.
+- **Packaging**: Added missing core dependencies (sqlalchemy, pyotp, etc.) to package definition to ensure correct installation. by endpoint type:
   - Login: 5 requests/minute
   - MFA verification: 10 requests/minute
   - API writes: 30 requests/minute

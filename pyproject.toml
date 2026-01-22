@@ -1,6 +1,6 @@
 [project]
 name = "roxx"
-version = "1.0.0-beta2"
+version = "1.0.0-beta6"
 description = "Linux RADIUS Authentication Proxy"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -27,6 +27,15 @@ dependencies = [
     "bcrypt>=4.0.0",
     "ldap3>=2.9.0",
     "python3-saml>=1.15.0",
+    "pyotp==2.9.0",
+    "sqlalchemy>=2.0.0",
+    "mysql-connector-python>=8.0.0",
+    "psycopg2-binary>=2.9.0",
+    "pyrad>=2.4",
+    "itsdangerous>=2.1.0",
+    "fido2>=2.1.1",
+    "redis==7.1.0",
+    "slowapi==0.1.9",
 
 
 

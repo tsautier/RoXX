@@ -12,7 +12,13 @@ from datetime import datetime
 logger = logging.getLogger("roxx.radius_backends.db")
 
 # Database path
-DB_PATH = Path.home() / ".roxx" / "radius_backends.db"
+# Database path
+_DEFAULT_DB_PATH = Path.home() / ".roxx" / "radius_backends.db"
+DB_PATH = _DEFAULT_DB_PATH
+
+
+
+
 
 
 class RadiusBackendDB:
@@ -22,6 +28,12 @@ class RadiusBackendDB:
     Stores configuration for LDAP, SQL, and file-based backends.
     """
     
+    @staticmethod
+    def set_db_path(path: Path):
+        """Set database path (for testing)"""
+        global DB_PATH
+        DB_PATH = path
+
     @staticmethod
     def init():
         """Initialize database and create tables if they don't exist"""
@@ -147,7 +159,7 @@ class RadiusBackendDB:
             return None
     
     @staticmethod
-    def create_backend(backend_type: str, name: str, config_dict: dict, 
+    def create_backend(backend_type: str, name: str, config: dict, 
                       enabled: bool = True, priority: int = 100) -> Tuple[bool, str, Optional[int]]:
         """
         Create a new backend configuration.
@@ -159,7 +171,7 @@ class RadiusBackendDB:
         if backend_type not in ALLOWED_TYPES:
              return False, f"Invalid backend type: {backend_type}. Allowed: {ALLOWED_TYPES}", None
         
-        config_json = json.dumps(config_dict)
+        config_json = json.dumps(config)
         
         try:
             with sqlite3.connect(DB_PATH) as conn:
@@ -181,7 +193,7 @@ class RadiusBackendDB:
     
     @staticmethod
     def update_backend(backend_id: int, name: Optional[str] = None,
-                      config_dict: Optional[dict] = None,
+                      config: Optional[dict] = None,
                       enabled: Optional[bool] = None,
                       priority: Optional[int] = None) -> Tuple[bool, str]:
         """Update backend configuration"""
@@ -192,9 +204,9 @@ class RadiusBackendDB:
             updates.append("name = ?")
             params.append(name)
         
-        if config_dict is not None:
+        if config is not None:
             updates.append("config_json = ?")
-            params.append(json.dumps(config_dict))
+            params.append(json.dumps(config))
         
         if enabled is not None:
             updates.append("enabled = ?")

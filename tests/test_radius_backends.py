@@ -60,7 +60,8 @@ class TestAuthCache:
         
         stats = cache.get_stats()
         
-        assert stats['size'] == 2
+        # user1 is removed due to wrong password attempt
+        assert stats['size'] == 1
         assert stats['hits'] == 2
         assert stats['misses'] == 2
         assert stats['hit_rate'] == 50.0
@@ -86,7 +87,19 @@ class TestRadiusBackendDB:
     @classmethod
     def setup_class(cls):
         """Initialize database before tests"""
+        # Use temp DB
+        from pathlib import Path
+        import tempfile
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        cls.db_path = Path(cls.temp_dir.name) / "test_backends.db"
+        
+        RadiusBackendDB.set_db_path(cls.db_path)
         RadiusBackendDB.init()
+
+    @classmethod
+    def teardown_class(cls):
+        """Clean up temp dir"""
+        cls.temp_dir.cleanup()
     
     def test_create_backend(self):
         """Test creating a RADIUS backend"""
@@ -154,7 +167,7 @@ class TestRadiusBackendDB:
         assert updated is not None
         assert updated['name'] == 'Updated Name'
         assert updated['priority'] == 50
-        assert updated['enabled'] is False
+        assert bool(updated['enabled']) is False
     
     def test_delete_backend(self):
         """Test deleting backend"""

@@ -29,6 +29,8 @@ class AuthCache:
         self.ttl = ttl
         self.max_size = max_size
         self._cache = {}  # {username: (password_hash, timestamp, attributes)}
+        self._hits = 0
+        self._misses = 0
         self._lock = Lock()
     
     def get(self, username: str, password: str) -> Optional[Tuple[bool, dict]]:
@@ -40,6 +42,7 @@ class AuthCache:
         """
         with self._lock:
             if username not in self._cache:
+                self._misses += 1
                 return None
             
             cached_password_hash, timestamp, attributes = self._cache[username]
@@ -56,11 +59,13 @@ class AuthCache:
             
             if password_hash == cached_password_hash:
                 logger.debug(f"Cache hit for {username}")
+                self._hits += 1
                 return True, attributes
             else:
                 # Password changed, remove from cache
                 del self._cache[username]
                 logger.debug(f"Password mismatch for cached {username}")
+                self._misses += 1
                 return None
     
     def set(self, username: str, password: str, attributes: dict):
@@ -92,13 +97,21 @@ class AuthCache:
         """Clear all cache entries"""
         with self._lock:
             self._cache.clear()
+            self._hits = 0
+            self._misses = 0
             logger.info("Cache cleared")
     
-    def stats(self) -> dict:
+    def get_stats(self) -> dict:
         """Get cache statistics"""
         with self._lock:
+            total = self._hits + self._misses
+            hit_rate = (self._hits / total * 100) if total > 0 else 0.0
+            
             return {
                 'size': len(self._cache),
                 'max_size': self.max_size,
-                'ttl': self.ttl
+                'ttl': self.ttl,
+                'hits': self._hits,
+                'misses': self._misses,
+                'hit_rate': hit_rate
             }
