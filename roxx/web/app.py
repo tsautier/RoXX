@@ -433,10 +433,14 @@ async def mfa_cert_verify(request: Request):
 # Password & MFA Management
 # ------------------------------------------------------------------------------
 @app.get("/auth/change-password", response_class=HTMLResponse)
-async def change_password_page(request: Request, current_user: str = Depends(get_current_username)):
+async def change_password_page(request: Request):
     """Change Password Page"""
+    username, status = await get_partial_user(request)
+    if not username or status not in ['active', 'force_change']:
+        return RedirectResponse("/login")
+        
     return templates.TemplateResponse("change_password.html", get_page_context(
-        request, current_user, "password"
+        request, username, "password"
     ))
 
 @app.post("/auth/change-password", response_class=HTMLResponse)
