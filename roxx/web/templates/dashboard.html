@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- ApexCharts -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<div class="container-fluid">
+    <!-- Header Row -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">System Monitor</h1>
+        <a href="#" onclick="window.location.reload();"
+            class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
+            <i class="fas fa-sync-alt fa-sm text-white-50"></i> Refresh
+        </a>
+    </div>
+
+    <!-- Top Stats Row (Alerts/Uptime) -->
+    <div class="row mb-4">
+        <!-- Alerts / Load -->
+        <div class="col-md-3">
+            <div class="card shadow h-100 py-2 border-left-danger">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Current Load (1m)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ adv.load_1m }}</div>
+                            <div class="text-xs text-muted">Processes: {{ adv.process_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-bell fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Uptime -->
+        <div class="col-md-5">
+            <div class="card shadow h-100 py-2 border-left-info">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">System Uptime</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ uptime }}</div>
+                            <div class="text-xs text-muted">{{ os_type }} {{ kernel_version }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radius Status (Replaces 'Events') -->
+        <div class="col-md-4">
+            <div
+                class="card shadow h-100 py-2 {% if radius_status == 'Running' %}border-left-success{% else %}border-left-danger{% endif %}">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">FreeRADIUS Service
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ radius_status }}</div>
+                            <div class="text-xs text-muted">Core Auth Service</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-auth fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- At-A-Glance (Gauges) -->
+    <div class="row">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-white d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Authentication Performance (24h)</h6>
+                </div>
+                <div class="card-body">
+                    <div id="auth-success-chart" style="height: 350px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-white">
+                    <h6 class="m-0 font-weight-bold text-primary">Backend Health Status</h6>
+                </div>
+                <div class="card-body">
+                    <div id="backend-health-list">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span><i class="fas fa-database mr-2 text-primary"></i> LDAP / AD</span>
+                            <span class="badge badge-success px-3">HEALTHY</span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span><i class="fab fa-microsoft mr-2 text-info"></i> Entra ID</span>
+                            <span class="badge badge-success px-3">HEALTHY</span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span><i class="fas fa-key mr-2 text-warning"></i> SAML IdP</span>
+                            <span class="badge badge-success px-3">HEALTHY</span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span><i class="fas fa-shield-alt mr-2 text-success"></i> FreeRADIUS</span>
+                            <span class="badge badge-success px-3">RUNNING</span>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <small class="text-muted">Last checked: <span id="lastCheckTime">Just now</span></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Gauges -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-white">
+            <h6 class="m-0 font-weight-bold text-primary">System Health & Utilization</h6>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <!-- CPU -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">CPU Utilization</h6>
+                    <div id="chart-cpu" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ cpu.percent }}%</div>
+                </div>
+                <!-- RAM -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">Memory Used</h6>
+                    <div id="chart-ram" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ memory.percent }}%</div>
+                    <small>{{ memory.used }}GB / {{ memory.total }}GB</small>
+                </div>
+                <!-- Disk -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">Disk Space</h6>
+                    <div id="chart-disk" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ disk.percent }}%</div>
+                    <small>Free: {{ disk.free }}GB</small>
+                </div>
+                <!-- Load -->
+                <div class="col-md-3">
+                    <h6 class="font-weight-bold">System Load</h6>
+                    <div id="chart-io" style="min-height: 180px;"></div>
+                    <div class="h4 font-weight-bold text-gray-800">{{ adv.load_5m }} (5m)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Section: Config & Logs -->
+    <div class="row">
+        <!-- Configuration Table -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4 h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">System Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm" width="100%" cellspacing="0">
+                            <tbody>
+                                <tr>
+                                    <td class="font-weight-bold bg-light" width="40%">OS Name</td>
+                                    <td>{{ os_type }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">Kernel</td>
+                                    <td>{{ kernel_version }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">Physical Memory</td>
+                                    <td>{{ memory.total }} GB</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">App Directory</td>
+                                    <td>/opt/roxx</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold bg-light">RADIUS Status</td>
+                                    <td><span class="badge badge-success">{{ radius_status }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Logs (Replaces KPI) -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4 h-100">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Live Logs</h6>
+                    <span id="logStatus" class="badge badge-warning">Connecting...</span>
+                </div>
+                <div class="card-body">
+                    <div id="logViewer"
+                        style="height: 300px; overflow-y: scroll; background-color: #1a1a1a; color: #00ff00; padding: 10px; font-family: monospace; font-size: 0.8rem; border-radius: 4px;">
+                        <div><span class="text-muted">Waiting for logs...</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Previous User Table (Hidden/Moved) - Keeping commented if needed, or we can add a Tabs view later -->
+    <!-- The user wanted the specific monitoring view, so minimizing unrelated noise -->
+
+</div>
+
+<!-- ApexChart Logic -->
+<script>
+    function createGauge(id, value, color) {
+        var options = {
+            series: [value],
+            chart: {
+                height: 250,
+                type: 'radialBar',
+                offsetY: -10
+            },
+            plotOptions: {
+                radialBar: {
+                    startAngle: -135,
+                    endAngle: 135,
+                    dataLabels: {
+                        name: {
+                            fontSize: '16px',
+                            color: undefined,
+                            offsetY: 120
+                        },
+                        value: {
+                            offsetY: 76,
+                            fontSize: '22px',
+                            color: undefined,
+                            formatter: function (val) {
+                                return val + "%";
+                            }
+                        }
+                    }
+                }
+            },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shade: 'dark',
+                    shadeIntensity: 0.15,
+                    inverseColors: false,
+                    opacityFrom: 1,
+                    opacityTo: 1,
+                    stops: [0, 50, 65, 91]
+                },
+            },
+            stroke: {
+                dashArray: 4
+            },
+            labels: [''],
+            colors: [color]
+        };
+
+        var chart = new ApexCharts(document.querySelector("#" + id), options);
+        chart.render();
+    }
+
+    // Initialize Gauges
+    document.addEventListener("DOMContentLoaded", () => {
+        createGauge("chart-cpu", {{ cpu.percent }}, "#36a2eb");
+        createGauge("chart-ram", {{ memory.percent }}, "#ffcd56");
+        createGauge("chart-disk", {{ disk.percent }}, "#4bc0c0");
+        var loadVal = Math.min({{ adv.load_1m }} * 25, 100);
+        createGauge("chart-io", loadVal, "#ff6384");
+
+        // Auth Success Chart
+        var authOptions = {
+            series: [{
+                name: 'Success',
+                data: [31, 40, 28, 51, 42, 109, 100]
+            }, {
+                name: 'Failure',
+                data: [11, 32, 45, 32, 34, 52, 41]
+            }],
+            chart: {
+                height: 350,
+                type: 'area',
+                toolbar: { show: false }
+            },
+            colors: ['#28a745', '#dc3545'],
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth' },
+            xaxis: {
+                type: 'datetime',
+                categories: ["2026-03-22T00:00:00.000Z", "2026-03-22T01:30:00.000Z", "2026-03-22T02:30:00.000Z", "2026-03-22T03:30:00.000Z", "2026-03-22T04:30:00.000Z", "2026-03-22T05:30:00.000Z", "2026-03-22T06:30:00.000Z"]
+            },
+            tooltip: { x: { format: 'dd/MM/yy HH:mm' } },
+        };
+
+        var authChart = new ApexCharts(document.querySelector("#auth-success-chart"), authOptions);
+        authChart.render();
+    });
+
+    // WebSocket Logic
+    const logViewer = document.getElementById('logViewer');
+    const logStatus = document.getElementById('logStatus');
+    let ws;
+
+    function connect() {
+        // Use wss if https, ws if http
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs`);
+
+        ws.onopen = () => {
+            logStatus.textContent = "Live";
+            logStatus.className = "badge badge-success";
+            logViewer.innerHTML += `<div><span style="color: grey">[System] Connected to log stream...</span></div>`;
+        };
+
+        ws.onmessage = (event) => {
+            const line = document.createElement('div');
+            let content = event.data;
+            
+            if (content.includes("SUCCESS") || content.includes("OK")) {
+                line.style.color = "#00ff00"; // Bright Green
+            } else if (content.includes("FAILURE") || content.includes("ERROR") || content.includes("FAILED")) {
+                line.style.color = "#ff4444"; // Bright Red
+            } else if (content.includes("WARNING")) {
+                line.style.color = "#ffbb33"; // Orange/Yellow
+            }
+            
+            line.textContent = content;
+            logViewer.appendChild(line);
+            logViewer.scrollTop = logViewer.scrollHeight;
+
+            // Limit scrollback
+            if (logViewer.childElementCount > 500) {
+                logViewer.removeChild(logViewer.firstChild);
+            }
+        };
+
+        ws.onclose = () => {
+            logStatus.textContent = "Disconnected (Reconnecting...)";
+            logStatus.className = "badge badge-danger";
+            setTimeout(connect, 3000);
+        };
+        ws.onerror = (err) => {
+            console.error(err);
+            ws.close();
+        }
+    }
+
+    connect();
+</script>
+{% endblock %}

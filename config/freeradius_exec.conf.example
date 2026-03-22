@@ -1,0 +1,41 @@
+# RoXX Example FreeRADIUS Exec Module for Python Auth Scripts
+# This shows how to integrate RoXX Python authentication modules
+
+# inWebo Push Authentication
+exec inwebo_push {
+    wait = yes
+    program = "python3 -m roxx.core.auth.inwebo"
+    input_pairs = request
+    output_pairs = reply
+    shell_escape = yes
+    timeout = 65
+}
+
+# TOTP Authentication
+exec totp_verify {
+    wait = yes
+    program = "python3 -m roxx.core.auth.totp"
+    input_pairs = request
+    output_pairs = reply
+    shell_escape = yes
+    timeout = 5
+}
+
+# EntraID/Azure AD Authentication
+exec entraid_auth {
+    wait = yes
+    program = "python3 -m roxx.core.auth.entraid"
+    input_pairs = request
+    output_pairs = reply
+    shell_escape = yes
+    timeout = 30
+}
+
+# Usage in authorize section:
+# authorize {
+#     ...
+#     inwebo_push
+#     totp_verify
+#     entraid_auth
+#     ...
+# }

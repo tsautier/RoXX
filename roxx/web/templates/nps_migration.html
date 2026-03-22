@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">NPS Migration Assistant</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Microsoft NPS Configuration Import</h6>
+                </div>
+                <div class="card-body">
+                    <p>Transition from Microsoft NPS to RoXX by importing your existing XML configuration. This tool will parse your RADIUS clients and server groups.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>How to export:</strong> Run <code>netsh nps export filename="nps_config.xml" exportPrivateKeys=yes</code> on your Windows Server.
+                    </div>
+
+                    <form id="npsUploadForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="npsFile">Select NPS XML File</label>
+                            <input type="file" class="form-control-file" id="npsFile" name="file" accept=".xml">
+                        </div>
+                        <button type="button" onclick="uploadNPS()" class="btn btn-primary">
+                            <i class="fas fa-file-import"></i> Analyze Configuration
+                        </button>
+                    </form>
+
+                    <div id="importResults" class="mt-4" style="display:none;">
+                        <hr>
+                        <h5 class="font-weight-bold">Import Preview</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-users"></i> RADIUS Clients (<span id="clientCount">0</span>)</h6>
+                                <div id="clientList" class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                    <table class="table table-sm table-bordered">
+                                        <thead>
+                                            <tr><th>Name</th><th>Address</th></tr>
+                                        </thead>
+                                        <tbody id="clientTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-server"></i> Remote Servers (<span id="serverCount">0</span>)</h6>
+                                <div id="serverList" class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                    <table class="table table-sm table-bordered">
+                                        <thead>
+                                            <tr><th>Group</th><th>Address</th></tr>
+                                        </thead>
+                                        <tbody id="serverTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-right">
+                            <button class="btn btn-success" onclick="confirmImport()">
+                                <i class="fas fa-check"></i> Applied Selected Configurations
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function uploadNPS() {
+    const fileInput = document.getElementById('npsFile');
+    if (!fileInput.files[0]) return alert("Please select a file.");
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const response = await fetch('/api/nps/analyze', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('importResults').style.display = 'block';
+            document.getElementById('clientCount').textContent = data.results.clients.length;
+            document.getElementById('serverCount').textContent = data.results.remote_radius_servers.length;
+            
+            const clientTable = document.getElementById('clientTableBody');
+            clientTable.innerHTML = data.results.clients.map(c => 
+                `<tr><td>${c.name}</td><td>${c.address}</td></tr>`
+            ).join('');
+
+            const serverTable = document.getElementById('serverTableBody');
+            serverTable.innerHTML = data.results.remote_radius_servers.map(s => 
+                `<tr><td>${s.group}</td><td>${s.address}</td></tr>`
+            ).join('');
+        } else {
+            alert("Error: " + data.detail);
+        }
+    } catch (e) {
+        alert("Upload failed.");
+    }
+}
+
+function confirmImport() {
+    // In a real implementation, this would send the confirmation to update the config
+    alert("Configurations imported successfully (Simulation)");
+}
+</script>
+{% endblock %}

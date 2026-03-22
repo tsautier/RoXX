@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - RoXX{% endblock %}
+
+{% block extra_head %}
+<style>
+    table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+    }
+
+    th {
+        background: #f8fafc;
+        color: var(--text-light);
+        font-weight: 600;
+        text-align: left;
+        padding: 1rem;
+        border-bottom: 2px solid var(--border-color);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    .user-type-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: #e0f2fe;
+        color: #0369a1;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 2rem;">
+    <h2 style="margin-bottom: 1.5rem;">Add New User</h2>
+    <form id="addUserForm" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1.5rem; align-items: end;">
+        <div>
+            <label>Username</label>
+            <input type="text" name="username" required placeholder="jdoe">
+        </div>
+        <div>
+            <label>Password</label>
+            <input type="password" name="password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary">Add User</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2 style="margin-bottom: 1rem;">Local Users</h2>
+    <p style="color: var(--text-light); margin-bottom: 1.5rem;">Users defined in <code>users.conf</code></p>
+
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Type</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody">
+                {% for user in users %}
+                <tr>
+                    <td style="font-weight: 500;">{{ user }}</td>
+                    <td><span class="user-type-badge">Cleartext-Password</span></td>
+                    <td style="text-align: right;">
+                        <button onclick="deleteUser('{{ user }}')"
+                            style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s;">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+            const response = await fetch('/api/users', {
+                method: 'POST',
+                body: formData
+            });
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to add user');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error submitting form');
+        }
+    });
+
+    async function deleteUser(username) {
+        if (!confirm(`Are you sure you want to delete ${username}?`)) return;
+
+        try {
+            const response = await fetch(`/api/users/${username}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed to delete user');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error deleting user');
+        }
+    }
+</script>
+{% endblock %}

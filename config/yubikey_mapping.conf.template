@@ -1,0 +1,15 @@
+# RoXX YubiKey User Mapping Template
+# Maps usernames to YubiKey public IDs
+# Format: username:yubikey_public_id
+
+# Example entries (replace with your actual data):
+# john.doe:ccccccbcgujh
+# jane.smith:ccccccdefghi
+# admin:ccccccabcdef
+
+# Instructions:
+# 1. Get the YubiKey public ID (first 12 characters of OTP)
+# 2. Add mapping: username:public_id
+# 3. Save this file securely (chmod 600)
+
+# Add your mappings below:

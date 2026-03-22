@@ -1,0 +1,28 @@
+# RoXX inWebo Push Authentication Configuration
+# This file contains the configuration for inWebo Push authentication
+
+[inwebo]
+# inWebo Service ID (provided by inWebo)
+service_id = 10408
+
+# API Base URL
+api_url = https://api.myinwebo.com/FS
+
+# Certificate paths (configured by setup wizard)
+cert_file = /usr/local/etc/roxx/certs/inwebo_cert.pem
+key_file = /usr/local/etc/roxx/certs/inwebo_key.pem
+
+# Proxy settings (optional)
+# proxy_url = http://proxy.example.com:8080
+
+# Push notification settings
+push_timeout = 60
+push_retries = 7
+push_interval = 3
+
+# Context identifier (shown in push notification)
+context = RoXX-Authentication
+
+# Logging
+log_level = INFO
+log_file = /var/log/roxx/inwebo.log

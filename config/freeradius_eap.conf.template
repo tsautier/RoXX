@@ -1,0 +1,99 @@
+# RoXX FreeRADIUS EAP Module Configuration Template
+# Modern EAP configuration for 802.1X authentication
+
+eap {
+    # Default EAP type
+    default_eap_type = peap
+    
+    # Timer settings
+    timer_expire = 60
+    ignore_unknown_eap_types = no
+    cisco_accounting_username_bug = no
+    max_sessions = ${max_requests}
+
+    # TLS configuration
+    tls-config tls-common {
+        # Certificate paths (will be configured by setup wizard)
+        private_key_file = ${certdir}/server.key
+        certificate_file = ${certdir}/server.pem
+        ca_file = ${cadir}/ca.pem
+        
+        # DH parameters
+        dh_file = ${certdir}/dh2048.pem
+        
+        # Cipher suite (modern, secure)
+        cipher_list = "HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4"
+        cipher_server_preference = yes
+        
+        # TLS version (TLS 1.2+)
+        tls_min_version = "1.2"
+        tls_max_version = "1.3"
+        
+        # Certificate verification
+        check_cert_cn = %{User-Name}
+        check_cert_issuer = "/CN=RoXX CA"
+        
+        # OCSP settings
+        ocsp {
+            enable = no
+            override_cert_url = no
+        }
+        
+        # Session cache
+        cache {
+            enable = yes
+            lifetime = 24
+            max_entries = 255
+        }
+        
+        # Certificate verification options
+        verify {
+            skip_if_ocsp_ok = no
+        }
+    }
+
+    # EAP-TLS
+    tls {
+        tls = tls-common
+        virtual_server = check-eap-tls
+    }
+
+    # EAP-TTLS
+    ttls {
+        tls = tls-common
+        default_eap_type = mschapv2
+        copy_request_to_tunnel = yes
+        use_tunneled_reply = yes
+        virtual_server = "inner-tunnel"
+    }
+
+    # PEAP
+    peap {
+        tls = tls-common
+        default_eap_type = mschapv2
+        copy_request_to_tunnel = yes
+        use_tunneled_reply = yes
+        virtual_server = "inner-tunnel"
+        
+        # PEAP version
+        soh = no
+        require_client_cert = no
+    }
+
+    # EAP-MSCHAPv2
+    mschapv2 {
+        send_error = yes
+        identity = "RoXX RADIUS Server"
+    }
+
+    # EAP-GTC
+    gtc {
+        challenge = "Password: "
+        auth_type = PAP
+    }
+
+    # EAP-MD5
+    md5 {
+        # MD5 is insecure, disabled by default
+    }
+}

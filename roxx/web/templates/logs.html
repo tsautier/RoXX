@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}System Audit Logs - RoXX{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card shadow">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">System Audit Logs</h6>
+                <div class="dropdown no-arrow">
+                    <button class="btn btn-sm btn-primary shadow-sm" onclick="fetchLogs()">
+                        <i class="fas fa-sync-alt fa-sm text-white-50"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-hover" id="logsTable" width="100%"
+                        cellspacing="0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th style="width: 180px;">Timestamp (UTC)</th>
+                                <th style="width: 100px;">Severity</th>
+                                <th style="width: 150px;">Action</th>
+                                <th style="width: 150px;">Username</th>
+                                <th style="width: 150px;">IP Address</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <!-- Logs here -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Pagination Control could go here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function fetchLogs() {
+        try {
+            const response = await fetch('/api/logs?limit=50');
+            const data = await response.json();
+
+            const tbody = document.getElementById('logsTableBody');
+            tbody.innerHTML = '';
+
+            data.logs.forEach(log => {
+                const row = document.createElement('tr');
+
+                let severityBadge = 'badge-secondary';
+                if (log.severity === 'WARNING') severityBadge = 'badge-warning';
+                if (log.severity === 'ERROR') severityBadge = 'badge-danger';
+                if (log.severity === 'INFO') severityBadge = 'badge-info';
+
+                row.innerHTML = `
+                <td>${log.timestamp}</td>
+                <td><span class="badge ${severityBadge}">${log.severity}</span></td>
+                <td>${log.action}</td>
+                <td>${log.username}</td>
+                <td>${log.ip_address}</td>
+                <td><small>${JSON.stringify(log.details)}</small></td>
+            `;
+                tbody.appendChild(row);
+            });
+        } catch (e) {
+            console.error("Failed to load logs", e);
+        }
+    }
+
+    // Load on start
+    document.addEventListener('DOMContentLoaded', fetchLogs);
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFA Verification - RoXX</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="login-page">
+    <div class="login-card">
+        <div class="login-header">
+            <img src="/static/img/logo.png" alt="RoXX Logo">
+            <h2>Two-Factor Authentication</h2>
+            <p style="color: var(--text-light); font-size: 0.95rem;">Enter the code from your authenticator app</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form action="/auth/mfa-challenge" method="POST">
+            <div class="form-group" style="text-align: left;">
+                <label for="code">Authentication Code</label>
+                <input type="text" id="code" name="code" placeholder="000000" maxlength="6" pattern="\d{6}" required
+                    autofocus style="letter-spacing: 0.5em; font-size: 1.25rem; text-align: center;">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Verify</button>
+        </form>
+    </div>
+</body>
+
+</html>

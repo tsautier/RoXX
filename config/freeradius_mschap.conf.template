@@ -1,0 +1,41 @@
+# RoXX MS-CHAP Module Configuration Template
+# Modern MS-CHAPv2 configuration
+
+mschap {
+    # Use NTLM authentication
+    use_mppe = yes
+    require_encryption = yes
+    require_strong = yes
+    
+    # MS-CHAP with NTLM Auth
+    with_ntdomain_hack = no
+    
+    # NTLM authentication settings
+    ntlm_auth = "/usr/bin/ntlm_auth --request-nt-key --domain=%{mschap:NT-Domain} --username=%{mschap:User-Name} --challenge=%{mschap:Challenge:-00} --nt-response=%{mschap:NT-Response:-00}"
+    
+    # Pool configuration for ntlm_auth
+    pool {
+        start = ${thread[pool].start_servers}
+        min = ${thread[pool].min_spare_servers}
+        max = ${thread[pool].max_servers}
+        spare = ${thread[pool].max_spare_servers}
+        uses = 0
+        retry_delay = 30
+        lifetime = 86400
+        cleanup_interval = 300
+        idle_timeout = 600
+    }
+    
+    # MS-CHAP authentication
+    passchange {
+        # Allow password changes
+        # ntlm_auth_username = "username: %{mschap:User-Name}"
+        # ntlm_auth_domain = "domain: %{mschap:NT-Domain}"
+    }
+    
+    # MPPE encryption keys
+    mppe {
+        # Generate MPPE keys
+        # These are used for VPN encryption
+    }
+}

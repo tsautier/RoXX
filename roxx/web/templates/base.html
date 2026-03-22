@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RoXX{% endblock %}</title>
+
+    <!-- Fonts and Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 4 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/toast.css">
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="app-sidebar">
+            <div class="brand">
+                <img src="/static/img/logo.png" alt="RoXX">
+                <span>RoXX Admin</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-category">Core</div>
+                <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="/admins" class="nav-item {% if active_page == 'users' %}active{% endif %}">
+                    <i class="fas fa-users"></i> User Management
+                </a>
+
+                <div class="nav-category">Security</div>
+                <a href="/settings/mfa" class="nav-item {% if active_page == 'mfa' %}active{% endif %}">
+                    <i class="fas fa-shield-alt"></i> MFA Settings
+                </a>
+                <a href="/logs" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
+                    <i class="fas fa-list-alt"></i> Audit Logs
+                </a>
+                <a href="/config/api-tokens" class="nav-item {% if active_page == 'tokens' %}active{% endif %}">
+                    <i class="fas fa-key"></i> API Tokens
+                </a>
+
+                <div class="nav-category">System</div>
+                <a href="/config" class="nav-item">
+                    <i class="fas fa-cog"></i> Config
+                </a>
+                <a href="/logout" class="nav-item text-danger">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="app-main">
+            <header class="top-bar">
+                <h2 class="page-title">{% block header_title %}Overview{% endblock %}</h2>
+                <div class="user-menu">
+                    <!-- User info or actions -->
+                </div>
+            </header>
+
+            <main class="content-wrapper">
+                {% block content %}{% endblock %}
+            </main>
+
+            <footer class="app-footer">
+                roxx v1.0.0-beta6
+            </footer>
+        </div>
+    </div>
+
+    <!-- Bootstrap Core Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Toast Notification System -->
+    <script src="/static/js/toast.js"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

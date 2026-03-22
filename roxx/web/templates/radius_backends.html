@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}RADIUS Backends - RoXX{% endblock %}
+
+{% block extra_head %}
+<style>
+    .backend-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .backend-card {
+        background: white;
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .backend-card:hover {
+        border-color: var(--accent-color);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .backend-card.disabled {
+        opacity: 0.6;
+        background: #f8f9fa;
+    }
+
+    .priority-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: var(--accent-color);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .backend-type {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-light);
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: var(--radius-lg);
+        width: 600px;
+        max-width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 2rem;
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h1 style="margin-bottom: 0.5rem;">RADIUS Backends</h1>
+        <p style="color: var(--text-light);">Configure upstream RADIUS servers (e.g. Duo, Okta) for proxying.</p>
+    </div>
+    <div style="display: flex; gap: 1rem;">
+        <a href="/config/radius-backends/logs" class="btn btn-outline"
+            style="color: var(--text-main); border-color: var(--border-color);">View Debug Logs</a>
+        <button onclick="openAddModal()" class="btn btn-primary">+ Add Backend</button>
+    </div>
+</div>
+
+<div id="backendsList" class="backend-grid">
+    <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-light);">
+        Loading backends...
+    </div>
+</div>
+
+<!-- Add Backend Modal -->
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 1.5rem;">Add RADIUS Backend</h2>
+        <form id="addBackendForm">
+            <div class="form-group">
+                <label>Type</label>
+                <select name="backend_type" id="backendTypeSelect" onchange="updateFormFields()">
+                    <option value="radius_server">Standard RADIUS Server</option>
+                    <option value="duo_security">Duo Security Proxy</option>
+                    <option value="saml">SAML Identity Provider</option>
+                    <option value="ldap">LDAP / Active Directory</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="name" placeholder="e.g. Okta Primary" required>
+            </div>
+
+            <div class="form-group">
+                <label>Priority (Lower = Higher Priority)</label>
+                <input type="number" name="priority" value="100" min="1" max="999">
+            </div>
+
+            <div id="radiusFields">
+                <div class="form-group">
+                    <label>Server Host/IP</label>
+                    <input type="text" name="server_host" placeholder="192.168.1.50">
+                </div>
+                <div class="form-group">
+                    <label>Auth Port</label>
+                    <input type="number" name="auth_port" value="1812">
+                </div>
+                <div class="form-group">
+                    <label>Shared Secret</label>
+                    <input type="password" name="secret">
+                </div>
+                <div class="form-group">
+                    <label>Retries</label>
+                    <input type="number" name="retries" value="3">
+                </div>
+                <div class="form-group">
+                    <label>Timeout (s)</label>
+                    <input type="number" name="timeout" value="5">
+                </div>
+            </div>
+
+            <!-- Test Connection Button -->
+            <div style="margin-bottom: 1.5rem;">
+                <button type="button" onclick="testConnection()" class="btn btn-outline"
+                    style="width: 100%; color: var(--accent-color); border-color: var(--accent-color);">Test
+                    Connectivity</button>
+                <div id="testResult" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                <button type="button" onclick="closeModal('addModal')" class="btn btn-outline"
+                    style="color: var(--text-main); border-color: var(--border-color);">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Backend</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadBackends() {
+        try {
+            const res = await fetch('/api/radius-backends');
+            if (!res.ok) throw new Error("Failed to load");
+            const backends = await res.json();
+            renderBackends(backends);
+        } catch (e) {
+            document.getElementById('backendsList').innerHTML = `<div style="color: #ef4444;">Error loading backends: ${e.message}</div>`;
+        }
+    }
+
+    function renderBackends(backends) {
+        const container = document.getElementById('backendsList');
+        if (backends.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 3rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #e2e8f0;">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">📡</div>
+                    <h3>No Backends Configured</h3>
+                    <p style="color: #64748b;">Add an upstream RADIUS server to enable proxying.</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = backends.map(b => `
+            <div class="backend-card ${b.enabled ? '' : 'disabled'}">
+                <span class="priority-badge">Pri: ${b.priority}</span>
+                <div class="backend-type">${(b.backend_type || b.type || 'unknown').replace('_', ' ')}</div>
+                <h3 style="margin-bottom: 0.5rem; padding-right: 3rem;">${b.name}</h3>
+                <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    ${b.config.server_host || 'No Host'} : ${b.config.auth_port || 1812}
+                </p>
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                     <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.85rem; color: #64748b; border-color: #e2e8f0;" onclick="deleteBackend(${b.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function openAddModal() { document.getElementById('addModal').style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    document.getElementById('addBackendForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = {
+            backend_type: formData.get('backend_type'),
+            name: formData.get('name'),
+            priority: parseInt(formData.get('priority')),
+            enabled: true,
+            config: {
+                server_host: formData.get('server_host'),
+                auth_port: parseInt(formData.get('auth_port')),
+                secret: formData.get('secret'),
+                retries: parseInt(formData.get('retries')),
+                timeout: parseInt(formData.get('timeout'))
+            }
+        };
+
+        try {
+            const res = await fetch('/api/radius-backends', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                closeModal('addModal');
+                loadBackends();
+                e.target.reset();
+            } else {
+                const errData = await res.json();
+                alert("Error creating backend: " + (errData.detail || "Unknown error"));
+            }
+        } catch (err) { console.error(err); alert("Error"); }
+    };
+
+    async function deleteBackend(id) {
+        if (!confirm("Delete this backend?")) return;
+        await fetch(`/api/radius-backends/${id}`, { method: 'DELETE' });
+        loadBackends();
+    }
+
+    // Future: impl testConnection()
+
+    loadBackends();
+</script>
+{% endblock %}

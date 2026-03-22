@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Debug Logs - Auth Providers{% endblock %}
+
+{% block extra_head %}
+<style>
+    .log-container {
+        font-family: 'Courier New', monospace;
+        background: #1e293b;
+        color: #e2e8f0;
+        padding: 1rem;
+        border-radius: var(--radius-md);
+        height: 600px;
+        overflow-y: auto;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+
+    .log-entry {
+        margin-bottom: 0.25rem;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 0.25rem;
+    }
+
+    .log-time {
+        color: #64748b;
+        margin-right: 0.5rem;
+    }
+
+    .log-level-INFO {
+        color: #10b981;
+    }
+
+    .log-level-WARN {
+        color: #f59e0b;
+    }
+
+    .log-level-ERROR {
+        color: #ef4444;
+    }
+
+    .log-level-DEBUG {
+        color: #3b82f6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1>Auth Provider Logs</h1>
+    <a href="/config/auth-providers" class="btn btn-outline"
+        style="color: var(--text-main); border-color: var(--border-color);">Back to Settings</a>
+</div>
+
+<div class="log-container" id="logContainer">
+    <div style="text-align: center; color: #64748b; margin-top: 2rem;">Connecting to log stream...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const container = document.getElementById('logContainer');
+    // Placeholder logs
+    container.innerHTML = "";
+
+    function addLog(level, msg) {
+        const time = new Date().toISOString().split('T')[1].split('.')[0];
+        const html = `
+            <div class="log-entry">
+                <span class="log-time">[${time}]</span>
+                <span class="log-level-${level}">${level}</span>
+                ${msg}
+            </div>
+        `;
+        container.innerHTML += html;
+    }
+
+    addLog("INFO", "Auth Provider Debug Log Wrapper initialized.");
+</script>
+{% endblock %}
