@@ -2,7 +2,32 @@
 
 All notable changes to RoXX will be documented in this file.
 
-## [1.0.0-beta6] - 2026-01-22
+## [1.0.0-beta7] - 2026-03-22
+
+### 🛡️ The "Competitor Killer" Update (Protection & Migration)
+
+#### 🎉 Major Features
+- **NPS Migration Assistant**: Seamlessly transition from Microsoft NPS XML exports to RoXX.
+- **Visual Analytics Dashboard**: Real-time Auth Success/Failure donut charts and backend health pings.
+- **Advanced Visibility**: Color-coded live log viewer (`SUCCESS` = green, `FAILURE` = red).
+- **AGPLv3 Licensing**: Strongest copyleft protection to block dishonest cloud clones.
+
+#### 🔒 Security & Integrity
+- **Integrity Manifests**: SHA-256 verification of all core files on application startup.
+- **Digital Watermarking**: Technical proof of ownership embedded in core modules.
+- **Security Headers**: Custom `X-RoXX` headers for build tracking and origin verification.
+
+#### 🛠️ Technical Improvements
+- **CI/CD Stabilization**: Resolved GitHub Actions branch mismatch and enabled Python 3.12 exclusive jobs.
+- **Linting Excellence**: Fixed 43 `ruff` errors (missing imports, orphan files).
+- **Dependency Resolution**: Added missing `psutil` core dependency.
+
+#### 🐛 Bug Fixes
+- **Auth Deadlock Fix**: Resolved the redirection loop for "Force Change Password" flow.
+- **Admin Recovery**: Implemented manual SQLite recovery path for admin credentials.
+
+---
+
 
 ### 🎉 Major Features
 
