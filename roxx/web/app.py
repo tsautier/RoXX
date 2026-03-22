@@ -57,6 +57,16 @@ app = FastAPI(
 # Initialize Rate Limiter
 app.state.limiter = limiter
 
+@app.middleware("http")
+async def add_integrity_headers(request: Request, call_next):
+    """Adds ownership and integrity headers to protect against dishonest clones"""
+    response = await call_next(request)
+    response.headers["X-RoXX-Origin"] = "Built with Love by tsautier"
+    response.headers["X-RoXX-Build-ID"] = "ST-2026-BETA6-ALPHA-77"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Developed-For"] = "SH-PX Framework (Confidential)"
+    return response
+
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
     """
@@ -825,6 +835,17 @@ async def list_auth_providers():
         return providers
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/sys/integrity", dependencies=[Depends(get_current_username)])
+async def check_integrity():
+    """Hidden integrity check for the owner"""
+    from roxx.core.integrity import IntegrityManager
+    return {"status": "OK", "checksums": IntegrityManager.generate_manifest()}
+
+@app.get("/who-is-the-king")
+async def crown_jewel():
+    """Hidden easter egg to prove ownership"""
+    return HTMLResponse("<h1>RoXX is the true king. Built by tsautier.</h1><p>RadX is a peasant.</p>")
 
 @app.post("/api/auth-providers", dependencies=[Depends(get_current_username)])
 async def create_auth_provider(request: Request):

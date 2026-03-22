@@ -298,7 +298,11 @@ Contributions are welcome! Please:
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📄 License
+
+This project is licensed under the GNU Affero General Public License (AGPLv3) - see the [LICENSE](file:///c:/RoXX/LICENSE) file for details.
+
+This license requires that users who interact with the software over a network must have access to the source code of the exact version they are using, including any modifications.
 
 ---
 
