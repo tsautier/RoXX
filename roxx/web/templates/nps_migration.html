@@ -108,9 +108,19 @@ async function uploadNPS() {
     }
 }
 
-function confirmImport() {
-    // In a real implementation, this would send the confirmation to update the config
-    alert("Configurations imported successfully (Simulation)");
+async function confirmImport() {
+    try {
+        const response = await fetch('/api/nps/import', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            alert(data.message);
+            window.location.reload();
+        } else {
+            alert("Import failed: " + data.detail);
+        }
+    } catch (e) {
+        alert("Import request failed.");
+    }
 }
 </script>
 {% endblock %}

@@ -37,7 +37,7 @@ class NPSImporter:
                 results["clients"].append({
                     "name": name.text if name is not None else "Unknown",
                     "address": address.text if address is not None else "0.0.0.0",
-                    "shared_secret": "***" if shared_secret is not None else "" # Don't log secrets
+                    "shared_secret": shared_secret.text if shared_secret is not None else ""
                 })
                 
             # Find Remote RADIUS Servers (Backends)

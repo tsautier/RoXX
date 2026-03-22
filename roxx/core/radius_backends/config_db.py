@@ -86,6 +86,18 @@ class RadiusBackendDB:
                     )
                 """)
             
+            # 📡 RADIUS Clients (NAS) Table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS radius_clients (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    shortname TEXT NOT NULL UNIQUE,
+                    ipaddr TEXT NOT NULL,
+                    secret TEXT NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             # Create index on priority for faster lookups
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_radius_backends_priority 
@@ -267,3 +279,25 @@ class RadiusBackendDB:
         except Exception as e:
             logger.error(f"Error updating priorities: {e}")
             return False, f"Database error: {str(e)}"
+    @staticmethod
+    def list_clients() -> List[dict]:
+        """List all RADIUS clients (NAS)"""
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT * FROM radius_clients ORDER BY shortname ASC").fetchall()
+            return [dict(row) for row in rows]
+
+    @staticmethod
+    def add_client(shortname: str, ipaddr: str, secret: str, description: str = "") -> bool:
+        """Add a new RADIUS client (NAS)"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    "INSERT INTO radius_clients (shortname, ipaddr, secret, description) VALUES (?, ?, ?, ?)",
+                    (shortname, ipaddr, secret, description)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error adding RADIUS client: {e}")
+            return False

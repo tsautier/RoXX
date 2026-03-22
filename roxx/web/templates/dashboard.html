@@ -278,32 +278,75 @@
         var loadVal = Math.min({{ adv.load_1m }} * 25, 100);
         createGauge("chart-io", loadVal, "#ff6384");
 
-        // Auth Success Chart
-        var authOptions = {
-            series: [{
-                name: 'Success',
-                data: [31, 40, 28, 51, 42, 109, 100]
-            }, {
-                name: 'Failure',
-                data: [11, 32, 45, 32, 34, 52, 41]
-            }],
-            chart: {
-                height: 350,
-                type: 'area',
-                toolbar: { show: false }
-            },
-            colors: ['#28a745', '#dc3545'],
-            dataLabels: { enabled: false },
-            stroke: { curve: 'smooth' },
-            xaxis: {
-                type: 'datetime',
-                categories: ["2026-03-22T00:00:00.000Z", "2026-03-22T01:30:00.000Z", "2026-03-22T02:30:00.000Z", "2026-03-22T03:30:00.000Z", "2026-03-22T04:30:00.000Z", "2026-03-22T05:30:00.000Z", "2026-03-22T06:30:00.000Z"]
-            },
-            tooltip: { x: { format: 'dd/MM/yy HH:mm' } },
-        };
+        // Initialize Backend Health
+        async function updateHealth() {
+            try {
+                const response = await fetch('/api/health/backends');
+                const data = await response.json();
+                const list = document.getElementById('backend-health-list');
+                list.innerHTML = '';
+                
+                for (const [backend, status] of Object.entries(data)) {
+                    const badgeClass = status === 'UP' || status === 'RUNNING' ? 'badge-success' : 'badge-danger';
+                    const iconMap = {
+                        'LDAP': 'fas fa-database',
+                        'EntraID': 'fab fa-microsoft',
+                        'SAML': 'fas fa-key',
+                        'Radius': 'fas fa-shield-alt'
+                    };
+                    const icon = iconMap[backend] || 'fas fa-server';
+                    
+                    list.innerHTML += `
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span><i class="${icon} mr-2"></i> ${backend}</span>
+                            <span class="badge ${badgeClass} px-3">${status}</span>
+                        </div>
+                    `;
+                }
+                document.getElementById('lastCheckTime').textContent = new Date().toLocaleTimeString();
+            } catch (err) { console.error('Health fetch failed:', err); }
+        }
+        
+        setInterval(updateHealth, 10000);
+        updateHealth();
 
-        var authChart = new ApexCharts(document.querySelector("#auth-success-chart"), authOptions);
-        authChart.render();
+        // Auth Success Chart
+        async function updateAuthChart() {
+            try {
+                const response = await fetch('/api/metrics/auth');
+                const data = await response.json();
+                
+                var authOptions = {
+                    series: [{
+                        name: 'Success',
+                        data: data.success
+                    }, {
+                        name: 'Failure',
+                        data: data.failure
+                    }],
+                    chart: {
+                        height: 350,
+                        type: 'area',
+                        toolbar: { show: false }
+                    },
+                    colors: ['#28a745', '#dc3545'],
+                    dataLabels: { enabled: false },
+                    stroke: { curve: 'smooth' },
+                    xaxis: {
+                        type: 'datetime',
+                        categories: data.categories
+                    },
+                    tooltip: { x: { format: 'dd/MM/yy HH:mm' } },
+                };
+
+                const chartContainer = document.querySelector("#auth-success-chart");
+                chartContainer.innerHTML = ''; // Clear prior if any
+                var authChart = new ApexCharts(chartContainer, authOptions);
+                authChart.render();
+            } catch (err) { console.error('Metrics fetch failed:', err); }
+        }
+        
+        updateAuthChart();
     });
 
     // WebSocket Logic

@@ -7,15 +7,24 @@ from roxx.utils.system import SystemManager
 
 logger = logging.getLogger("roxx.audit.db")
 
-def get_db_path():
-    return SystemManager.get_config_dir() / "roxx.db"
+
 
 class AuditDatabase:
     @staticmethod
-    def init_db():
+    def get_db_path():
+        """Get path to the SQLite database"""
+        return SystemManager.get_config_dir() / "roxx.db"
+
+    @classmethod
+    def get_connection(cls):
+        """Get a database connection"""
+        return sqlite3.connect(cls.get_db_path())
+
+    @classmethod
+    def init_db(cls):
         """Initialize the audit logs table"""
         try:
-            conn = sqlite3.connect(get_db_path())
+            conn = cls.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -36,14 +45,14 @@ class AuditDatabase:
         except Exception as e:
             logger.error(f"Failed to initialize audit DB: {e}")
 
-    @staticmethod
-    def log_event(username: str, ip_address: str, action: str, severity: str = "INFO", details: dict = None):
+    @classmethod
+    def log_event(cls, username: str, ip_address: str, action: str, severity: str = "INFO", details: dict = None):
         """Log an event to the database"""
         try:
             if details is None:
                 details = {}
             
-            conn = sqlite3.connect(get_db_path())
+            conn = cls.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -63,11 +72,11 @@ class AuditDatabase:
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
 
-    @staticmethod
-    def get_logs(limit: int = 100, offset: int = 0, search: str = None):
+    @classmethod
+    def get_logs(cls, limit: int = 100, offset: int = 0, search: str = None):
         """Retrieve logs with optional search filter"""
         try:
-            conn = sqlite3.connect(get_db_path())
+            conn = cls.get_connection()
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
