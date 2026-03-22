@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - RoXX{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">System Settings</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">General Server Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form action="/config/system" method="POST">
+                        <div class="form-group row">
+                            <label class="col-sm-4 col-form-label">Server Name</label>
+                            <div class="col-sm-8">
+                                <input type="text" name="server_name" class="form-control" value="{{ settings.server_name }}">
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="form-group row">
+                            <label class="col-sm-4 col-form-label">RADIUS Auth Port</label>
+                            <div class="col-sm-4">
+                                <input type="number" name="radius_auth_port" class="form-control" value="{{ settings.radius_auth_port }}">
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label class="col-sm-4 col-form-label">RADIUS Acct Port</label>
+                            <div class="col-sm-4">
+                                <input type="number" name="radius_acct_port" class="form-control" value="{{ settings.radius_acct_port }}">
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="form-group row">
+                            <label class="col-sm-4 col-form-label">Debug Mode</label>
+                            <div class="col-sm-8">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" name="debug_mode" class="custom-control-input" id="debugSwitch" {% if settings.debug_mode == 'true' %}checked{% endif %}>
+                                    <label class="custom-control-label" for="debugSwitch">Enable verbose logging</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label class="col-sm-4 col-form-label">Log Level</label>
+                            <div class="col-sm-4">
+                                <select name="log_level" class="form-control">
+                                    <option value="DEBUG" {% if settings.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                                    <option value="INFO" {% if settings.log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                                    <option value="WARNING" {% if settings.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                                    <option value="ERROR" {% if settings.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                </select>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="form-group row">
+                            <label class="col-sm-4 col-form-label">Audit Retention (Days)</label>
+                            <div class="col-sm-4">
+                                <input type="number" name="audit_retention_days" class="form-control" value="{{ settings.audit_retention_days }}">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Settings
+                            </button>
+                            <a href="/config" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">Server Information</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Version:</strong> v1.0.0-beta7</p>
+                    <p><strong>OS:</strong> Linux (Kali)</p>
+                    <p><strong>Uptime:</strong> Running</p>
+                    <hr>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Changing RADIUS ports requires a service restart to take effect.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

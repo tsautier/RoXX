@@ -52,6 +52,29 @@ class AuthProviderDatabase:
             ON auth_providers(provider_type, enabled)
         """)
         
+        # ⚙️ System Settings Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Initialize default settings if empty
+        cursor.execute("SELECT COUNT(*) FROM system_settings")
+        if cursor.fetchone()[0] == 0:
+            defaults = {
+                "server_name": "RoXX RADIUS Proxy",
+                "radius_auth_port": "1812",
+                "radius_acct_port": "1813",
+                "debug_mode": "false",
+                "log_level": "INFO",
+                "audit_retention_days": "90"
+            }
+            for k, v in defaults.items():
+                cursor.execute("INSERT INTO system_settings (key, value) VALUES (?, ?)", (k, v))
+        
         conn.commit()
         conn.close()
         logger.info("Auth provider database initialized")
@@ -363,3 +386,31 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Provider test error: {e}")
             return False, f"Test failed: {str(e)}"
+    @staticmethod
+    def get_system_settings() -> dict:
+        """Get all system settings"""
+        conn = AuthProviderDatabase.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM system_settings")
+        settings = {row['key']: row['value'] for row in cursor.fetchall()}
+        conn.close()
+        return settings
+
+    @staticmethod
+    def update_system_settings(settings: dict) -> bool:
+        """Update multiple system settings"""
+        try:
+            conn = AuthProviderDatabase.get_connection()
+            cursor = conn.cursor()
+            for k, v in settings.items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                    (k, str(v))
+                )
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating system settings: {e}")
+            return False

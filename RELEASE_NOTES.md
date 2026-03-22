@@ -1,20 +1,17 @@
-# RoXX v1.0.0-beta6 Release
+# RoXX v1.0.0-beta7 Release (The "Competitor Killer")
 
-**Date:** January 22, 2026
-**Tag:** \1.0.0-beta6**Commit:** \3df9b75
+**Date:** March 22, 2026
+**Tag:** v1.0.0-beta7
 ---
 
 ## 🚀 Release Highlights
+- **NPS Migration Assistant**: Seamlessly transition from Microsoft NPS to RoXX with XML configuration import.
+- **Dynamic Dashboard**: Real-time authentication performance and backend health monitoring.
+- **System Settings**: A complete interface for managing server branding, ports, and logging.
+- **Automated Integrity**: Startup verification of core files to protect against unauthorized modifications.
+- **Hardened Protection**: Fully operational "Competitor Killer" features for enterprise readiness.
 
-This beta release represents a major milestone in production readiness, focusing on security hardening, user experience, and completing critical MFA management features.
-
-### 🔑 Complete MFA Management
-Administrators can now fully manage user MFA credentials:
-- **View & Delete WebAuthn Keys**: Visual interface to manage security keys and biometrics.
-- **Reset TOTP**: One-click reset for users who lost their authenticator.
-- **Real-time Status**: Instant overview of enabled MFA methods per user.
-
-### 🎨 Unified & Modern UX
+### ðŸŽ¨ Unified & Modern UX
 - **Toast Notifications**: Replaced intrusive alerts with modern, non-blocking toast notifications (Success/Error/Warning).
 - **Consistent UI**: Unified all 12 modules under a single responsive template (\ase.html\).
-- **Improved Navigation**: \�
+- **Improved Navigation**: \ÿ

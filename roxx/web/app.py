@@ -66,7 +66,7 @@ async def add_integrity_headers(request: Request, call_next):
     """Adds ownership and integrity headers to protect against dishonest clones"""
     response = await call_next(request)
     response.headers["X-RoXX-Origin"] = "Built with Love by tsautier"
-    response.headers["X-RoXX-Build-ID"] = "ST-2026-BETA6-ALPHA-77"
+    response.headers["X-RoXX-Build-ID"] = "ST-2026-BETA7-FINAL-88"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Developed-For"] = "SH-PX Framework (Confidential)"
     return response
@@ -1678,7 +1678,45 @@ async def test_sms(request: Request):
         return {"success": False, "message": "SMS disabled"}
 
     result = await SMSProvider.send_sms(phone, message, config)
-    return {"success": result}
+    return {"success": result, "message": "SMS sent" if result else "SMS failed"}
+
+# ------------------------------------------------------------------------------
+# System Settings
+# ------------------------------------------------------------------------------
+@app.get("/config/system", response_class=HTMLResponse)
+async def config_system_get(request: Request, username: str = Depends(get_current_username)):
+    """GET system settings page"""
+    from roxx.core.auth.config_db import ConfigManager
+    settings = ConfigManager.get_system_settings()
+    return templates.TemplateResponse("system_settings.html", {"request": request, "username": username, "settings": settings})
+
+@app.post("/config/system")
+async def config_system_post(
+    request: Request,
+    server_name: str = Form(...),
+    radius_auth_port: str = Form(...),
+    radius_acct_port: str = Form(...),
+    log_level: str = Form(...),
+    audit_retention_days: str = Form(...),
+    debug_mode: str = Form(None),
+    username: str = Depends(get_current_username)
+):
+    """POST system settings update"""
+    from roxx.core.auth.config_db import ConfigManager
+    
+    settings = {
+        "server_name": server_name,
+        "radius_auth_port": radius_auth_port,
+        "radius_acct_port": radius_acct_port,
+        "log_level": log_level,
+        "audit_retention_days": audit_retention_days,
+        "debug_mode": "true" if debug_mode else "false"
+    }
+    
+    if ConfigManager.update_system_settings(settings):
+        return RedirectResponse(url="/config?success=settings_updated", status_code=303)
+    else:
+        return RedirectResponse(url="/config/system?error=save_failed", status_code=303)
 
 @app.post("/api/test/email", dependencies=[Depends(get_current_username)])
 async def test_email(request: Request):
