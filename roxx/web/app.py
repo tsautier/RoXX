@@ -1405,26 +1405,43 @@ async def get_user_mfa_status(username: str):
 
 # ------------------------------------------------------------------------------
 # User Management API
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------@app.get("/users", response_class=HTMLResponse)
+async def users_page(request: Request, username: str = Depends(get_current_username)):
+    """RADIUS User Management Page"""
+    return templates.TemplateResponse("users.html", {"request": request, "username": username})
+
+@app.get("/api/users", dependencies=[Depends(get_current_username)])
+async def get_radius_users():
+    """List local RADIUS users from users.conf"""
+    users_file = SystemManager.get_config_dir() / "users.conf"
+    users = []
+    if users_file.exists():
+        with open(users_file, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 4:
+                    users.append({
+                        "username": parts[0],
+                        "attribute": parts[1],
+                        "op": parts[2],
+                        "password": parts[3].strip('"')
+                    })
+    return users
+
 @app.post("/api/users", dependencies=[Depends(get_current_username)])
-async def create_user(
-    username: str = Form(...),
-    password: str = Form(...),
-    user_type: str = Form(default="Cleartext-Password")
-):
-    """Add a new user"""
-    if SystemManager.add_radius_user(username, password, user_type):
-        return {"success": True, "message": f"User {username} added"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to write to users.conf")
+async def add_radius_user(request: Request):
+    data = await request.json()
+    username = data.get("username")
+    password = data.get("password")
+    if SystemManager.add_radius_user(username, password):
+        return {"success": True}
+    return {"success": False}
 
 @app.delete("/api/users/{username}", dependencies=[Depends(get_current_username)])
-async def delete_user(username: str):
-    """Delete a user"""
+async def delete_radius_user(username: str):
     if SystemManager.delete_radius_user(username):
-        return {"success": True, "message": f"User {username} deleted"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to delete user")
+        return {"success": True}
+    return {"success": False}
 
 # ------------------------------------------------------------------------------
 # Real-time Logs (WebSocket)
@@ -1600,6 +1617,26 @@ async def remove_ssl_cert():
     return {"success": success, "message": msg}
 
 # ------------------------------------------------------------------------------
+# PKI Routes
+# ------------------------------------------------------------------------------
+@app.get("/config/pki", response_class=HTMLResponse)
+async def pki_page(request: Request, username: str = Depends(get_current_username)):
+    """Internal PKI Management Page"""
+    return templates.TemplateResponse("pki.html", {"request": request, "username": username})
+
+@app.get("/api/pki/status", dependencies=[Depends(get_current_username)])
+async def get_pki_status():
+    from roxx.core.security.pki import PKIManager
+    return PKIManager.get_ca_status()
+
+@app.post("/api/pki/init", dependencies=[Depends(get_current_username)])
+async def init_pki():
+    from roxx.core.security.pki import PKIManager
+    if PKIManager.create_ca():
+        return {"success": True, "message": "CA Generated"}
+    return {"success": False, "message": "CA already exists or failed"}
+
+# ------------------------------------------------------------------------------
 # TOTP Routes
 # ------------------------------------------------------------------------------
 @app.post("/api/totp/generate-qr", dependencies=[Depends(get_current_username)])
@@ -1717,6 +1754,11 @@ async def config_system_post(
         return RedirectResponse(url="/config?success=settings_updated", status_code=303)
     else:
         return RedirectResponse(url="/config/system?error=save_failed", status_code=303)
+
+@app.get("/config/nps-migration", response_class=HTMLResponse)
+async def nps_migration_page(request: Request, username: str = Depends(get_current_username)):
+    """GET NPS Migration Assistant page"""
+    return templates.TemplateResponse("nps_migration.html", {"request": request, "username": username})
 
 @app.post("/api/test/email", dependencies=[Depends(get_current_username)])
 async def test_email(request: Request):

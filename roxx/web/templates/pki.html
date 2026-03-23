@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}PKI Management - RoXX{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Local PKI</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Certificate Authority (CA)</h6>
+                </div>
+                <div class="card-body" id="caBox">
+                    <!-- Status via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadPKI() {
+    const response = await fetch('/api/pki/status');
+    const status = await response.json();
+    const box = document.getElementById('caBox');
+    if (status.exists) {
+        box.innerHTML = `
+            <div class="alert alert-success">CA is active.</div>
+            <p><strong>Path:</strong> <code>${status.path}</code></p>
+            <button class="btn btn-info btn-sm">Download CA Certificate</button>
+        `;
+    } else {
+        box.innerHTML = `
+            <div class="alert alert-warning">No internal CA found.</div>
+            <button class="btn btn-primary" onclick="generateCA()">Initialize Internal PKI</button>
+        `;
+    }
+}
+
+async function generateCA() {
+    await fetch('/api/pki/init', { method: 'POST' });
+    loadPKI();
+}
+
+window.onload = loadPKI;
+</script>
+{% endblock %}
