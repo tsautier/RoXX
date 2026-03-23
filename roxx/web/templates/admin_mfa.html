@@ -116,7 +116,12 @@
 
     <!-- WebAuthn Credentials -->
     <div class="mfa-section">
-        <h3><i class="fas fa-key"></i> Security Keys & Passkeys (WebAuthn)</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3><i class="fas fa-key"></i> Security Keys & Passkeys (WebAuthn)</h3>
+            <button class="btn btn-primary btn-sm" onclick="registerWebAuthn()">
+                <i class="fas fa-plus"></i> Add Security Key
+            </button>
+        </div>
         <div id="credentialsContainer">
             <table class="credentials-table" id="credentialsTable" style="display: none;">
                 <thead>
@@ -133,6 +138,7 @@
             <div id="emptyCredentials" class="empty-state">
                 <i class="fas fa-key" style="font-size: 3rem; color: #d1d5db; margin-bottom: 1rem;"></i>
                 <p>No WebAuthn credentials registered</p>
+                <button class="btn btn-link" onclick="registerWebAuthn()">Register your first key</button>
             </div>
         </div>
     </div>
@@ -275,6 +281,79 @@
             console.error('Error resetting TOTP:', err);
             showError('Error', 'Network error while resetting TOTP');
         }
+    }
+
+    // WebAuthn Registration
+    async function registerWebAuthn() {
+        if (!window.isSecureContext || !navigator.credentials) {
+            showError('Secure Context Required', 'WebAuthn (Security Keys) requires a secure context (HTTPS). Please access RoXX via HTTPS or localhost.');
+            return;
+        }
+
+        try {
+            // 1. Get options from server
+            const optionsResponse = await fetch(`/api/admins/${username}/mfa/webauthn/register/options`);
+            if (!optionsResponse.ok) {
+                const err = await optionsResponse.json();
+                throw new Error(err.detail || 'Failed to get registration options');
+            }
+            const options = await optionsResponse.json();
+
+            // 2. Decode base64url strings to ArrayBuffer
+            options.challenge = bufferDecode(options.challenge);
+            options.user.id = bufferDecode(options.user.id);
+            if (options.excludeCredentials) {
+                for (let i = 0; i < options.excludeCredentials.length; i++) {
+                    options.excludeCredentials[i].id = bufferDecode(options.excludeCredentials[i].id);
+                }
+            }
+
+            // 3. Create credential via browser
+            const credential = await navigator.credentials.create({ publicKey: options });
+
+            // 4. Encode ArrayBuffers back to base64url
+            const credentialPayload = {
+                id: credential.id,
+                rawId: bufferEncode(credential.rawId),
+                type: credential.type,
+                response: {
+                    attestationObject: bufferEncode(credential.response.attestationObject),
+                    clientDataJSON: bufferEncode(credential.response.clientDataJSON),
+                },
+            };
+
+            // 5. Send to server for verification
+            const verifyResponse = await fetch(`/api/admins/${username}/mfa/webauthn/register/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(credentialPayload)
+            });
+
+            if (verifyResponse.ok) {
+                showSuccess('Success!', 'Security key registered successfully');
+                loadCredentials();
+                loadMFAStatus();
+            } else {
+                const err = await verifyResponse.json();
+                throw new Error(err.detail || 'Verification failed');
+            }
+
+        } catch (err) {
+            console.error('WebAuthn Error:', err);
+            showError('Registration Failed', err.message);
+        }
+    }
+
+    // Helpers for WebAuthn encoding
+    function bufferDecode(value) {
+        return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+    }
+
+    function bufferEncode(value) {
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=/g, "");
     }
 
     // Load data on page load

@@ -18,6 +18,7 @@ from questionary import Style
 from roxx.utils.system import SystemManager
 from roxx.utils.i18n import translate as _, set_locale, get_locale
 from roxx.core.services import ServiceManager
+from roxx.core.security.cert_manager import CertManager
 
 console = Console()
 service_mgr = ServiceManager()
@@ -386,6 +387,34 @@ class SetupAssistant:
             
         except Exception as e:
             console.print(f"[red]✗[/red] Failed to create CA: {e}")
+
+    def configure_web_ssl(self):
+        """Web/API SSL configuration"""
+        console.print("\n[bold cyan]Step 5: Web & API SSL Configuration[/bold cyan]")
+        
+        cert_path, _ = CertManager.get_cert_paths()
+        if cert_path.exists():
+            console.print("[green]✓[/green] SSL Certificate already exists.")
+            if not questionary.confirm("Regenerate self-signed certificate?", default=False, style=custom_style).ask():
+                return
+        
+        console.print("[yellow]ℹ[/yellow] RoXX requires HTTPS for WebAuthn (Security Keys) to work.")
+        
+        if questionary.confirm("Generate a self-signed certificate for the Web interface?", default=True, style=custom_style).ask():
+            import socket
+            hostname = questionary.text(
+                "Hostname or IP for the certificate:",
+                default=socket.gethostname(),
+                style=custom_style
+            ).ask()
+            
+            with console.status("[yellow]Generating certificate...[/yellow]"):
+                success, msg = CertManager.generate_self_signed_cert(hostname)
+            
+            if success:
+                console.print(f"[green]✓[/green] {msg}")
+            else:
+                console.print(f"[red]✗[/red] {msg}")
     
     def _import_external_certs(self):
         """Import external certificates"""
@@ -451,6 +480,7 @@ class SetupAssistant:
             self.configure_freeradius()
             self.configure_auth_providers()
             self.configure_pki()
+            self.configure_web_ssl()
             self.save_configuration()
             self.show_summary()
             

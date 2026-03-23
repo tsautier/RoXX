@@ -60,8 +60,13 @@ class WebAuthnDatabase:
             ).fetchall()
             
             creds = []
+            import base64
             for row in rows:
                 c = dict(row)
+                # Base64 encode binary fields for JSON serialization
+                c['credential_id'] = base64.b64encode(c['credential_id']).decode('utf-8')
+                c['public_key'] = base64.b64encode(c['public_key']).decode('utf-8')
+                
                 if c['transports']:
                    try:
                        c['transports'] = json.loads(c['transports'])

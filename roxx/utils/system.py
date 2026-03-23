@@ -219,6 +219,9 @@ class SystemManager:
             with open(users_file, 'r') as f:
                 lines = f.readlines()
             
+            if username.startswith('#'):
+                return False # Safety: Cannot delete comments
+                
             clean_lines = [l for l in lines if not l.strip().startswith(f"{username} ")]
             
             with open(users_file, 'w') as f:

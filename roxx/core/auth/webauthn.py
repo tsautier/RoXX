@@ -8,6 +8,7 @@ from fido2.webauthn import PublicKeyCredentialRpEntity, PublicKeyCredentialUserE
 from fido2.server import Fido2Server
 from fido2.utils import websafe_encode, websafe_decode
 from roxx.core.auth.webauthn_db import WebAuthnDatabase
+from datetime import datetime
 
 logger = logging.getLogger("roxx.auth.webauthn")
 
@@ -17,43 +18,43 @@ RP_NAME = "RoXX Authentication"
 ORIGIN = "https://localhost:8000" # Must match exactly, includes protocol and port
 
 class WebAuthnManager:
-    server = Fido2Server(
-        PublicKeyCredentialRpEntity(id=RP_ID, name=RP_NAME),
-        verify_origin=lambda o: True # Allow any origin for dev/beta (or check against ORIGIN)
-    )
+    @staticmethod
+    def get_server(rp_id=None):
+        """Get Fido2Server instance with current RP_ID"""
+        effective_rp_id = rp_id or RP_ID
+        return Fido2Server(
+            PublicKeyCredentialRpEntity(id=effective_rp_id, name=RP_NAME),
+            verify_origin=lambda o: True # Allow any origin for dev/beta
+        )
 
     @staticmethod
     def init():
         WebAuthnDatabase.init()
 
     @staticmethod
-    def generate_registration_options(username: str, user_id: str):
+    def generate_registration_options(username: str, user_id: str, rp_id=None):
         """
         Generate options for navigator.credentials.create()
         """
-        # Get existing credentials to exclude them (prevent re-registration)
-        # We need byte credential_ids
-        # ... logic skipped for simplicity in MVP, or implement list_credentials mapping
-        
-        # User entity also needs kwargs likely
         user = PublicKeyCredentialUserEntity(id=user_id.encode('utf-8'), name=username, display_name=username)
         
-        options, state = WebAuthnManager.server.register_begin(
+        server = WebAuthnManager.get_server(rp_id)
+        options, state = server.register_begin(
             user,
-            credentials=[], # list of AuthenticatorData or credential IDs to exclude
-            user_verification="discouraged", # 'preferred' or 'required'
-            authenticator_attachment=None # 'platform' or 'cross-platform'
+            credentials=[], 
+            user_verification="discouraged"
         )
         
         return options, state
 
     @staticmethod
-    def verify_registration(username: str, response_data, state):
+    def verify_registration(username: str, response_data, state, rp_id=None):
         """
         Verify the registration response
         """
         try:
-            auth_data = WebAuthnManager.server.register_complete(
+            server = WebAuthnManager.get_server(rp_id)
+            auth_data = server.register_complete(
                 state,
                 response_data
             )
@@ -89,7 +90,7 @@ class WebAuthnManager:
             return False, str(e)
             
     @staticmethod
-    def generate_authentication_options(username: str):
+    def generate_authentication_options(username: str, rp_id=None):
         """
         Generate options for navigator.credentials.get()
         """
@@ -140,7 +141,8 @@ class WebAuthnManager:
                  # Skip invalid credentials
                  continue
 
-        options, state = WebAuthnManager.server.authenticate_begin(fido_creds)
+        server = WebAuthnManager.get_server(rp_id)
+        options, state = server.authenticate_begin(fido_creds)
         
         print(f"[DEBUG] FIDO2 Options Type: {type(options)}")
         print(f"[DEBUG] FIDO2 Options Dir: {dir(options)}")
@@ -171,7 +173,7 @@ class WebAuthnManager:
         return opt_dict, state
 
     @staticmethod
-    def verify_authentication(username: str, response_data, state):
+    def verify_authentication(username: str, response_data, state, rp_id=None):
         """
         Verify authentication response
         """
@@ -215,7 +217,8 @@ class WebAuthnManager:
             # Verify
             # authenticate_complete returns the credential object that was used (AttestedCredentialData)
             # It does NOT return the new counter. We must extract it from authenticatorData.
-            matched_cred = WebAuthnManager.server.authenticate_complete(
+            server = WebAuthnManager.get_server(rp_id)
+            matched_cred = server.authenticate_complete(
                 state,
                 [credential_data], # List of candidate credentials
                 response_data

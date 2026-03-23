@@ -45,6 +45,9 @@
                 </p>
 
                 <div id="webauthn-area">
+                    <div id="webauthn-keys-list" style="margin-bottom: 1rem; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.5rem; min-height: 50px;">
+                        <!-- Keys load here -->
+                    </div>
                     <button id="registerKeyBtn" class="btn btn-primary btn-block" onclick="registerWebAuthn()">Register
                         New Security Key</button>
                     <div id="webauthn-status" style="margin-top: 1rem; font-size: 0.9rem;"></div>
@@ -117,7 +120,52 @@
                 .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
         }
 
+        async function loadWebAuthnKeys() {
+            const container = document.getElementById('webauthn-keys-list');
+            if (!container) return;
+            try {
+                // We use the same endpoint as the Admin page if it works for self?
+                // No, we need a self-service endpoint for /api/webauthn/list
+                const res = await fetch('/api/webauthn/list');
+                const data = await res.json();
+                const keys = data.credentials || [];
+                
+                container.innerHTML = keys.length ? '' : '<div style="color:var(--text-light);font-style:italic;">No security keys registered.</div>';
+
+                keys.forEach(key => {
+                    const el = document.createElement('div');
+                    el.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border-color);";
+                    el.innerHTML = `
+                    <div>
+                        <div style="font-weight:600;">${key.credential_name || 'Security Key'}</div>
+                        <div style="font-size:0.8rem;color:var(--text-light);">Created: ${new Date(key.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <button onclick="deleteWebAuthnKey(${key.id})" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
+                `;
+                    container.appendChild(el);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteWebAuthnKey(id) {
+            if (!confirm("Remove this security key?")) return;
+            try {
+                const res = await fetch('/api/webauthn/' + id, { method: 'DELETE' });
+                if (res.ok) {
+                    loadWebAuthnKeys();
+                } else {
+                    alert("Failed to delete key");
+                }
+            } catch (e) { console.error(e); }
+        }
+
         async function registerWebAuthn() {
+            if (!window.isSecureContext || !navigator.credentials) {
+                const status = document.getElementById('webauthn-status');
+                status.innerHTML = "❌ Error: Secure context (HTTPS) required for WebAuthn.";
+                status.style.color = "red";
+                return;
+            }
             const status = document.getElementById('webauthn-status');
             status.innerHTML = "Requesting registration options...";
             status.style.color = "var(--text-light)";
@@ -168,6 +216,7 @@
                 if (verifyResp.ok) {
                     status.innerHTML = "✅ Security Key Registered Successfully!";
                     status.style.color = "green";
+                    loadWebAuthnKeys(); // Refresh list
                 } else {
                     const err = await verifyResp.json();
                     throw new Error(err.detail);
@@ -226,6 +275,8 @@
             } catch (e) { console.error(e); }
         }
 
+        // Initial Load
         loadCerts();
+        loadWebAuthnKeys();
     </script>
     {% endblock %}

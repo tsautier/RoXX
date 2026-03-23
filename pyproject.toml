@@ -3,7 +3,7 @@ name = "roxx"
 version = "1.0.0-beta8"
 description = "Linux RADIUS Authentication Proxy"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = {text = "AGPL-3.0-or-later"}
 authors = []
 
@@ -65,8 +65,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.black]
 line-length = 100
-target-version = ['py39']
+target-version = ['py312']
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py312"

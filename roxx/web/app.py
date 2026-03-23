@@ -4,6 +4,7 @@ Replaces the old SimpleSAMLphp interface with a modern Python web app
 """
 
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect, UploadFile, File
+from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -52,10 +53,44 @@ logger = logging.getLogger("roxx.web")
 
 VERSION = "1.0.0-beta8"
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Modern Lifespan context manager for startup and shutdown events.
+    Replaces the deprecated @app.on_event system.
+    """
+    # 🏁 Startup Logic
+    from roxx.core.auth.webauthn import WebAuthnManager
+    from roxx.core.auth.cert_db import CertDatabase
+    from roxx.core.integrity import IntegrityManager
+    
+    WebAuthnManager.init()
+    CertDatabase.init_db()
+    
+    # 🛡️ Integrity Check on Startup
+    # In a production build, the expected_manifest would be signed and baked into the binary.
+    # For this phase, we generate it to ensure we start from a known good state.
+    known_good = IntegrityManager.generate_manifest()
+    # Log manifest generation for audit
+    logger.info(f"[Integrity] Manifest generated for {len(known_good)} core files.")
+    
+    # Verify initial state
+    violations = IntegrityManager.verify_integrity(known_good)
+    modified = [v['path'] for v in violations if v['status'] != 'OK']
+    if modified:
+        logger.warning(f"[Integrity] Startup verification failed for: {modified}")
+    else:
+        logger.info("[Integrity] Startup verification successful. All core files match manifest.")
+
+    yield
+    # 🛑 Shutdown Logic (if any)
+    logger.info("Cleaning up resources on shutdown...")
+
 app = FastAPI(
     title="RoXX Admin Interface",
     description="Modern web interface for RoXX RADIUS Authentication Proxy",
-    version=VERSION
+    version=VERSION,
+    lifespan=lifespan
 )
 
 # Initialize Rate Limiter
@@ -544,59 +579,11 @@ async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(
 from roxx.core.auth.webauthn import WebAuthnManager
 from fido2.utils import websafe_encode, websafe_decode
 
-@app.on_event("startup")
-async def startup_event():
-    WebAuthnManager.init()
-    from roxx.core.auth.cert_db import CertDatabase
-    CertDatabase.init_db()
-    
-    # 🛡️ Integrity Check on Startup
-    from roxx.core.integrity import IntegrityManager
-    # Note: In a production build, the expected_manifest would be signed and baked into the binary.
-    # For this phase, we generate it to ensure we start from a known good state.
-    known_good = IntegrityManager.generate_manifest()
-    # Log manifest generation for audit
-    logger.info(f"[Integrity] Manifest generated for {len(known_good)} core files.")
-    
-    # Verify initial state
-    violations = IntegrityManager.verify_integrity(known_good)
-    modified = [v['path'] for v in violations if v['status'] != 'OK']
-    if modified:
-        logger.warning(f"[Integrity] Startup verification failed for: {modified}")
-    else:
-        logger.info("[Integrity] Startup verification successful. All core files match manifest.")
 
-@app.get("/api/webauthn/register/options", dependencies=[Depends(get_current_username)])
-async def webauthn_register_options(request: Request):
-    """Generate registration options"""
-    username = await get_current_username(request)
-    # We use username as user_id for simplicity, but ideally should be stable UID
-    options, state = WebAuthnManager.generate_registration_options(username, username)
-    request.session["webauthn_state"] = state
-    return dict(options)
-
-@app.post("/api/webauthn/register/verify", dependencies=[Depends(get_current_username)])
-async def webauthn_register_verify(request: Request):
-    """Verify registration response"""
-    username = await get_current_username(request)
-    state = request.session.get("webauthn_state")
-    if not state:
-        raise HTTPException(status_code=400, detail="State not found")
-        
-    data = await request.json()
-    success, msg = WebAuthnManager.verify_registration(username, data, state)
-    
-    if success:
-        return {"success": True, "message": "Security Key Registered"}
-    else:
-        raise HTTPException(status_code=400, detail=msg)
 
 @app.get("/api/webauthn/authenticate/options")
 async def webauthn_auth_options(request: Request):
     """Generate auth options"""
-    # We need username. If doing 2FA, we have it in session.
-    # If doing passwordless, we might need to ask username first.
-    # For MFA scenario:
     session_cookie = request.cookies.get("session")
     username = None
     if session_cookie:
@@ -606,25 +593,22 @@ async def webauthn_auth_options(request: Request):
         except: pass
     
     if not username:
-        # Check mfa_username in session (set during login)
         username = request.session.get('mfa_username')
 
     if not username:
         raise HTTPException(status_code=400, detail="User context missing")
         
-    options, state = WebAuthnManager.generate_authentication_options(username)
+    options, state = WebAuthnManager.generate_authentication_options(username, rp_id=request.url.hostname)
     if not options:
          raise HTTPException(status_code=400, detail="No keys found")
          
     request.session["webauthn_auth_state"] = state
     return dict(options)
 
-
 @app.post("/api/webauthn/authenticate/verify")
 async def webauthn_auth_verify(request: Request):
     """Verify auth response"""
     state = request.session.get("webauthn_auth_state")
-    # need username again
     session_cookie = request.cookies.get("session")
     username = None
     if session_cookie:
@@ -639,17 +623,11 @@ async def webauthn_auth_verify(request: Request):
         raise HTTPException(status_code=400, detail="State or User missing")
         
     data = await request.json()
-    success, msg = WebAuthnManager.verify_authentication(username, data, state)
+    success, msg = WebAuthnManager.verify_authentication(username, data, state, rp_id=request.url.hostname)
     
     if success:
-        # If successful, we need to log them in fully or set session
-        # If this was MFA step:
         if request.session.get('mfa_username'):
-             # Perform Login
              session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
-             # We can't set cookie here easily without return Response object?
-             # Actually we return JSON. The Client JS should redirect.
-             # But we need to set the cookie in this response.
              response = JSONResponse({"success": True, "redirect": "/"})
              response.set_cookie(key="session", value=session_val, httponly=True)
              request.session.pop('mfa_username', None)
@@ -1403,6 +1381,48 @@ async def get_user_mfa_status(username: str):
         logger.error(f"Error getting MFA status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/admins/{username}/mfa/webauthn/register/options", dependencies=[Depends(get_current_username)])
+async def admin_webauthn_register_options(request: Request, username: str):
+    """Get WebAuthn registration options for an admin"""
+    from roxx.core.auth.webauthn import WebAuthnManager
+    options, state = WebAuthnManager.generate_registration_options(username, username, rp_id=request.url.hostname)
+    request.session[f"webauthn_reg_state_{username}"] = state
+    
+    # Correct serialization for FIDO2 object
+    from fido2.utils import websafe_encode
+    pk_options = options.public_key
+    return {
+        "rp": {"id": pk_options.rp.id, "name": pk_options.rp.name},
+        "user": {
+            "id": websafe_encode(pk_options.user.id), 
+            "name": pk_options.user.name, 
+            "displayName": pk_options.user.display_name
+        },
+        "challenge": websafe_encode(pk_options.challenge),
+        "pubKeyCredParams": [{"type": p.type, "alg": p.alg} for p in pk_options.pub_key_cred_params],
+        "timeout": pk_options.timeout,
+        "attestation": pk_options.attestation,
+        "authenticatorSelection": {
+            "userVerification": pk_options.authenticator_selection.user_verification if pk_options.authenticator_selection else "discouraged"
+        }
+    }
+
+@app.post("/api/admins/{username}/mfa/webauthn/register/verify", dependencies=[Depends(get_current_username)])
+async def admin_webauthn_register_verify(request: Request, username: str):
+    """Verify WebAuthn registration for an admin"""
+    data = await request.json()
+    state = request.session.get(f"webauthn_reg_state_{username}")
+    if not state:
+        raise HTTPException(status_code=400, detail="Registration state not found")
+    
+    from roxx.core.auth.webauthn import WebAuthnManager
+    success, msg = WebAuthnManager.verify_registration(username, data, state, rp_id=request.url.hostname)
+    if success:
+        request.session.pop(f"webauthn_reg_state_{username}", None)
+        return {"success": True}
+    raise HTTPException(status_code=400, detail=msg)
+
+
 # ------------------------------------------------------------------------------
 # User Management API
 # ---------------------------------------------------------------------------@app.get("/users", response_class=HTMLResponse)
@@ -1418,7 +1438,10 @@ async def get_radius_users():
     if users_file.exists():
         with open(users_file, "r") as f:
             for line in f:
-                parts = line.strip().split()
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#'):
+                    continue
+                parts = stripped.split()
                 if len(parts) >= 4:
                     users.append({
                         "username": parts[0],
@@ -1507,10 +1530,87 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 # ------------------------------------------------------------------------------
-# MFA API Endpoints
+# API Token Management
+# ------------------------------------------------------------------------------
+@app.get("/config/api-tokens", response_class=HTMLResponse)
+async def api_tokens_page(request: Request, current_user: str = Depends(get_current_username)):
+    return templates.TemplateResponse("config_api_tokens.html", get_page_context(request, current_user, "tokens"))
+
+# ------------------------------------------------------------------------------
+# MFA API Endpoints (Self-Service)
 # ------------------------------------------------------------------------------
 from roxx.core.auth.mfa import MFAManager
 from roxx.core.auth.mfa_db import MFADatabase
+
+@app.get("/api/webauthn/list")
+async def webauthn_list_self(username: str = Depends(get_current_username)):
+    """List WebAuthn credentials for current user"""
+    from roxx.core.auth.webauthn_db import WebAuthnDatabase
+    try:
+        creds = WebAuthnDatabase.list_credentials(username)
+        return {"credentials": creds}
+    except Exception as e:
+        logger.error(f"Error listing self credentials: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/totp/enroll", response_class=HTMLResponse)
+async def totp_enroll_page(request: Request, username: str = Depends(get_current_username)):
+    """TOTP Enrollment Page"""
+    return templates.TemplateResponse("totp_enroll.html", get_page_context(request, username, "mfa"))
+
+@app.get("/api/webauthn/register/options")
+async def webauthn_register_options(request: Request, username: str = Depends(get_current_username)):
+    """Registration options for self-service"""
+    from roxx.core.auth.webauthn import WebAuthnManager
+    options, state = WebAuthnManager.generate_registration_options(username, username, rp_id=request.url.hostname)
+    request.session[f"webauthn_reg_state_{username}"] = state
+    
+    from fido2.utils import websafe_encode
+    pk_options = options.public_key
+    return {
+        "publicKey": {
+            "rp": {"id": pk_options.rp.id, "name": pk_options.rp.name},
+            "user": {
+                "id": websafe_encode(pk_options.user.id), 
+                "name": pk_options.user.name, 
+                "displayName": pk_options.user.display_name
+            },
+            "challenge": websafe_encode(pk_options.challenge),
+            "pubKeyCredParams": [{"type": p.type, "alg": p.alg} for p in pk_options.pub_key_cred_params],
+            "timeout": pk_options.timeout,
+            "attestation": pk_options.attestation,
+            "authenticatorSelection": {
+                "userVerification": pk_options.authenticator_selection.user_verification if pk_options.authenticator_selection else "discouraged"
+            }
+        }
+    }
+
+@app.post("/api/webauthn/register/verify")
+async def webauthn_register_verify(request: Request, username: str = Depends(get_current_username)):
+    """Verify registration for self-service"""
+    data = await request.json()
+    state = request.session.get(f"webauthn_reg_state_{username}")
+    if not state:
+        raise HTTPException(status_code=400, detail="Registration state not found")
+    
+    from roxx.core.auth.webauthn import WebAuthnManager
+    success, msg = WebAuthnManager.verify_registration(username, data, state, rp_id=request.url.hostname)
+    if success:
+        request.session.pop(f"webauthn_reg_state_{username}", None)
+        return {"success": True}
+    raise HTTPException(status_code=400, detail=msg)
+
+@app.delete("/api/webauthn/{credential_id}", dependencies=[Depends(get_current_username)])
+async def delete_webauthn_self(credential_id: int, username: str = Depends(get_current_username)):
+    """Delete a WebAuthn credential for current user"""
+    from roxx.core.auth.webauthn_db import WebAuthnDatabase
+    try:
+        if WebAuthnDatabase.delete_credential(credential_id, username):
+            return {"success": True}
+        raise HTTPException(status_code=404, detail="Credential not found")
+    except Exception as e:
+        logger.error(f"Error deleting credential: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/mfa/enroll")
 async def mfa_enroll(request: Request, username: str = Depends(get_current_username)):
@@ -1993,6 +2093,24 @@ async def saml_acs(provider_id: int, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def silence_windows_proactor_reset():
+    """Silences noisy ConnectionResetError on Windows asyncio/proactor"""
+    import platform
+    if platform.system() == 'Windows':
+        import asyncio
+        from asyncio import proactor_events
+        
+        # Monkey patch _call_connection_lost to ignore ConnectionResetError [WinError 10054]
+        original_call_connection_lost = proactor_events._ProactorBasePipeTransport._call_connection_lost
+        def patched_call_connection_lost(self, exc):
+            try:
+                original_call_connection_lost(self, exc)
+            except (ConnectionResetError, ConnectionAbortedError):
+                pass
+        proactor_events._ProactorBasePipeTransport._call_connection_lost = patched_call_connection_lost
+
+silence_windows_proactor_reset()
+
 def main():
     import uvicorn
     from roxx.core.security.cert_manager import CertManager
@@ -2001,6 +2119,16 @@ def main():
     ca_bundle = CertManager.get_ca_paths()
     ssl_enabled = ssl_cert.exists() and ssl_key.exists()
     
+    # Auto-generate if missing (Best for Beta/QuickStart)
+    if not ssl_enabled:
+        print("[Core] No SSL Certificates found. Generating self-signed certificate...")
+        success, msg = CertManager.generate_self_signed_cert()
+        if success:
+            print(f"[Core] {msg}")
+            ssl_enabled = True
+        else:
+            print(f"[Core] Failed to generate SSL: {msg}. Falling back to HTTP.")
+
     config_kwargs = {
         "host": "0.0.0.0",
         "port": 8000,
@@ -2018,7 +2146,9 @@ def main():
             config_kwargs["ssl_ca_certs"] = str(ca_bundle)
             config_kwargs["ssl_cert_reqs"] = ssl.CERT_OPTIONAL
     else:
-        print("[Core] No SSL Certificates found. Starting in HTTP mode.")
+        print("[Core] CRITICAL ERROR: SSL is required but could not be enabled. Plaintext mode is disabled.")
+        import sys
+        sys.exit(1)
 
     uvicorn.run(**config_kwargs)
 
