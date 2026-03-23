@@ -1,8 +1,8 @@
-# RoXX - RADIUS Proxy & Admin Portal
+# RoXX (v1.0.0-beta8)
 
 **Modern RADIUS proxy with integrated admin portal, multi-factor authentication, and enterprise identity provider support.**
 
-![Version](https://img.shields.io/badge/version-1.0.0--beta7-blue)
+![Version](https://img.shields.io/badge/version-1.0.0--beta8-blue)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

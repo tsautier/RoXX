@@ -2,6 +2,14 @@
 
 All notable changes to RoXX will be documented in this file.
 
+## [1.0.0-beta8] - Unreleased
+
+### 🚀 Planned Features
+- [ ] Advanced RBAC for Admins
+- [ ] Multi-tenant support (Virtual RADIUS)
+- [ ] Integration with more MFA providers (Duo, Okta)
+- [ ] Performance optimizations for high-concurrency 802.1X
+
 ## [1.0.0-beta7] - 2026-03-22
 
 ### 🛡️ The "Competitor Killer" Update (Protection & Migration)
