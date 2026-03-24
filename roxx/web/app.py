@@ -962,7 +962,7 @@ async def config_page(request: Request, current_user: str = Depends(get_current_
 async def api_tokens_page(request: Request, current_user: str = Depends(get_current_username)):
     """API Tokens Management"""
     return templates.TemplateResponse(request, "api_tokens.html", get_page_context(
-        request, current_user, "settings"
+        request, current_user, "tokens"
     ))
 
 @app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
@@ -1807,7 +1807,9 @@ async def remove_ssl_cert():
 @app.get("/config/pki", response_class=HTMLResponse)
 async def pki_page(request: Request, username: str = Depends(get_current_username)):
     """Internal PKI Management Page"""
-    return templates.TemplateResponse(request, "pki.html", {"request": request, "username": username})
+    return templates.TemplateResponse(request, "pki.html", get_page_context(
+        request, username, "pki"
+    ))
 
 @app.get("/api/pki/status", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def get_pki_status():
@@ -1963,7 +1965,7 @@ async def config_system_post(
 async def config_nps_migration_page(request: Request, username: str = Depends(get_current_username)):
     """GET NPS Migration Assistant page"""
     return templates.TemplateResponse(request, "nps_migration.html", get_page_context(
-        request, username, "settings"
+        request, username, "nps-migration"
     ))
 
 @app.post("/api/test/email", dependencies=[Depends(require_action(Action.MANAGE_MFA))])

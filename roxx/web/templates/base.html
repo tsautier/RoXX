@@ -52,7 +52,7 @@
                 <a href="/settings/mfa" class="nav-item {% if active_page == 'mfa' %}active{% endif %}">
                     <i class="fas fa-shield-alt"></i> MFA Settings
                 </a>
-                <a href="/config/pki" class="nav-item">
+                <a href="/config/pki" class="nav-item {% if active_page == 'pki' %}active{% endif %}">
                     <i class="fas fa-certificate"></i> PKI Management
                 </a>
                 {% endif %}
@@ -76,7 +76,7 @@
                 <a href="/tools/integrations" class="nav-item {% if active_page == 'tools' %}active{% endif %}">
                     <i class="fas fa-vials"></i> Integration Tools
                 </a>
-                <a href="/config/nps-migration" class="nav-item">
+                <a href="/config/nps-migration" class="nav-item {% if active_page == 'nps-migration' %}active{% endif %}">
                     <i class="fas fa-file-import"></i> NPS Migration
                 </a>
                 {% endif %}
