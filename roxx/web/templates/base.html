@@ -38,10 +38,12 @@
                 <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
                     <i class="fas fa-home"></i> Dashboard
                 </a>
-                {% if user_role in ['superadmin', 'admin'] %}
+                {% if user_role == 'superadmin' %}
                 <a href="/admins" class="nav-item {% if active_page == 'admins' %}active{% endif %}">
                     <i class="fas fa-user-shield"></i> Admins
                 </a>
+                {% endif %}
+                {% if user_role in ['superadmin', 'admin'] %}
                 <a href="/users" class="nav-item {% if active_page == 'users' %}active{% endif %}">
                     <i class="fas fa-users"></i> RADIUS Users
                 </a>

@@ -1371,7 +1371,6 @@ async def health_check():
 @app.get("/admins", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_ADMINS))])
 async def admins_page(request: Request, current_user: str = Depends(get_current_username)):
     """Admin management page"""
-    is_admin = True # Todo: Check if super-admin? For now all admins are equal.
     admins_list = AuthManager.list_admins()
     
     return templates.TemplateResponse(request, "admins.html", get_page_context(
@@ -1379,7 +1378,7 @@ async def admins_page(request: Request, current_user: str = Depends(get_current_
         admins=admins_list
     ))
 
-@app.post("/api/admins", dependencies=[Depends(require_role(Role.SUPERADMIN))])
+@app.post("/api/admins", dependencies=[Depends(require_action(Action.MANAGE_ADMINS))])
 async def create_admin(
     request: Request,
     username: str = Form(...),
@@ -1387,17 +1386,7 @@ async def create_admin(
     auth_source: str = Form("local"),
     role: str = Form("admin")
 ):
-    """Create a new admin"""
-    # RBAC check — only superadmin can create admins
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role not in ('superadmin', 'admin'):
-        raise HTTPException(status_code=403, detail="Insufficient permissions to create admins")
-    
-    # Only superadmin can assign superadmin role
-    if role == 'superadmin' and caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Only superadmins can assign superadmin role")
-    
-    # Validation
+    """Create a new admin."""
     if auth_source == "local" and not password:
         raise HTTPException(status_code=400, detail="Password required for local auth")
     
@@ -1410,14 +1399,9 @@ async def create_admin(
     else:
         raise HTTPException(status_code=400, detail=message)
 
-@app.delete("/api/admins/{username}", dependencies=[Depends(require_role(Role.SUPERADMIN))])
+@app.delete("/api/admins/{username}", dependencies=[Depends(require_action(Action.DELETE_ADMINS))])
 async def delete_admin(username: str, request: Request, current_user: str = Depends(get_current_username)):
-    """Delete an admin (superadmin only)"""
-    # RBAC check — only superadmin can delete
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Only superadmins can delete admin accounts")
-    
+    """Delete an admin."""
     if username == current_user:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
         
@@ -1427,13 +1411,9 @@ async def delete_admin(username: str, request: Request, current_user: str = Depe
     else:
         raise HTTPException(status_code=400, detail=message)
 
-@app.put("/api/admins/{username}/role", dependencies=[Depends(require_role(Role.SUPERADMIN))])
+@app.put("/api/admins/{username}/role", dependencies=[Depends(require_action(Action.CHANGE_ROLES))])
 async def change_admin_role(username: str, request: Request, current_user: str = Depends(get_current_username)):
-    """Change an admin's role (superadmin only)"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Only superadmins can change roles")
-    
+    """Change an admin's role."""
     if username == current_user:
         raise HTTPException(status_code=400, detail="Cannot change your own role")
     

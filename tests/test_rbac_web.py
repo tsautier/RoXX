@@ -69,3 +69,26 @@ def test_require_role_enforces_superadmin(monkeypatch):
         assert False, "Expected role denial"
     except Exception as exc:
         assert getattr(exc, "status_code", None) == 403
+
+
+def test_require_action_denies_admin_role_management(monkeypatch):
+    monkeypatch.setattr("roxx.core.auth.db.AdminDatabase.get_role", lambda username: "admin")
+    request = make_request(session_auth={"username": "alice", "status": "active", "role": "superadmin"})
+
+    dependency = require_action(Action.CHANGE_ROLES)
+
+    try:
+        asyncio.run(dependency(request))
+        assert False, "Expected permission denial"
+    except Exception as exc:
+        assert getattr(exc, "status_code", None) == 403
+
+
+def test_require_action_allows_superadmin_role_management(monkeypatch):
+    monkeypatch.setattr("roxx.core.auth.db.AdminDatabase.get_role", lambda username: "superadmin")
+    request = make_request(session_auth={"username": "alice", "status": "active", "role": "auditor"})
+
+    dependency = require_action(Action.CHANGE_ROLES)
+    username = asyncio.run(dependency(request))
+
+    assert username == "alice"

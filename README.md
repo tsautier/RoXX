@@ -31,6 +31,7 @@
 - **Advanced Visibility**: Live log viewer with color-coded event tracking
 - **User Management**: Create, edit, delete admin users
 - **Audit Logs**: Complete system activity tracking
+- **RBAC**: `superadmin`, `admin`, and `auditor` roles for portal access control
 
 ---
 
@@ -95,6 +96,15 @@ Key files:
 2. Login with default credentials
 3. **Change your password** under User Settings
 
+### Understand Roles
+
+RoXX uses three admin roles:
+- `superadmin`
+- `admin`
+- `auditor`
+
+See [docs/RBAC.md](docs/RBAC.md) for the complete permission matrix and role-management rules.
+
 ### Configure MFA
 
 1. Go to **Settings → MFA Settings**
@@ -145,6 +155,7 @@ All API requests require authentication via session cookie or API token.
 GET    /api/admins              - List all admin users
 POST   /api/admins              - Create new admin user
 GET    /api/admins/{username}   - Get user details
+PUT    /api/admins/{username}/role - Change user role
 DELETE /api/admins/{username}   - Delete user
 ```
 
