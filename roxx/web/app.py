@@ -24,6 +24,7 @@ import asyncio
 import logging
 import json
 import ssl
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -738,33 +739,84 @@ async def get_backend_health():
     return await HealthManager.get_backend_status()
 
 @app.get("/api/metrics/auth", dependencies=[Depends(require_action(Action.VIEW_DASHBOARD))])
-async def get_auth_metrics():
+async def get_auth_metrics(period_hours: int = 24, granularity: str = "hour"):
     """
-    Returns real authentication success/failure metrics from the Audit Database.
+    Returns authentication success/failure metrics for the selected time window.
     """
     from roxx.core.audit.db import AuditDatabase
+    from collections import defaultdict
+
+    if period_hours not in (1, 24):
+        raise HTTPException(status_code=400, detail="Unsupported period_hours")
+    if granularity not in ("hour", "minute"):
+        raise HTTPException(status_code=400, detail="Unsupported granularity")
+
     conn = AuditDatabase.get_connection()
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    
-    # Get last 7 intervals (simulated for the chart categories)
-    # In a real app, this would be grouped by day/hour
-    stats = []
-    for i in range(7):
-        # Simulated distribution based on real DB stats if available
-        # But let's try to query real success/failure counts
-        cursor.execute("SELECT COUNT(*) FROM audit_logs WHERE action = 'LOGIN_SUCCESS'")
-        success = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM audit_logs WHERE action = 'LOGIN_FAILED'")
-        failure = cursor.fetchone()[0]
-        
-        # Add some variance for the chart logic (simulated historical data)
-        stats.append({"success": max(10, success - i*5), "failure": max(2, failure - i*2)})
-    
-    conn.close()
+
+    now = datetime.now()
+    if granularity == "hour":
+        bucket_delta = timedelta(hours=1)
+        bucket_count = period_hours
+        start_time = now - timedelta(hours=period_hours - 1)
+        first_bucket = start_time.replace(minute=0, second=0, microsecond=0)
+        category_format = "%Y-%m-%dT%H:00:00"
+    else:
+        bucket_delta = timedelta(minutes=1)
+        bucket_count = 60 if period_hours == 1 else 24 * 60
+        start_time = now - timedelta(minutes=bucket_count - 1)
+        first_bucket = start_time.replace(second=0, microsecond=0)
+        category_format = "%Y-%m-%dT%H:%M:00"
+
+    buckets = []
+    current_bucket = first_bucket
+    for _ in range(bucket_count):
+        buckets.append(current_bucket)
+        current_bucket += bucket_delta
+
+    success_counts = defaultdict(int)
+    failure_counts = defaultdict(int)
+
+    try:
+        cursor.execute(
+            """
+            SELECT timestamp, action
+            FROM audit_logs
+            WHERE action IN ('LOGIN_SUCCESS', 'LOGIN_FAILED')
+              AND timestamp >= ?
+            ORDER BY timestamp ASC
+            """,
+            (start_time.strftime("%Y-%m-%d %H:%M:%S"),)
+        )
+
+        for row in cursor.fetchall():
+            try:
+                event_time = datetime.fromisoformat(str(row["timestamp"]))
+            except ValueError:
+                continue
+
+            if granularity == "hour":
+                bucket = event_time.replace(minute=0, second=0, microsecond=0)
+            else:
+                bucket = event_time.replace(second=0, microsecond=0)
+
+            if bucket < buckets[0] or bucket > buckets[-1]:
+                continue
+
+            if row["action"] == "LOGIN_SUCCESS":
+                success_counts[bucket] += 1
+            elif row["action"] == "LOGIN_FAILED":
+                failure_counts[bucket] += 1
+    finally:
+        conn.close()
+
     return {
-        "success": [s['success'] for s in reversed(stats)],
-        "failure": [s['failure'] for s in reversed(stats)],
-        "categories": [(datetime.now() - timedelta(hours=i*2)).strftime("%Y-%m-%dT%H:00:00.000Z") for i in reversed(range(7))]
+        "success": [success_counts[bucket] for bucket in buckets],
+        "failure": [failure_counts[bucket] for bucket in buckets],
+        "categories": [bucket.strftime(category_format) for bucket in buckets],
+        "period_hours": period_hours,
+        "granularity": granularity,
     }
 
 from datetime import timedelta

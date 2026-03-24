@@ -79,7 +79,17 @@
         <div class="col-xl-8 col-lg-7">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 bg-white d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Authentication Performance (24h)</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Authentication Performance</h6>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <select id="authPeriodSelect" class="form-control form-control-sm" style="width: auto;">
+                            <option value="24">Last 24 Hours</option>
+                            <option value="1">Last Hour</option>
+                        </select>
+                        <select id="authGranularitySelect" class="form-control form-control-sm" style="width: auto;">
+                            <option value="hour">Hourly</option>
+                            <option value="minute">Minute</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="auth-success-chart" style="height: 350px;"></div>
@@ -272,6 +282,9 @@
 
     // Initialize Gauges
     document.addEventListener("DOMContentLoaded", () => {
+        const authPeriodSelect = document.getElementById('authPeriodSelect');
+        const authGranularitySelect = document.getElementById('authGranularitySelect');
+
         createGauge("chart-cpu", {{ cpu.percent }}, "#36a2eb");
         createGauge("chart-ram", {{ memory.percent }}, "#ffcd56");
         createGauge("chart-disk", {{ disk.percent }}, "#4bc0c0");
@@ -311,11 +324,27 @@
         updateHealth();
 
         // Auth Success Chart
+        let authChart = null;
+
+        function syncAuthFilterOptions() {
+            if (authPeriodSelect.value === '24' && authGranularitySelect.value === 'minute') {
+                authGranularitySelect.value = 'minute';
+            }
+        }
+
         async function updateAuthChart() {
             try {
-                const response = await fetch('/api/metrics/auth');
+                syncAuthFilterOptions();
+                const params = new URLSearchParams({
+                    period_hours: authPeriodSelect.value,
+                    granularity: authGranularitySelect.value
+                });
+                const response = await fetch(`/api/metrics/auth?${params.toString()}`);
                 const data = await response.json();
-                
+
+                const titleSuffix = data.period_hours === 24 ? 'Last 24 Hours' : 'Last Hour';
+                const curveStyle = data.granularity === 'minute' ? 'straight' : 'smooth';
+
                 var authOptions = {
                     series: [{
                         name: 'Success',
@@ -329,9 +358,14 @@
                         type: 'area',
                         toolbar: { show: false }
                     },
+                    title: {
+                        text: `${titleSuffix} (${data.granularity})`,
+                        align: 'left',
+                        style: { fontSize: '14px', fontWeight: 600 }
+                    },
                     colors: ['#28a745', '#dc3545'],
                     dataLabels: { enabled: false },
-                    stroke: { curve: 'smooth' },
+                    stroke: { curve: curveStyle },
                     xaxis: {
                         type: 'datetime',
                         categories: data.categories
@@ -340,12 +374,17 @@
                 };
 
                 const chartContainer = document.querySelector("#auth-success-chart");
-                chartContainer.innerHTML = ''; // Clear prior if any
-                var authChart = new ApexCharts(chartContainer, authOptions);
+                if (authChart) {
+                    authChart.destroy();
+                }
+                chartContainer.innerHTML = '';
+                authChart = new ApexCharts(chartContainer, authOptions);
                 authChart.render();
             } catch (err) { console.error('Metrics fetch failed:', err); }
         }
-        
+
+        authPeriodSelect.addEventListener('change', updateAuthChart);
+        authGranularitySelect.addEventListener('change', updateAuthChart);
         updateAuthChart();
     });
 
