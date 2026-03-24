@@ -73,10 +73,12 @@ async def lifespan(app: FastAPI):
     # 🏁 Startup Logic
     from roxx.core.auth.webauthn import WebAuthnManager
     from roxx.core.auth.cert_db import CertDatabase
+    from roxx.core.auth.tenant_db import TenantDatabase
     from roxx.core.integrity import IntegrityManager
     
     WebAuthnManager.init()
     CertDatabase.init_db()
+    TenantDatabase.init()
     
     # 🛡️ Integrity Check on Startup
     # In a production build, the expected_manifest would be signed and baked into the binary.
@@ -140,7 +142,7 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
         )
     
     # HTML Pages -> Template
-    return templates.TemplateResponse("429.html", {"request": request}, status_code=429)
+    return templates.TemplateResponse(request, "429.html", {"request": request}, status_code=429)
 
 # Add SessionMiddleware for MFA enrollment (needs to be before routes)
 import secrets
@@ -249,7 +251,7 @@ async def not_authenticated_exception_handler(request: Request, exc: NotAuthenti
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html", {"request": request})
 
 @app.post("/login")
 @limiter.limit("5/minute")
@@ -349,7 +351,7 @@ async def mfa_verification_page(request: Request):
     if not auth or auth.get("status") != "mfa_pending":
         return RedirectResponse(url="/login", status_code=303)
     
-    return templates.TemplateResponse("mfa_verify.html", {
+    return templates.TemplateResponse(request, "mfa_verify.html", {
         "request": request,
         "username": auth["username"]
     })
@@ -461,7 +463,7 @@ async def change_password_page(request: Request):
     if not username or status not in ['active', 'force_change']:
         return RedirectResponse("/login")
         
-    return templates.TemplateResponse("change_password.html", get_page_context(
+    return templates.TemplateResponse(request, "change_password.html", get_page_context(
         request, username, "password"
     ))
 
@@ -477,20 +479,20 @@ async def change_password(
         return RedirectResponse("/login")
 
     if new_password != confirm_password:
-        return templates.TemplateResponse("change_password.html", {
+        return templates.TemplateResponse(request, "change_password.html", {
             "request": request, "error": "New passwords do not match"
         })
 
     success, _ = AuthManager.verify_credentials(username, current_password)
     if not success:
-        return templates.TemplateResponse("change_password.html", {
+        return templates.TemplateResponse(request, "change_password.html", {
             "request": request, "error": "Current password incorrect"
         })
 
     try:
         AuthManager.change_password(username, new_password)
     except ValueError as e:
-         return templates.TemplateResponse("change_password.html", {
+         return templates.TemplateResponse(request, "change_password.html", {
             "request": request, "error": str(e)
         })
 
@@ -505,7 +507,7 @@ async def mfa_challenge_page(request: Request):
     username, status = await get_partial_user(request)
     if not username or status != "mfa_pending":
         return RedirectResponse("/login")
-    return templates.TemplateResponse("mfa_challenge.html", {"request": request})
+    return templates.TemplateResponse(request, "mfa_challenge.html", {"request": request})
 
 @app.post("/auth/mfa-challenge", response_class=HTMLResponse)
 async def mfa_challenge(request: Request, code: str = Form(...)):
@@ -519,7 +521,7 @@ async def mfa_challenge(request: Request, code: str = Form(...)):
         response.delete_cookie("session")
         return response
     
-    return templates.TemplateResponse("mfa_challenge.html", {
+    return templates.TemplateResponse(request, "mfa_challenge.html", {
         "request": request, "error": "Invalid authentication code"
     })
 
@@ -536,7 +538,7 @@ async def mfa_setup_page(request: Request):
     img.save(buf, format="PNG")
     qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
     
-    return templates.TemplateResponse("mfa_setup.html", {
+    return templates.TemplateResponse(request, "mfa_setup.html", {
         "request": request, 
         "secret": secret,
         "qr_b64": qr_b64
@@ -553,7 +555,7 @@ async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(
     
     # Error handling? Need to re-generate QR? 
     # Usually we re-render page. For simplicity, just error.
-    return templates.TemplateResponse("error.html", {"request": request, "message": "Invalid code. MFA Setup Failed."}) # Needs error.html or logic
+    return templates.TemplateResponse(request, "error.html", {"request": request, "message": "Invalid code. MFA Setup Failed."}) # Needs error.html or logic
 
 
 # ------------------------------------------------------------------------------
@@ -674,7 +676,7 @@ async def home(request: Request):
 @app.get("/totp/enroll", response_class=HTMLResponse)
 async def totp_enroll_page(request: Request, current_user: str = Depends(get_current_username)):
     """TOTP enrollment page"""
-    return templates.TemplateResponse("totp_enroll.html", get_page_context(
+    return templates.TemplateResponse(request, "totp_enroll.html", get_page_context(
         request, current_user, "mfa",
         title="TOTP Enrollment"
     ))
@@ -682,7 +684,7 @@ async def totp_enroll_page(request: Request, current_user: str = Depends(get_cur
 @app.get("/config/mfa-gateways", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def config_mfa_gateways_page(request: Request, current_user: str = Depends(get_current_username)):
     """MFA Gateways Configuration Page"""
-    return templates.TemplateResponse("config_mfa_gateways.html", get_page_context(
+    return templates.TemplateResponse(request, "config_mfa_gateways.html", get_page_context(
         request, current_user, "config",
         title="MFA Gateways"
     ))
@@ -874,7 +876,7 @@ async def dashboard(request: Request, current_user: str = Depends(get_current_us
             {"username": "admin", "role": "Local", "status": "UP", "last_login": "2024-05-22"}
         ]
     
-    return templates.TemplateResponse("dashboard.html", get_page_context(
+    return templates.TemplateResponse(request, "dashboard.html", get_page_context(
         request, current_user, "dashboard",
         radius_status=radius_status,
         os_type=SystemManager.get_os(),
@@ -906,7 +908,7 @@ async def users_page(request: Request, current_user: str = Depends(get_current_u
     except Exception:
         pass
         
-    return templates.TemplateResponse("users.html", get_page_context(
+    return templates.TemplateResponse(request, "users.html", get_page_context(
         request, current_user, "users",
         users=users_list or ["admin (demo)"]
     ))
@@ -954,21 +956,21 @@ async def delete_radius_user(username: str):
 @app.get("/config", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
 async def config_page(request: Request, current_user: str = Depends(get_current_username)):
     """Configuration page"""
-    return templates.TemplateResponse("config.html", get_page_context(
+    return templates.TemplateResponse(request, "config.html", get_page_context(
         request, current_user, "settings"
     ))
 
 @app.get("/config/api-tokens", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_API_TOKENS))])
 async def api_tokens_page(request: Request, current_user: str = Depends(get_current_username)):
     """API Tokens Management"""
-    return templates.TemplateResponse("api_tokens.html", get_page_context(
+    return templates.TemplateResponse(request, "api_tokens.html", get_page_context(
         request, current_user, "settings"
     ))
 
 @app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def mfa_settings_page(request: Request, current_user: str = Depends(get_current_username)):
     """MFA Settings Page"""
-    return templates.TemplateResponse("mfa_settings.html", get_page_context(
+    return templates.TemplateResponse(request, "mfa_settings.html", get_page_context(
         request, current_user, "mfa"
     ))
 
@@ -979,14 +981,14 @@ async def mfa_settings_page(request: Request, current_user: str = Depends(get_cu
 @app.get("/config/auth-providers", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def auth_providers_page(request: Request, current_user: str = Depends(get_current_username)):
     """Authentication providers configuration page"""
-    return templates.TemplateResponse("auth_providers.html", get_page_context(
+    return templates.TemplateResponse(request, "auth_providers.html", get_page_context(
         request, current_user, "settings"
     ))
 
 @app.get("/config/auth-providers/logs", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def auth_providers_logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """Authentication Provider Debug Logs"""
-    return templates.TemplateResponse("auth_providers_logs.html", get_page_context(
+    return templates.TemplateResponse(request, "auth_providers_logs.html", get_page_context(
         request, current_user, "settings"
     ))
 
@@ -1109,14 +1111,14 @@ async def test_auth_provider(request: Request):
 @app.get("/config/radius-backends", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def radius_backends_page(request: Request, current_user: str = Depends(get_current_username)):
     """RADIUS backends configuration page"""
-    return templates.TemplateResponse("radius_backends.html", get_page_context(
+    return templates.TemplateResponse(request, "radius_backends.html", get_page_context(
         request, current_user, "settings"
     ))
 
 @app.get("/config/radius-backends/logs", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def radius_backends_logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """RADIUS Backend Debug Logs"""
-    return templates.TemplateResponse("radius_backends_logs.html", get_page_context(
+    return templates.TemplateResponse(request, "radius_backends_logs.html", get_page_context(
         request, current_user, "settings"
     ))
 
@@ -1274,7 +1276,7 @@ async def radius_authenticate(request: Request):
 @app.get("/logs", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_LOGS))])
 async def logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """Audit Logs Viewer"""
-    return templates.TemplateResponse("logs.html", get_page_context(request, current_user, "logs"))
+    return templates.TemplateResponse(request, "logs.html", get_page_context(request, current_user, "logs"))
 
 @app.get("/api/logs", dependencies=[Depends(require_action(Action.VIEW_LOGS))])
 async def get_audit_logs(
@@ -1292,7 +1294,7 @@ async def get_audit_logs(
 @app.get("/system/observability", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
 async def system_observability_page(request: Request, current_user: str = Depends(get_current_username)):
     """System observability page for health, integrity and live diagnostics."""
-    return templates.TemplateResponse("system_observability.html", get_page_context(
+    return templates.TemplateResponse(request, "system_observability.html", get_page_context(
         request, current_user, "observability"
     ))
 
@@ -1300,7 +1302,7 @@ async def system_observability_page(request: Request, current_user: str = Depend
 @app.get("/tools/integrations", response_class=HTMLResponse, dependencies=[Depends(require_role(Role.SUPERADMIN, Role.ADMIN))])
 async def integration_tools_page(request: Request, current_user: str = Depends(get_current_username)):
     """GUI for API-only integration tooling and diagnostics."""
-    return templates.TemplateResponse("integration_tools.html", get_page_context(
+    return templates.TemplateResponse(request, "integration_tools.html", get_page_context(
         request, current_user, "tools"
     ))
 
@@ -1374,8 +1376,8 @@ async def admins_page(request: Request, current_user: str = Depends(get_current_
     is_admin = True # Todo: Check if super-admin? For now all admins are equal.
     admins_list = AuthManager.list_admins()
     
-    return templates.TemplateResponse("admins.html", get_page_context(
-        request, current_user, "users",
+    return templates.TemplateResponse(request, "admins.html", get_page_context(
+        request, current_user, "admins",
         admins=admins_list
     ))
 
@@ -1454,8 +1456,8 @@ async def change_admin_role(username: str, request: Request, current_user: str =
 @app.get("/admins/{username}/mfa", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def admin_mfa_page(username: str, request: Request, current_user: str = Depends(get_current_username)):
     """MFA management page for a specific admin user"""
-    return templates.TemplateResponse("admin_mfa.html", get_page_context(
-        request, current_user, "users",
+    return templates.TemplateResponse(request, "admin_mfa.html", get_page_context(
+        request, current_user, "admins",
         managed_username=username
     ))
 
@@ -1758,7 +1760,7 @@ async def mfa_disable(request: Request, username: str = Depends(get_current_user
 @app.get("/config/ssl", response_class=HTMLResponse)
 async def ssl_settings_page(request: Request, current_user: str = Depends(get_current_username)):
     """SSL/TLS Settings Page"""
-    return templates.TemplateResponse("ssl_settings.html", get_page_context(
+    return templates.TemplateResponse(request, "ssl_settings.html", get_page_context(
         request, current_user, "settings"
     ))
 
@@ -1807,7 +1809,7 @@ async def remove_ssl_cert():
 @app.get("/config/pki", response_class=HTMLResponse)
 async def pki_page(request: Request, username: str = Depends(get_current_username)):
     """Internal PKI Management Page"""
-    return templates.TemplateResponse("pki.html", {"request": request, "username": username})
+    return templates.TemplateResponse(request, "pki.html", {"request": request, "username": username})
 
 @app.get("/api/pki/status", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def get_pki_status():
@@ -1908,7 +1910,7 @@ async def test_sms(request: Request):
 @app.get("/config/system", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
 async def config_system_get(request: Request, username: str = Depends(get_current_username)):
     """GET system settings page"""
-    return templates.TemplateResponse("system_settings.html", get_page_context(
+    return templates.TemplateResponse(request, "system_settings.html", get_page_context(
         request, username, "settings", settings=get_system_settings_snapshot()
     ))
 
@@ -1962,7 +1964,7 @@ async def config_system_post(
 @app.get("/config/nps-migration", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def config_nps_migration_page(request: Request, username: str = Depends(get_current_username)):
     """GET NPS Migration Assistant page"""
-    return templates.TemplateResponse("nps_migration.html", get_page_context(
+    return templates.TemplateResponse(request, "nps_migration.html", get_page_context(
         request, username, "settings"
     ))
 
@@ -2204,10 +2206,6 @@ async def saml_acs(provider_id: int, request: Request):
 # ------------------------------------------------------------------------------
 from roxx.core.auth.tenant_db import TenantDatabase
 
-@app.on_event("startup")
-async def init_tenants_db():
-    TenantDatabase.init()
-
 @app.get("/config/tenants", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def tenants_page(request: Request, current_user: str = Depends(get_current_username)):
     """Tenant Management Page (superadmin only)"""
@@ -2215,7 +2213,7 @@ async def tenants_page(request: Request, current_user: str = Depends(get_current
     if caller_role != 'superadmin':
         raise HTTPException(status_code=403, detail="Superadmin access required")
     tenants = TenantDatabase.list_tenants()
-    return templates.TemplateResponse("tenants.html", get_page_context(
+    return templates.TemplateResponse(request, "tenants.html", get_page_context(
         request, current_user, "tenants", tenants=tenants
     ))
 
