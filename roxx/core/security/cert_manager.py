@@ -173,6 +173,15 @@ class CertManager:
         except Exception as e:
             return False, f"Failed to generate certificate: {str(e)}"
 
+    @classmethod
+    def remove_cert(cls) -> Tuple[bool, str]:
+        """Remove the configured server certificate and key."""
+        cert_path, key_path = cls.get_cert_paths()
+        try:
+            if cert_path.exists():
+                os.remove(cert_path)
+            if key_path.exists():
+                os.remove(key_path)
             return True, "Certificate removed."
         except Exception as e:
             return False, str(e)

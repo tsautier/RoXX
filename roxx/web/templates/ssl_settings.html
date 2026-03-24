@@ -217,13 +217,16 @@
 
         try {
             const res = await fetch('/api/system/ssl/remove', { method: 'POST' });
+            const payload = await res.json();
             if (res.ok) {
-                alert("Certificates removed. Restart server to revert to HTTP.");
+                alert(payload.message || "Certificates removed. Restart server to revert to HTTP.");
                 restartWarning.style.display = 'block';
                 loadStatus();
+            } else {
+                alert("Error: " + (payload.detail || 'Failed to remove certificate'));
             }
         } catch (e) {
-            alert("Error");
+            alert("Error: " + e.message);
         }
     }
 
@@ -240,7 +243,10 @@
         try {
             const res = await fetch('/api/system/ssl/ca', { method: 'POST', body: formData });
             const d = await res.json();
-            if (d.success) alert("CA Uploaded. Restart required.");
+            if (d.success) {
+                alert("CA Uploaded. Restart required.");
+                e.target.reset();
+            }
             else alert("Error: " + d.detail);
         } catch (e) { alert("Error: " + e.message); }
     });
@@ -249,7 +255,9 @@
         if (!confirm("Remove CA Bundle? Client Auth will be disabled.")) return;
         try {
             const res = await fetch('/api/system/ssl/ca', { method: 'DELETE' });
-            if (res.ok) alert("CA Removed. Restart required.");
+            const payload = await res.json();
+            if (res.ok) alert(payload.message || "CA Removed. Restart required.");
+            else alert("Error: " + (payload.detail || 'Failed to remove CA'));
         } catch (e) { alert("Error: " + e.message); }
     }
 

@@ -361,6 +361,7 @@
 
     function openAddModal() {
         document.getElementById('addModal').style.display = 'flex';
+        document.getElementById('testResult').textContent = '';
         updateFormFields();
     }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -477,6 +478,7 @@
                 closeModal('addModal');
                 loadBackends();
                 e.target.reset();
+                document.getElementById('testResult').textContent = '';
             } else {
                 const errData = await res.json();
                 alert("Error creating backend: " + (errData.detail || "Unknown error"));
@@ -486,8 +488,17 @@
 
     async function deleteBackend(id) {
         if (!confirm("Delete this backend?")) return;
-        await fetch(`/api/radius-backends/${id}`, { method: 'DELETE' });
-        loadBackends();
+        try {
+            const res = await fetch(`/api/radius-backends/${id}`, { method: 'DELETE' });
+            const payload = await res.json();
+            if (!res.ok || !payload.success) {
+                alert("Delete failed: " + (payload.detail || payload.message || 'Unknown error'));
+                return;
+            }
+            loadBackends();
+        } catch (error) {
+            alert("Delete failed: " + error.message);
+        }
     }
 
     async function testConnection() {

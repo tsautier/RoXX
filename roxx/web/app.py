@@ -5,7 +5,7 @@ Replaces the old SimpleSAMLphp interface with a modern Python web app
 
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect, UploadFile, File
 from contextlib import asynccontextmanager
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -229,6 +229,11 @@ async def get_current_username(request: Request):
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Basic"},
         )
+
+
+def _rethrow_http_exception(exc: Exception) -> None:
+    if isinstance(exc, HTTPException):
+        raise exc
 
 
 def _load_mfa_gateway_config() -> dict:
@@ -797,15 +802,22 @@ async def api_nps_analyze(request: Request, file: UploadFile = File(...)):
 @app.post("/api/nps/import", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def api_nps_import(request: Request):
     """API to actually import the analyzed data"""
-    data = request.session.get("nps_import_buffer")
-    if not data:
+    buffered_data = request.session.get("nps_import_buffer")
+    if not buffered_data:
         raise HTTPException(status_code=400, detail="No analyzed data found in session. Please analyze first.")
+
+    selection = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    selected_clients = set(selection.get("selected_clients", []))
+    selected_servers = set(selection.get("selected_servers", []))
     
     from roxx.core.radius_backends.config_db import RadiusBackendDB
     
     import_count = 0
     # Import Clients
-    for client in data.get("clients", []):
+    for client in buffered_data.get("clients", []):
+        client_key = f"{client['name']}|{client['address']}"
+        if selected_clients and client_key not in selected_clients:
+            continue
         success = RadiusBackendDB.add_client(
             shortname=client["name"].lower().replace(" ", "_"),
             ipaddr=client["address"],
@@ -815,20 +827,26 @@ async def api_nps_import(request: Request):
         if success: import_count += 1
     
     # Import Remote Servers as RADIUS Backends
-    for server in data.get("remote_radius_servers", []):
+    imported_backends = 0
+    for server in buffered_data.get("remote_radius_servers", []):
+        server_key = f"{server['group']}|{server['address']}"
+        if selected_servers and server_key not in selected_servers:
+            continue
         name = f"NPS_{server['group']}_{server['address']}".replace(".", "_")
-        RadiusBackendDB.create_backend(
+        success, _, _ = RadiusBackendDB.create_backend(
             backend_type='radius_server',
             name=name,
             config={"server": server["address"], "port": 1812, "secret": "TODO_MANUAL_INPUT"},
             enabled=True,
             priority=200 # Lower priority for imported servers
         )
+        if success:
+            imported_backends += 1
         
     # Clear buffer
     del request.session["nps_import_buffer"]
     
-    return {"success": True, "message": f"Successfully imported {import_count} clients and backend stubs."}
+    return {"success": True, "message": f"Successfully imported {import_count} clients and {imported_backends} backend stubs."}
 
 @app.get("/api/health/backends", dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
 async def get_backend_health():
@@ -1076,6 +1094,7 @@ async def list_auth_providers():
         providers = ConfigManager.list_providers()
         return providers
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/sys/integrity", dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
@@ -1114,6 +1133,7 @@ async def create_auth_provider(request: Request):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/auth-providers/{provider_id}", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
@@ -1137,6 +1157,7 @@ async def update_auth_provider(provider_id: int, request: Request):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/auth-providers/{provider_id}", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
@@ -1153,6 +1174,7 @@ async def delete_auth_provider(provider_id: int):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth-providers/test", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
@@ -1177,6 +1199,7 @@ async def test_auth_provider(request: Request):
         return {"success": success, "message": message}
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1206,6 +1229,7 @@ async def list_radius_backends():
         backends = RadiusBackendDB.list_backends()
         return backends
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/radius-backends", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
@@ -1237,6 +1261,7 @@ async def create_radius_backend(request: Request):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/radius-backends/{backend_id}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
@@ -1252,7 +1277,7 @@ async def update_radius_backend(backend_id: int, request: Request):
         priority = data.get('priority')
         
         success, message = RadiusBackendDB.update_backend(
-            backend_id, name=name, config_dict=config_dict, 
+            backend_id, name=name, config=config_dict,
             enabled=enabled, priority=priority
         )
         
@@ -1265,6 +1290,7 @@ async def update_radius_backend(backend_id: int, request: Request):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/radius-backends/{backend_id}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
@@ -1284,6 +1310,7 @@ async def delete_radius_backend(backend_id: int):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/radius-backends/test", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
@@ -1306,6 +1333,7 @@ async def test_radius_backend(request: Request):
         return {"success": success, "message": message}
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/radius-auth", dependencies=[Depends(get_current_username)])
@@ -1882,13 +1910,16 @@ async def upload_ssl_cert(request: Request):
             raise HTTPException(status_code=400, detail=message)
             
     except Exception as e:
+        _rethrow_http_exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/system/ssl/remove", dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def remove_ssl_cert():
     from roxx.core.security.cert_manager import CertManager
     success, msg = CertManager.remove_cert()
-    return {"success": success, "message": msg}
+    if success:
+        return {"success": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
 
 # ------------------------------------------------------------------------------
 # PKI Routes
@@ -1903,7 +1934,9 @@ async def pki_page(request: Request, username: str = Depends(get_current_usernam
 @app.get("/api/pki/status", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def get_pki_status():
     from roxx.core.security.pki import PKIManager
-    return PKIManager.get_ca_status()
+    status = PKIManager.get_ca_status()
+    status["certificates"] = PKIManager.list_certificates()
+    return status
 
 @app.post("/api/pki/init", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def init_pki():
@@ -1911,6 +1944,32 @@ async def init_pki():
     if PKIManager.create_ca():
         return {"success": True, "message": "CA Generated"}
     return {"success": False, "message": "CA already exists or failed"}
+
+@app.get("/api/pki/ca/download", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
+async def download_pki_ca():
+    from roxx.core.security.pki import PKIManager
+
+    ca_path = PKIManager.get_pki_dir() / "ca.crt"
+    if not ca_path.exists():
+        raise HTTPException(status_code=404, detail="CA certificate not found")
+    return FileResponse(path=ca_path, filename="roxx-ca.crt", media_type="application/x-x509-ca-cert")
+
+@app.get("/api/pki/certificates", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
+async def list_pki_certificates():
+    from roxx.core.security.pki import PKIManager
+
+    return {"certificates": PKIManager.list_certificates()}
+
+@app.get("/api/pki/certificates/{certificate_name}/download",
+         dependencies=[Depends(require_action(Action.MANAGE_PKI))])
+async def download_pki_certificate(certificate_name: str):
+    from roxx.core.security.pki import PKIManager
+
+    safe_name = Path(certificate_name).name
+    cert_path = PKIManager.get_pki_dir() / f"{safe_name}.crt"
+    if not cert_path.exists():
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    return FileResponse(path=cert_path, filename=cert_path.name, media_type="application/x-pem-file")
 
 # ------------------------------------------------------------------------------
 # TOTP Routes

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
+import asyncio
 import json
-
 import roxx.web.app as web_app
 
 
@@ -149,3 +149,114 @@ def test_sensitive_pages_require_auth():
     assert pki_page.status_code == 401
     assert health.status_code == 401
     assert mfa_status.status_code == 401
+
+
+def test_pki_endpoints_expose_ca_and_certificates(monkeypatch, tmp_path):
+    allow_role(monkeypatch, "superadmin")
+
+    pki_dir = tmp_path / "pki"
+    pki_dir.mkdir()
+    (pki_dir / "ca.crt").write_text("ca")
+    (pki_dir / "vpn-client.crt").write_text("cert")
+
+    monkeypatch.setattr("roxx.core.security.pki.PKIManager.get_pki_dir", classmethod(lambda cls: pki_dir))
+
+    client = TestClient(web_app.app)
+
+    status = client.get("/api/pki/status")
+    certs = client.get("/api/pki/certificates")
+    ca_download = client.get("/api/pki/ca/download")
+    cert_download = client.get("/api/pki/certificates/vpn-client/download")
+
+    assert status.status_code == 200
+    assert status.json()["exists"] is True
+    assert status.json()["certificates"][0]["name"] == "vpn-client"
+    assert certs.status_code == 200
+    assert certs.json()["certificates"][0]["name"] == "vpn-client"
+    assert ca_download.status_code == 200
+    assert cert_download.status_code == 200
+
+
+def test_radius_backend_update_uses_config_keyword(monkeypatch):
+    allow_role(monkeypatch, "superadmin")
+
+    captured = {}
+
+    monkeypatch.setattr(
+        "roxx.core.radius_backends.config_db.RadiusBackendDB.update_backend",
+        lambda backend_id, **kwargs: captured.update({"backend_id": backend_id, **kwargs}) or (True, "ok"),
+    )
+    monkeypatch.setattr("roxx.core.radius_backends.manager.reload_manager", lambda: None)
+
+    client = TestClient(web_app.app)
+    response = client.put("/api/radius-backends/42", json={
+        "name": "Updated Backend",
+        "config": {"server": "ldap://dc.example.local"},
+        "enabled": True,
+        "priority": 50,
+    })
+
+    assert response.status_code == 200
+    assert captured["backend_id"] == 42
+    assert captured["config"] == {"server": "ldap://dc.example.local"}
+    assert "config_dict" not in captured
+
+
+def test_ssl_remove_keeps_business_error_as_400(monkeypatch):
+    allow_role(monkeypatch, "superadmin")
+    monkeypatch.setattr(
+        "roxx.core.security.cert_manager.CertManager.remove_cert",
+        lambda: (False, "No certificate configured"),
+    )
+
+    client = TestClient(web_app.app)
+    response = client.post("/api/system/ssl/remove")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "No certificate configured"
+
+
+def test_nps_import_respects_selected_entries(monkeypatch):
+    class FakeRequest:
+        def __init__(self):
+            self.headers = {"content-type": "application/json"}
+            self.session = {
+                "nps_import_buffer": {
+                    "clients": [
+                        {"name": "Client A", "address": "10.0.0.1", "shared_secret": "secret-a"},
+                        {"name": "Client B", "address": "10.0.0.2", "shared_secret": "secret-b"},
+                    ],
+                    "remote_radius_servers": [
+                        {"group": "HQ", "address": "192.168.1.10"},
+                        {"group": "Branch", "address": "192.168.1.11"},
+                    ],
+                }
+            }
+
+        async def json(self):
+            return {
+                "selected_clients": ["Client A|10.0.0.1"],
+                "selected_servers": ["Branch|192.168.1.11"],
+            }
+
+    added_clients = []
+    created_backends = []
+
+    monkeypatch.setattr(
+        "roxx.core.radius_backends.config_db.RadiusBackendDB.add_client",
+        lambda shortname, ipaddr, secret, description="": added_clients.append((shortname, ipaddr, secret, description)) or True,
+    )
+    monkeypatch.setattr(
+        "roxx.core.radius_backends.config_db.RadiusBackendDB.create_backend",
+        lambda backend_type, name, config, enabled=True, priority=100: created_backends.append(
+            (backend_type, name, config, enabled, priority)
+        ) or (True, "ok", 1),
+    )
+
+    response = asyncio.run(web_app.api_nps_import(FakeRequest()))
+
+    assert response["success"] is True
+    assert len(added_clients) == 1
+    assert added_clients[0][1] == "10.0.0.1"
+    assert len(created_backends) == 1
+    assert created_backends[0][1].startswith("NPS_Branch_192_168_1_11")

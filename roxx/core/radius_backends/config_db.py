@@ -250,8 +250,10 @@ class RadiusBackendDB:
             conn = sqlite3.connect(DB_PATH)
             try:
                 query = f"UPDATE radius_backends SET {', '.join(updates)} WHERE id = ?"
-                conn.execute(query, params)
+                cursor = conn.execute(query, params)
                 conn.commit()
+                if cursor.rowcount == 0:
+                    return False, "Backend not found"
                 logger.info(f"Updated backend ID {backend_id}")
                 return True, "Backend updated successfully"
             finally:
@@ -266,8 +268,10 @@ class RadiusBackendDB:
         try:
             conn = sqlite3.connect(DB_PATH)
             try:
-                conn.execute("DELETE FROM radius_backends WHERE id = ?", (backend_id,))
+                cursor = conn.execute("DELETE FROM radius_backends WHERE id = ?", (backend_id,))
                 conn.commit()
+                if cursor.rowcount == 0:
+                    return False, "Backend not found"
                 logger.info(f"Deleted backend ID {backend_id}")
                 return True, "Backend deleted successfully"
             finally:

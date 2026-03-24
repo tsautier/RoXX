@@ -88,8 +88,9 @@
                     style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.5rem; padding: 1rem; margin-top: 1rem;">
                     <strong style="color: #1e40af; display: block; margin-bottom: 0.5rem;">Usage:</strong>
                     <code
+                        id="tokenUsageExample"
                         style="background: white; padding: 0.5rem; border-radius: 0.25rem; display: block; overflow-x: auto; font-size: 0.85rem;">
-curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/system/info
+curl -H "Authorization: Bearer YOUR_TOKEN" /api/system/info
                     </code>
                 </div>
 
@@ -207,6 +208,8 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/system/info
 
             if (data.success && data.token) {
                 document.getElementById('generatedToken').value = data.token;
+                document.getElementById('tokenUsageExample').textContent =
+                    `curl -H "Authorization: Bearer ${data.token}" ${window.location.origin}/api/system/info`;
                 document.getElementById('generateForm').style.display = 'none';
                 document.getElementById('tokenDisplay').style.display = 'block';
             } else {
@@ -219,9 +222,20 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/system/info
     }
 
     async function copyToken() {
-        const tokenInput = document.getElementById('generatedToken');
-        tokenInput.select();
-        document.execCommand('copy');
+        const tokenValue = document.getElementById('generatedToken').value;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(tokenValue);
+            } else {
+                const tokenInput = document.getElementById('generatedToken');
+                tokenInput.focus();
+                tokenInput.select();
+                document.execCommand('copy');
+            }
+        } catch (error) {
+            alert('Copy failed. Please copy the token manually.');
+            return;
+        }
 
         const btn = document.getElementById('copyBtn');
         const originalText = btn.textContent;

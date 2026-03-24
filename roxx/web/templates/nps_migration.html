@@ -40,7 +40,7 @@
                                 <div id="clientList" class="table-responsive" style="max-height: 200px; overflow-y: auto;">
                                     <table class="table table-sm table-bordered">
                                         <thead>
-                                            <tr><th>Name</th><th>Address</th></tr>
+                                            <tr><th style="width: 60px;">Import</th><th>Name</th><th>Address</th></tr>
                                         </thead>
                                         <tbody id="clientTableBody"></tbody>
                                     </table>
@@ -51,7 +51,7 @@
                                 <div id="serverList" class="table-responsive" style="max-height: 200px; overflow-y: auto;">
                                     <table class="table table-sm table-bordered">
                                         <thead>
-                                            <tr><th>Group</th><th>Address</th></tr>
+                                            <tr><th style="width: 60px;">Import</th><th>Group</th><th>Address</th></tr>
                                         </thead>
                                         <tbody id="serverTableBody"></tbody>
                                     </table>
@@ -59,9 +59,13 @@
                             </div>
                         </div>
 
+                        <div class="mt-3 text-muted" style="font-size: 0.9rem;">
+                            Review the parsed entries and uncheck anything you do not want to import.
+                        </div>
+
                         <div class="mt-4 text-right">
                             <button class="btn btn-success" onclick="confirmImport()">
-                                <i class="fas fa-check"></i> Applied Selected Configurations
+                                <i class="fas fa-check"></i> Import Selected Configurations
                             </button>
                         </div>
                     </div>
@@ -93,12 +97,20 @@ async function uploadNPS() {
             
             const clientTable = document.getElementById('clientTableBody');
             clientTable.innerHTML = data.results.clients.map(c => 
-                `<tr><td>${c.name}</td><td>${c.address}</td></tr>`
+                `<tr>
+                    <td><input type="checkbox" class="nps-client-select" value="${encodeURIComponent(`${c.name}|${c.address}`)}" checked></td>
+                    <td>${c.name}</td>
+                    <td>${c.address}</td>
+                </tr>`
             ).join('');
 
             const serverTable = document.getElementById('serverTableBody');
             serverTable.innerHTML = data.results.remote_radius_servers.map(s => 
-                `<tr><td>${s.group}</td><td>${s.address}</td></tr>`
+                `<tr>
+                    <td><input type="checkbox" class="nps-server-select" value="${encodeURIComponent(`${s.group}|${s.address}`)}" checked></td>
+                    <td>${s.group}</td>
+                    <td>${s.address}</td>
+                </tr>`
             ).join('');
         } else {
             alert("Error: " + data.detail);
@@ -109,8 +121,25 @@ async function uploadNPS() {
 }
 
 async function confirmImport() {
+    const selectedClients = Array.from(document.querySelectorAll('.nps-client-select:checked'))
+        .map(el => decodeURIComponent(el.value));
+    const selectedServers = Array.from(document.querySelectorAll('.nps-server-select:checked'))
+        .map(el => decodeURIComponent(el.value));
+
+    if (selectedClients.length === 0 && selectedServers.length === 0) {
+        alert("Select at least one client or remote server to import.");
+        return;
+    }
+
     try {
-        const response = await fetch('/api/nps/import', { method: 'POST' });
+        const response = await fetch('/api/nps/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                selected_clients: selectedClients,
+                selected_servers: selectedServers
+            })
+        });
         const data = await response.json();
         if (data.success) {
             alert(data.message);

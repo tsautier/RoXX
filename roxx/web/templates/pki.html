@@ -19,31 +19,87 @@
                 </div>
             </div>
         </div>
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Issued Certificates</h6>
+                </div>
+                <div class="card-body" id="certificatesBox">
+                    <!-- Certificate list via JS -->
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
 async function loadPKI() {
-    const response = await fetch('/api/pki/status');
-    const status = await response.json();
     const box = document.getElementById('caBox');
-    if (status.exists) {
-        box.innerHTML = `
-            <div class="alert alert-success">CA is active.</div>
-            <p><strong>Path:</strong> <code>${status.path}</code></p>
-            <button class="btn btn-info btn-sm">Download CA Certificate</button>
-        `;
-    } else {
-        box.innerHTML = `
-            <div class="alert alert-warning">No internal CA found.</div>
-            <button class="btn btn-primary" onclick="generateCA()">Initialize Internal PKI</button>
-        `;
+    const certificatesBox = document.getElementById('certificatesBox');
+
+    try {
+        const response = await fetch('/api/pki/status');
+        const status = await response.json();
+
+        if (!response.ok) {
+            throw new Error(status.detail || 'Failed to load PKI status');
+        }
+
+        if (status.exists) {
+            box.innerHTML = `
+                <div class="alert alert-success">CA is active.</div>
+                <p><strong>Path:</strong> <code>${status.path}</code></p>
+                <a class="btn btn-info btn-sm" href="/api/pki/ca/download">Download CA Certificate</a>
+            `;
+        } else {
+            box.innerHTML = `
+                <div class="alert alert-warning">No internal CA found.</div>
+                <button class="btn btn-primary" onclick="generateCA()">Initialize Internal PKI</button>
+            `;
+        }
+
+        renderCertificates(status.certificates || []);
+    } catch (error) {
+        box.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        certificatesBox.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
     }
 }
 
 async function generateCA() {
-    await fetch('/api/pki/init', { method: 'POST' });
+    const response = await fetch('/api/pki/init', { method: 'POST' });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+        alert(payload.detail || payload.message || 'Failed to initialize PKI');
+        return;
+    }
     loadPKI();
+}
+
+function renderCertificates(certificates) {
+    const box = document.getElementById('certificatesBox');
+    if (!certificates.length) {
+        box.innerHTML = '<p class="text-muted mb-0">No issued certificates found in the local PKI directory.</p>';
+        return;
+    }
+
+    box.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead>
+                    <tr><th>Name</th><th>Updated</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    ${certificates.map((cert) => `
+                        <tr>
+                            <td>${cert.name}</td>
+                            <td>${cert.created}</td>
+                            <td><a class="btn btn-outline-primary btn-sm" href="/api/pki/certificates/${encodeURIComponent(cert.name)}/download">Download</a></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 window.onload = loadPKI;
