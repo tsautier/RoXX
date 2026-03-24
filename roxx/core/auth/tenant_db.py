@@ -114,6 +114,7 @@ class TenantDatabase:
     @staticmethod
     def update_tenant(tenant_id: int, name: str = None, description: str = None, enabled: bool = None) -> Tuple[bool, str]:
         """Update tenant details"""
+        TenantDatabase.init()
         updates, params = [], []
         if name is not None:
             updates.append("name = ?")
@@ -175,6 +176,7 @@ class TenantDatabase:
     @staticmethod
     def unassign_admin(username: str, tenant_id: int) -> Tuple[bool, str]:
         """Remove admin from a tenant"""
+        TenantDatabase.init()
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 conn.execute(
