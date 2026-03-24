@@ -748,7 +748,7 @@ async def home(request: Request):
     return RedirectResponse("/dashboard")
 
 
-@app.get("/totp/enroll", response_class=HTMLResponse)
+@app.get("/totp/enroll", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def totp_enroll_page(request: Request, current_user: str = Depends(get_current_username)):
     """TOTP enrollment page"""
     return templates.TemplateResponse(request, "totp_enroll.html", get_page_context(
@@ -1084,7 +1084,7 @@ async def check_integrity():
     from roxx.core.integrity import IntegrityManager
     return {"status": "OK", "checksums": IntegrityManager.generate_manifest()}
 
-@app.get("/who-is-the-king")
+@app.get("/who-is-the-king", dependencies=[Depends(get_current_username)])
 async def crown_jewel():
     """Hidden easter egg to prove ownership"""
     return HTMLResponse("<h1>RoXX is the true king. Built by tsautier.</h1><p>RadX is a peasant.</p>")
@@ -1436,7 +1436,7 @@ async def system_info():
 
 
 
-@app.get("/health")
+@app.get("/health", dependencies=[Depends(get_current_username)])
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "roxx-web"}
@@ -1629,23 +1629,14 @@ async def admin_webauthn_register_verify(request: Request, username: str):
 active_log_websockets: List[WebSocket] = []
 
 async def get_current_username_ws(websocket: WebSocket):
-    """Verifies Basic Auth for WebSocket manually"""
-    # Browser cannot send custom headers on WS connect easily.
-    # We can read from Sec-WebSocket-Protocol or Cookie if available.
-    # For now, let's implement soft failing: if no auth, just allow (for demo) 
-    # OR better: parse Authorization header which might be sent by non-browser clients (like our test script)
-    # Browsers typically handle auth via Cookie/Session from the main page.
-    # Since we use Basic Auth, the browser caches the creds.
-    # UNFORTUNATELY, standard JS WebSocket API DOES NOT send Authorization header with the handshake automatically 
-    # unless it was conditioned by a 401 on the same origin previously.
-    # However, Python server needs to explicitly look for it.
-    
+    """Require an authenticated WebSocket session, with legacy Basic Auth fallback."""
+    auth = get_auth_context(websocket)
+    if auth and auth.get("username") and auth.get("status") == "active":
+        return auth["username"]
+
     auth_header = websocket.headers.get("authorization")
     if not auth_header:
-        # Strict mode: Reject
-        # await websocket.close(code=1008) # Policy Violation
-        # raise WebSocketDisconnect()
-        return None # Let endpoint handle rejection if critical
+        return None
 
     try:
         scheme, param = auth_header.split()
@@ -1665,14 +1656,12 @@ async def get_current_username_ws(websocket: WebSocket):
 
 @app.websocket("/ws/logs")
 async def websocket_endpoint(websocket: WebSocket):
+    username = await get_current_username_ws(websocket)
+    if not username:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
-    
-    # Check Auth manually
-    # Note: Browsers are tricky with Basic Auth + WS. 
-    # If standard browser usage relies on prior HTTP auth, the browser MIGHT send the header if the origin matched.
-    # But usually it relies on Cookies.
-    # Given we set up Basic Auth, we can try to validate. If missing, we warn but allow connection for now 
-    # to avoid breaking the Dashboard which might not send the header explicitly in JS.
     active_log_websockets.append(websocket)
     try:
         await websocket.send_text("Connected to Real-Time System Logs...")
@@ -1689,7 +1678,7 @@ async def websocket_endpoint(websocket: WebSocket):
 from roxx.core.auth.mfa import MFAManager
 from roxx.core.auth.mfa_db import MFADatabase
 
-@app.get("/api/webauthn/list")
+@app.get("/api/webauthn/list", dependencies=[Depends(get_current_username)])
 async def webauthn_list_self(username: str = Depends(get_current_username)):
     """List WebAuthn credentials for current user"""
     from roxx.core.auth.webauthn_db import WebAuthnDatabase
@@ -1700,7 +1689,7 @@ async def webauthn_list_self(username: str = Depends(get_current_username)):
         logger.error(f"Error listing self credentials: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/webauthn/register/options")
+@app.get("/api/webauthn/register/options", dependencies=[Depends(get_current_username)])
 async def webauthn_register_options(request: Request, username: str = Depends(get_current_username)):
     """Registration options for self-service"""
     from roxx.core.auth.webauthn import WebAuthnManager
@@ -1727,7 +1716,7 @@ async def webauthn_register_options(request: Request, username: str = Depends(ge
         }
     }
 
-@app.post("/api/webauthn/register/verify")
+@app.post("/api/webauthn/register/verify", dependencies=[Depends(get_current_username)])
 async def webauthn_register_verify(request: Request, username: str = Depends(get_current_username)):
     """Verify registration for self-service"""
     data = await request.json()
@@ -1754,7 +1743,7 @@ async def delete_webauthn_self(credential_id: int, username: str = Depends(get_c
         logger.error(f"Error deleting credential: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/mfa/enroll")
+@app.post("/api/mfa/enroll", dependencies=[Depends(get_current_username)])
 async def mfa_enroll(request: Request, username: str = Depends(get_current_username)):
     """Start MFA enrollment for current user"""
     secret = MFAManager.generate_secret()
@@ -1774,7 +1763,7 @@ async def mfa_enroll(request: Request, username: str = Depends(get_current_usern
         "backup_codes": plain_codes
     }
 
-@app.post("/api/mfa/verify-enrollment")
+@app.post("/api/mfa/verify-enrollment", dependencies=[Depends(get_current_username)])
 async def mfa_verify_enrollment(request: Request, token: str = Form(...), username: str = Depends(get_current_username)):
     """Verify TOTP token and complete enrollment"""
     enrollment = request.session.get('mfa_enrollment')
@@ -1791,7 +1780,7 @@ async def mfa_verify_enrollment(request: Request, token: str = Form(...), userna
     raise HTTPException(status_code=500, detail=message)
 
 
-@app.put("/api/mfa/phone")
+@app.put("/api/mfa/phone", dependencies=[Depends(get_current_username)])
 async def save_mfa_phone(request: Request, username: str = Depends(get_current_username)):
     """Save or clear the current user's SMS phone number."""
     data = await request.json()
@@ -1816,7 +1805,7 @@ async def save_mfa_phone(request: Request, username: str = Depends(get_current_u
     }
 
 
-@app.get("/api/mfa/status")
+@app.get("/api/mfa/status", dependencies=[Depends(get_current_username)])
 async def mfa_status(request: Request, username: str = Depends(get_current_username)):
     """Get MFA status for current user"""
     settings = MFADatabase.get_mfa_settings(username)
@@ -1845,7 +1834,7 @@ async def mfa_status(request: Request, username: str = Depends(get_current_usern
         "methods": ["sms"] if sms_enabled else [],
     }
 
-@app.post("/api/mfa/disable")
+@app.post("/api/mfa/disable", dependencies=[Depends(get_current_username)])
 async def mfa_disable(request: Request, username: str = Depends(get_current_username)):
     """Disable MFA for current user"""
     success, message = MFADatabase.disable_mfa(username)
@@ -1855,7 +1844,7 @@ async def mfa_disable(request: Request, username: str = Depends(get_current_user
 
 
 
-@app.get("/config/ssl", response_class=HTMLResponse)
+@app.get("/config/ssl", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def ssl_settings_page(request: Request, current_user: str = Depends(get_current_username)):
     """SSL/TLS Settings Page"""
     return templates.TemplateResponse(request, "ssl_settings.html", get_page_context(
@@ -1904,7 +1893,7 @@ async def remove_ssl_cert():
 # ------------------------------------------------------------------------------
 # PKI Routes
 # ------------------------------------------------------------------------------
-@app.get("/config/pki", response_class=HTMLResponse)
+@app.get("/config/pki", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def pki_page(request: Request, username: str = Depends(get_current_username)):
     """Internal PKI Management Page"""
     return templates.TemplateResponse(request, "pki.html", get_page_context(

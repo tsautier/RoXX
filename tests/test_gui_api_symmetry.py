@@ -135,3 +135,17 @@ def test_sms_login_otp_send(monkeypatch, tmp_path):
     assert response.json()["success"] is True
     assert captured["phone_number"] == "+33612345678"
     assert "Your RoXX code is" in captured["message"]
+
+
+def test_sensitive_pages_require_auth():
+    client = TestClient(web_app.app)
+
+    ssl_page = client.get("/config/ssl", follow_redirects=False)
+    pki_page = client.get("/config/pki", follow_redirects=False)
+    health = client.get("/health", headers={"accept": "application/json"})
+    mfa_status = client.get("/api/mfa/status", headers={"accept": "application/json"})
+
+    assert ssl_page.status_code == 401
+    assert pki_page.status_code == 401
+    assert health.status_code == 401
+    assert mfa_status.status_code == 401
