@@ -55,6 +55,11 @@ class AdminDatabase:
         except sqlite3.OperationalError:
             pass
         
+        try:
+            cursor.execute("ALTER TABLE admins ADD COLUMN role TEXT DEFAULT 'admin'")
+        except sqlite3.OperationalError:
+            pass
+        
         conn.commit()
         conn.close()
 
@@ -96,3 +101,37 @@ class AdminDatabase:
             "totp_enabled": bool(row['mfa_secret']),
             "sms_enabled": bool(row['phone_number'])
         }
+
+    @classmethod
+    def get_role(cls, username: str) -> str:
+        """Get the role for a user. Returns 'admin' as default."""
+        conn = cls.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT role FROM admins WHERE username = ?",
+            (username,)
+        ).fetchone()
+        conn.close()
+        if not row:
+            return 'admin'
+        return row['role'] or 'admin'
+
+    @classmethod
+    def set_role(cls, username: str, role: str) -> bool:
+        """Set the role for a user."""
+        valid_roles = ('superadmin', 'admin', 'auditor')
+        if role not in valid_roles:
+            logger.error(f"Invalid role '{role}'. Must be one of {valid_roles}")
+            return False
+        try:
+            conn = cls.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE admins SET role = ? WHERE username = ?", (role, username))
+            conn.commit()
+            conn.close()
+            logger.debug(f"[RBAC] Set role for {username} to {role}")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting role for {username}: {e}")
+            return False

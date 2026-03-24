@@ -36,7 +36,7 @@ class AuthProviderDatabase:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS auth_providers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                provider_type TEXT NOT NULL CHECK(provider_type IN ('ldap', 'saml', 'radius')),
+                provider_type TEXT NOT NULL CHECK(provider_type IN ('ldap', 'saml', 'radius', 'duo', 'okta')),
                 name TEXT NOT NULL,
                 enabled BOOLEAN DEFAULT 1,
                 config_json TEXT NOT NULL,
@@ -180,7 +180,7 @@ class ConfigManager:
         Returns:
             (success: bool, message: str, provider_id: int or None)
         """
-        if provider_type not in ['ldap', 'saml', 'radius']:
+        if provider_type not in ['ldap', 'saml', 'radius', 'duo', 'okta']:
             return False, "Invalid provider type", None
         
         # Validate config has required fields
@@ -336,6 +336,18 @@ class ConfigManager:
                     return False, "Port must be between 1 and 65535"
             except ValueError:
                 return False, "Port must be a number"
+        
+        elif provider_type == 'duo':
+            required = ['integration_key', 'secret_key', 'api_hostname']
+            for field in required:
+                if field not in config_dict or not config_dict[field]:
+                    return False, f"Missing required field: {field}"
+        
+        elif provider_type == 'okta':
+            required = ['org_url', 'api_token']
+            for field in required:
+                if field not in config_dict or not config_dict[field]:
+                    return False, f"Missing required field: {field}"
         
         return True, ""
     

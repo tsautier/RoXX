@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import time
 import logging
 from threading import Lock
+from collections import OrderedDict
 
 logger = logging.getLogger("roxx.radius_backends.cache")
 
@@ -28,10 +29,12 @@ class AuthCache:
         """
         self.ttl = ttl
         self.max_size = max_size
-        self._cache = {}  # {username: (password_hash, timestamp, attributes)}
+        self._cache = OrderedDict()  # LRU: {username: (password_hash, timestamp, attributes)}
         self._hits = 0
         self._misses = 0
+        self._evictions = 0
         self._lock = Lock()
+        self._get_count = 0  # For batch cleanup trigger
     
     def get(self, username: str, password: str) -> Optional[Tuple[bool, dict]]:
         """
@@ -41,6 +44,12 @@ class AuthCache:
             (success, attributes) if cached and not expired, None otherwise
         """
         with self._lock:
+            self._get_count += 1
+            
+            # Batch TTL cleanup every 50 gets
+            if self._get_count % 50 == 0:
+                self._cleanup_expired()
+            
             if username not in self._cache:
                 self._misses += 1
                 return None
@@ -51,6 +60,7 @@ class AuthCache:
             if time.time() - timestamp > self.ttl:
                 del self._cache[username]
                 logger.debug(f"Cache expired for {username}")
+                self._misses += 1
                 return None
             
             # Verify password hash matches
@@ -60,6 +70,8 @@ class AuthCache:
             if password_hash == cached_password_hash:
                 logger.debug(f"Cache hit for {username}")
                 self._hits += 1
+                # Move to end for LRU
+                self._cache.move_to_end(username)
                 return True, attributes
             else:
                 # Password changed, remove from cache
@@ -67,6 +79,15 @@ class AuthCache:
                 logger.debug(f"Password mismatch for cached {username}")
                 self._misses += 1
                 return None
+    
+    def _cleanup_expired(self):
+        """Remove all expired entries in batch"""
+        now = time.time()
+        expired = [k for k, (_, ts, _) in self._cache.items() if now - ts > self.ttl]
+        for k in expired:
+            del self._cache[k]
+        if expired:
+            logger.debug(f"Batch cleanup: removed {len(expired)} expired entries")
     
     def set(self, username: str, password: str, attributes: dict):
         """
@@ -78,13 +99,11 @@ class AuthCache:
             attributes: RADIUS attributes
         """
         with self._lock:
-            # Check cache size
-            if len(self._cache) >= self.max_size:
-                # Remove oldest entry
-                oldest_user = min(self._cache.keys(), 
-                                key=lambda k: self._cache[k][1])
-                del self._cache[oldest_user]
-                logger.debug(f"Cache full, removed {oldest_user}")
+            # LRU eviction if at capacity
+            while len(self._cache) >= self.max_size:
+                evicted_key, _ = self._cache.popitem(last=False)  # Remove oldest (LRU)
+                self._evictions += 1
+                logger.debug(f"LRU eviction: removed {evicted_key}")
             
             # Hash password for storage
             import hashlib
@@ -99,7 +118,13 @@ class AuthCache:
             self._cache.clear()
             self._hits = 0
             self._misses = 0
+            self._evictions = 0
+            self._get_count = 0
             logger.info("Cache cleared")
+    
+    def stats(self) -> dict:
+        """Get cache statistics (alias for get_stats)"""
+        return self.get_stats()
     
     def get_stats(self) -> dict:
         """Get cache statistics"""
@@ -113,5 +138,7 @@ class AuthCache:
                 'ttl': self.ttl,
                 'hits': self._hits,
                 'misses': self._misses,
-                'hit_rate': hit_rate
+                'hit_rate': round(hit_rate, 2),
+                'evictions': self._evictions,
+                'total_gets': self._get_count,
             }

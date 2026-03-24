@@ -38,27 +38,34 @@
                 <a href="/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
                     <i class="fas fa-home"></i> Dashboard
                 </a>
+                {% if user_role in ['superadmin', 'admin'] %}
                 <a href="/admins" class="nav-item {% if active_page == 'users' %}active{% endif %}">
                     <i class="fas fa-user-shield"></i> Admins
                 </a>
                 <a href="/users" class="nav-item">
                     <i class="fas fa-users"></i> RADIUS Users
                 </a>
+                {% endif %}
 
                 <div class="nav-category">Security</div>
+                {% if user_role in ['superadmin', 'admin'] %}
                 <a href="/settings/mfa" class="nav-item {% if active_page == 'mfa' %}active{% endif %}">
                     <i class="fas fa-shield-alt"></i> MFA Settings
                 </a>
                 <a href="/config/pki" class="nav-item">
                     <i class="fas fa-certificate"></i> PKI Management
                 </a>
+                {% endif %}
                 <a href="/logs" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
                     <i class="fas fa-list-alt"></i> Audit Logs
                 </a>
+                {% if user_role in ['superadmin', 'admin'] %}
                 <a href="/config/api-tokens" class="nav-item {% if active_page == 'tokens' %}active{% endif %}">
                     <i class="fas fa-key"></i> API Tokens
                 </a>
+                {% endif %}
 
+                {% if user_role in ['superadmin', 'admin'] %}
                 <div class="nav-category">System</div>
                 <a href="/config" class="nav-item">
                     <i class="fas fa-cog"></i> Config
@@ -66,6 +73,12 @@
                 <a href="/config/nps-migration" class="nav-item">
                     <i class="fas fa-file-import"></i> NPS Migration
                 </a>
+                {% if user_role == 'superadmin' %}
+                <a href="/config/tenants" class="nav-item {% if active_page == 'tenants' %}active{% endif %}">
+                    <i class="fas fa-building"></i> Tenants
+                </a>
+                {% endif %}
+                {% endif %}
                 <a href="/logout" class="nav-item text-danger">
                     <i class="fas fa-sign-out-alt"></i> Logout
                 </a>
