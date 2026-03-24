@@ -5,6 +5,8 @@ Unit tests for RADIUS backends functionality
 import pytest
 from roxx.core.radius_backends.cache import AuthCache
 from roxx.core.radius_backends.config_db import RadiusBackendDB
+from roxx.core.radius_backends.duo_backend import DuoRadiusBackend
+from roxx.core.radius_backends.okta_backend import OktaRadiusBackend
 
 
 class TestAuthCache:
@@ -189,3 +191,81 @@ class TestRadiusBackendDB:
         deleted = next((b for b in backends if b['id'] == backend_id), None)
         
         assert deleted is None
+
+
+class TestMfaRadiusBackends:
+    def test_duo_backend_push_success(self, monkeypatch):
+        class FakeDuoProvider:
+            def __init__(self, config):
+                self.config = config
+
+            def preauth(self, username):
+                return True, {"result": "auth"}
+
+            def auth(self, username, factor="push", device="auto", passcode=None):
+                assert factor == "push"
+                assert device == "auto"
+                return True, {"txid": "tx-1", "status": "pending"}
+
+            def auth_status(self, txid):
+                assert txid == "tx-1"
+                return True, {"result": "allow"}
+
+            def ping(self):
+                return True, "pong"
+
+            def check(self):
+                return True, "ok"
+
+        monkeypatch.setattr("roxx.core.radius_backends.duo_backend.DuoProvider", FakeDuoProvider)
+
+        backend = DuoRadiusBackend({
+            "name": "Duo",
+            "integration_key": "ikey",
+            "secret_key": "skey",
+            "api_hostname": "api.example.com",
+            "factor": "push",
+            "poll_interval": 0,
+            "poll_timeout": 1,
+        })
+
+        success, attrs = backend.authenticate("alice", "ignored")
+        assert success is True
+        assert attrs["Reply-Message"] == "Authenticated via Duo"
+        assert backend.test_connection() == (True, "ok")
+
+    def test_okta_backend_totp_success(self, monkeypatch):
+        class FakeOktaProvider:
+            def __init__(self, config):
+                self.config = config
+
+            def list_factors(self, username):
+                return True, [{"id": "factor-1", "factorType": "token:software:totp", "provider": "OKTA"}]
+
+            def verify_factor(self, username, factor_id, passcode=None):
+                assert factor_id == "factor-1"
+                assert passcode == "123456"
+                return True, {"factorResult": "SUCCESS"}
+
+            def poll_factor(self, poll_url):
+                return True, {"factorResult": "SUCCESS"}
+
+            def test_connection(self):
+                return True, "Connected"
+
+        monkeypatch.setattr("roxx.core.radius_backends.okta_backend.OktaProvider", FakeOktaProvider)
+
+        backend = OktaRadiusBackend({
+            "name": "Okta",
+            "org_url": "https://example.okta.com",
+            "api_token": "token",
+            "factor_type": "token:software:totp",
+            "provider": "OKTA",
+            "poll_interval": 0,
+            "poll_timeout": 1,
+        })
+
+        success, attrs = backend.authenticate("alice", "123456")
+        assert success is True
+        assert attrs["Reply-Message"] == "Authenticated via Okta"
+        assert backend.test_connection() == (True, "Connected")

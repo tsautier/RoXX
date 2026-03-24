@@ -6,6 +6,9 @@ from roxx.utils.system import SystemManager
 
 logger = logging.getLogger("roxx.auth.db")
 
+_DEFAULT_DB_PATH = SystemManager.get_config_dir() / "roxx.db"
+DB_PATH = _DEFAULT_DB_PATH
+
 class AdminDatabase:
     """
     Manages the SQLite database for Admin users.
@@ -15,7 +18,7 @@ class AdminDatabase:
     @staticmethod
     def get_db_path() -> Path:
         """Get path to the SQLite database"""
-        return SystemManager.get_config_dir() / "roxx.db"
+        return DB_PATH
 
     @classmethod
     def init_db(cls):

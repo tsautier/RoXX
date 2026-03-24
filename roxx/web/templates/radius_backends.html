@@ -104,16 +104,18 @@
             <div class="form-group">
                 <label>Type</label>
                 <select name="backend_type" id="backendTypeSelect" onchange="updateFormFields()">
-                    <option value="radius_server">Standard RADIUS Server</option>
-                    <option value="duo_security">Duo Security Proxy</option>
-                    <option value="saml">SAML Identity Provider</option>
                     <option value="ldap">LDAP / Active Directory</option>
+                    <option value="ntlm">NTLM / Active Directory</option>
+                    <option value="duo_security">Duo Security</option>
+                    <option value="okta">Okta Verify</option>
+                    <option value="sql">SQL Database</option>
+                    <option value="file">Users File</option>
                 </select>
             </div>
 
             <div class="form-group">
                 <label>Name</label>
-                <input type="text" name="name" placeholder="e.g. Okta Primary" required>
+                <input type="text" name="name" id="backendNameInput" placeholder="e.g. Active Directory LDAP" required>
             </div>
 
             <div class="form-group">
@@ -121,26 +123,160 @@
                 <input type="number" name="priority" value="100" min="1" max="999">
             </div>
 
-            <div id="radiusFields">
+            <div id="ldapFields">
                 <div class="form-group">
-                    <label>Server Host/IP</label>
-                    <input type="text" name="server_host" placeholder="192.168.1.50">
+                    <label>LDAP Server URL</label>
+                    <input type="text" name="ldap_server" placeholder="ldap://dc.example.local" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label>Auth Port</label>
-                    <input type="number" name="auth_port" value="1812">
+                    <label>Bind DN Format</label>
+                    <input type="text" name="bind_dn_format" placeholder="uid={},ou=users,dc=example,dc=local" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label>Shared Secret</label>
-                    <input type="password" name="secret">
+                    <label>Search Base</label>
+                    <input type="text" name="search_base" placeholder="ou=users,dc=example,dc=local" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label>Retries</label>
-                    <input type="number" name="retries" value="3">
+                    <label>Search Filter</label>
+                    <input type="text" name="search_filter" value="(uid={})" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label>Timeout (s)</label>
-                    <input type="number" name="timeout" value="5">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" name="use_tls">
+                        Use TLS / LDAPS
+                    </label>
+                </div>
+            </div>
+
+            <div id="sqlFields" style="display: none;">
+                <div class="form-group">
+                    <label>Database Type</label>
+                    <select name="db_type">
+                        <option value="mysql">MySQL</option>
+                        <option value="postgresql">PostgreSQL</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Database Host</label>
+                    <input type="text" name="db_host" value="localhost" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" name="db_port" value="3306">
+                </div>
+                <div class="form-group">
+                    <label>Database Name</label>
+                    <input type="text" name="database" placeholder="radius" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="db_username" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="db_password">
+                </div>
+                <div class="form-group">
+                    <label>Users Table</label>
+                    <input type="text" name="users_table" value="radusers" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Username Column</label>
+                    <input type="text" name="username_column" value="username" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Password Column</label>
+                    <input type="text" name="password_column" value="password" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Password Type</label>
+                    <select name="sql_password_type">
+                        <option value="bcrypt">bcrypt</option>
+                        <option value="plain">plain</option>
+                        <option value="sha256">sha256</option>
+                        <option value="sha1">sha1</option>
+                        <option value="md5">md5</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Attributes Table</label>
+                    <input type="text" name="attributes_table" placeholder="radreply" autocomplete="off">
+                </div>
+            </div>
+
+            <div id="duoFields" style="display: none;">
+                <div class="form-group">
+                    <label>Integration Key</label>
+                    <input type="text" name="duo_integration_key" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Secret Key</label>
+                    <input type="password" name="duo_secret_key">
+                </div>
+                <div class="form-group">
+                    <label>API Hostname</label>
+                    <input type="text" name="duo_api_hostname" placeholder="api-xxxxxxxx.duosecurity.com" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Factor</label>
+                    <select name="duo_factor">
+                        <option value="push">push</option>
+                        <option value="passcode">passcode</option>
+                        <option value="phone">phone</option>
+                        <option value="sms">sms</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Device</label>
+                    <input type="text" name="duo_device" value="auto" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Poll Timeout (s)</label>
+                    <input type="number" name="duo_poll_timeout" value="30" min="1">
+                </div>
+            </div>
+
+            <div id="oktaFields" style="display: none;">
+                <div class="form-group">
+                    <label>Organization URL</label>
+                    <input type="text" name="okta_org_url" placeholder="https://dev-xxxx.okta.com" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>API Token</label>
+                    <input type="password" name="okta_api_token">
+                </div>
+                <div class="form-group">
+                    <label>Factor Type</label>
+                    <select name="okta_factor_type">
+                        <option value="push">push</option>
+                        <option value="token:software:totp">token:software:totp</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Provider</label>
+                    <input type="text" name="okta_provider" value="OKTA" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Factor ID (optional)</label>
+                    <input type="text" name="okta_factor_id" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Poll Timeout (s)</label>
+                    <input type="number" name="okta_poll_timeout" value="30" min="1">
+                </div>
+            </div>
+
+            <div id="fileFields" style="display: none;">
+                <div class="form-group">
+                    <label>Users File Path</label>
+                    <input type="text" name="file_path" placeholder="/etc/roxx/users.conf" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Password Type</label>
+                    <select name="file_password_type">
+                        <option value="bcrypt">bcrypt</option>
+                        <option value="plain">plain</option>
+                    </select>
                 </div>
             </div>
 
@@ -187,13 +323,33 @@
             return;
         }
 
+        const backendSummary = (backend) => {
+            const config = backend.config || {};
+            if (backend.backend_type === 'ldap' || backend.backend_type === 'ntlm') {
+                return config.server || 'No LDAP server configured';
+            }
+            if (backend.backend_type === 'sql') {
+                return `${config.db_type || 'db'}://${config.host || 'localhost'}:${config.port || '?'}/${config.database || ''}`;
+            }
+            if (backend.backend_type === 'duo_security') {
+                return `${config.api_hostname || 'No Duo host'} (${config.factor || 'push'})`;
+            }
+            if (backend.backend_type === 'okta') {
+                return `${config.org_url || 'No Okta org'} (${config.factor_type || 'push'})`;
+            }
+            if (backend.backend_type === 'file') {
+                return config.file_path || 'No users file configured';
+            }
+            return 'Configuration available';
+        };
+
         container.innerHTML = backends.map(b => `
             <div class="backend-card ${b.enabled ? '' : 'disabled'}">
                 <span class="priority-badge">Pri: ${b.priority}</span>
                 <div class="backend-type">${(b.backend_type || b.type || 'unknown').replace('_', ' ')}</div>
                 <h3 style="margin-bottom: 0.5rem; padding-right: 3rem;">${b.name}</h3>
                 <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1.5rem;">
-                    ${b.config.server_host || 'No Host'} : ${b.config.auth_port || 1812}
+                    ${backendSummary(b)}
                 </p>
                 
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
@@ -203,24 +359,112 @@
         `).join('');
     }
 
-    function openAddModal() { document.getElementById('addModal').style.display = 'flex'; }
+    function openAddModal() {
+        document.getElementById('addModal').style.display = 'flex';
+        updateFormFields();
+    }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function updateFormFields() {
+        const type = document.getElementById('backendTypeSelect').value;
+        const nameInput = document.getElementById('backendNameInput');
+        const placeholderMap = {
+            ldap: 'e.g. Active Directory LDAP',
+            ntlm: 'e.g. Domain NTLM Auth',
+            duo_security: 'e.g. Duo Push Gateway',
+            okta: 'e.g. Okta Verify MFA',
+            sql: 'e.g. MySQL Radius Users',
+            file: 'e.g. Local Users File'
+        };
+
+        if (nameInput) {
+            nameInput.placeholder = placeholderMap[type] || 'e.g. Authentication Backend';
+        }
+
+        document.getElementById('ldapFields').style.display = (type === 'ldap' || type === 'ntlm') ? 'block' : 'none';
+        document.getElementById('duoFields').style.display = type === 'duo_security' ? 'block' : 'none';
+        document.getElementById('oktaFields').style.display = type === 'okta' ? 'block' : 'none';
+        document.getElementById('sqlFields').style.display = type === 'sql' ? 'block' : 'none';
+        document.getElementById('fileFields').style.display = type === 'file' ? 'block' : 'none';
+
+        const dbType = document.querySelector('select[name="db_type"]');
+        const portInput = document.querySelector('input[name="db_port"]');
+        if (dbType && portInput) {
+            dbType.onchange = () => {
+                portInput.value = dbType.value === 'postgresql' ? '5432' : '3306';
+            };
+        }
+    }
+
+    function buildBackendConfig(formData, backendType) {
+        if (backendType === 'ldap' || backendType === 'ntlm') {
+            return {
+                server: formData.get('ldap_server'),
+                bind_dn_format: formData.get('bind_dn_format'),
+                search_base: formData.get('search_base'),
+                search_filter: formData.get('search_filter') || '(uid={})',
+                use_tls: formData.get('use_tls') === 'on'
+            };
+        }
+
+        if (backendType === 'sql') {
+            return {
+                db_type: formData.get('db_type'),
+                host: formData.get('db_host'),
+                port: parseInt(formData.get('db_port')) || 3306,
+                database: formData.get('database'),
+                username: formData.get('db_username'),
+                password: formData.get('db_password'),
+                users_table: formData.get('users_table') || 'radusers',
+                username_column: formData.get('username_column') || 'username',
+                password_column: formData.get('password_column') || 'password',
+                password_type: formData.get('sql_password_type') || 'bcrypt',
+                attributes_table: formData.get('attributes_table') || null
+            };
+        }
+
+        if (backendType === 'duo_security') {
+            return {
+                integration_key: formData.get('duo_integration_key'),
+                secret_key: formData.get('duo_secret_key'),
+                api_hostname: formData.get('duo_api_hostname'),
+                factor: formData.get('duo_factor') || 'push',
+                device: formData.get('duo_device') || 'auto',
+                poll_timeout: parseInt(formData.get('duo_poll_timeout')) || 30
+            };
+        }
+
+        if (backendType === 'okta') {
+            return {
+                org_url: formData.get('okta_org_url'),
+                api_token: formData.get('okta_api_token'),
+                factor_type: formData.get('okta_factor_type') || 'push',
+                provider: formData.get('okta_provider') || 'OKTA',
+                factor_id: formData.get('okta_factor_id') || '',
+                poll_timeout: parseInt(formData.get('okta_poll_timeout')) || 30
+            };
+        }
+
+        if (backendType === 'file') {
+            return {
+                file_path: formData.get('file_path'),
+                password_type: formData.get('file_password_type') || 'bcrypt'
+            };
+        }
+
+        return {};
+    }
 
     document.getElementById('addBackendForm').onsubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
+        const backendType = formData.get('backend_type');
         const data = {
-            backend_type: formData.get('backend_type'),
+            backend_type: backendType,
             name: formData.get('name'),
             priority: parseInt(formData.get('priority')),
             enabled: true,
-            config: {
-                server_host: formData.get('server_host'),
-                auth_port: parseInt(formData.get('auth_port')),
-                secret: formData.get('secret'),
-                retries: parseInt(formData.get('retries')),
-                timeout: parseInt(formData.get('timeout'))
-            }
+            config: buildBackendConfig(formData, backendType)
         };
 
         try {
@@ -246,8 +490,38 @@
         loadBackends();
     }
 
-    // Future: impl testConnection()
+    async function testConnection() {
+        const form = document.getElementById('addBackendForm');
+        const formData = new FormData(form);
+        const backendType = formData.get('backend_type');
+        const testResult = document.getElementById('testResult');
 
+        testResult.innerHTML = '<span style="color: #0284c7;">Testing connection...</span>';
+
+        try {
+            const res = await fetch('/api/radius-backends/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    backend_type: backendType,
+                    config: buildBackendConfig(formData, backendType),
+                    test_username: null,
+                    test_password: null
+                })
+            });
+
+            const payload = await res.json();
+            if (res.ok && payload.success) {
+                testResult.innerHTML = `<span style="color: #16a34a;">${payload.message}</span>`;
+            } else {
+                testResult.innerHTML = `<span style="color: #dc2626;">${payload.detail || payload.message || 'Connection test failed'}</span>`;
+            }
+        } catch (err) {
+            testResult.innerHTML = `<span style="color: #dc2626;">${err.message}</span>`;
+        }
+    }
+
+    updateFormFields();
     loadBackends();
 </script>
 {% endblock %}

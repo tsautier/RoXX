@@ -6,6 +6,7 @@ Provides Linux-specific abstractions for system operations
 import os
 import platform
 import subprocess
+import shutil
 import psutil
 import datetime
 from pathlib import Path
@@ -242,6 +243,18 @@ class SystemManager:
         """
         Executes a system command
         """
+        if platform.system() == "Windows" and command:
+            executable = shutil.which(command[0])
+            if executable is None and command[0].lower() in {"echo", "dir", "copy", "del", "type"}:
+                return subprocess.run(
+                    " ".join(command),
+                    check=check,
+                    capture_output=capture_output,
+                    text=text,
+                    timeout=timeout,
+                    shell=True
+                )
+
         return subprocess.run(
             command,
             check=check,

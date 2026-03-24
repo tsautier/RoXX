@@ -46,8 +46,9 @@ class APITokenManager:
     def init():
         """Initialize API tokens database"""
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        
-        with sqlite3.connect(DB_PATH) as conn:
+
+        conn = sqlite3.connect(DB_PATH)
+        try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS api_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,6 +61,8 @@ class APITokenManager:
             """)
             conn.commit()
             logger.info(f"API tokens database initialized at {DB_PATH}")
+        finally:
+            conn.close()
     
     @staticmethod
     def generate_token(name: str) -> Tuple[bool, str, Optional[str]]:
@@ -82,12 +85,15 @@ class APITokenManager:
             # Hash token for storage
             token_hash = bcrypt.hashpw(raw_token.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.execute(
                     "INSERT INTO api_tokens (name, token_hash) VALUES (?, ?)",
                     (name, token_hash)
                 )
                 conn.commit()
+            finally:
+                conn.close()
             
             logger.info(f"Generated API token: {name}")
             return True, f"Token created: {name}", raw_token
@@ -110,7 +116,8 @@ class APITokenManager:
             (valid: bool, token_name: str or None)
         """
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.row_factory = sqlite3.Row
                 
                 # Get all enabled tokens
@@ -130,6 +137,8 @@ class APITokenManager:
                         
                         logger.debug(f"API token verified: {row['name']}")
                         return True, row['name']
+            finally:
+                conn.close()
             
             # No match found
             logger.warning("Invalid API token attempt")
@@ -148,7 +157,8 @@ class APITokenManager:
             List of token info dictionaries
         """
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.row_factory = sqlite3.Row
                 
                 rows = conn.execute("""
@@ -158,6 +168,8 @@ class APITokenManager:
                 """).fetchall()
                 
                 return [dict(row) for row in rows]
+            finally:
+                conn.close()
                 
         except Exception as e:
             logger.error(f"Error listing tokens: {e}")
@@ -175,7 +187,8 @@ class APITokenManager:
             (success: bool, message: str)
         """
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.execute(
                     "UPDATE api_tokens SET enabled = 0 WHERE id = ?",
                     (token_id,)
@@ -187,6 +200,8 @@ class APITokenManager:
                     return True, "Token revoked successfully"
                 else:
                     return False, "Token not found"
+            finally:
+                conn.close()
                     
         except Exception as e:
             logger.error(f"Error revoking token: {e}")
@@ -204,7 +219,8 @@ class APITokenManager:
             (success: bool, message: str)
         """
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.execute("DELETE FROM api_tokens WHERE id = ?", (token_id,))
                 conn.commit()
                 
@@ -213,6 +229,8 @@ class APITokenManager:
                     return True, "Token deleted successfully"
                 else:
                     return False, "Token not found"
+            finally:
+                conn.close()
                     
         except Exception as e:
             logger.error(f"Error deleting token: {e}")

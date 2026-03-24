@@ -31,7 +31,16 @@ from typing import List
 from roxx.core.auth.totp import TOTPAuthenticator
 from roxx.utils.system import SystemManager
 from roxx.core.auth.saml_provider import SAMLProvider
-from roxx.core.auth.rbac import Role, require_role, get_role_from_session, check_permission
+from roxx.core.auth.rbac import (
+    Role,
+    Action,
+    require_role,
+    require_action,
+    get_role_from_session,
+    get_auth_context,
+    set_auth_context,
+    clear_auth_context,
+)
 
 logger = logging.getLogger("roxx.web")
 
@@ -201,20 +210,9 @@ async def get_current_username(request: Request):
     Enforces 'active' status for general access.
     Also extracts role from cookie.
     """
-    # 1. Check Cookie
-    session_cookie = request.cookies.get("session")
-    if session_cookie:
-        try:
-            decoded = base64.b64decode(session_cookie).decode("utf-8")
-            parts = decoded.split(":")
-            if len(parts) >= 2:
-                username = parts[0]
-                status = parts[1]
-                # Only allow 'active' sessions for general routes
-                if username and status == 'active':
-                    return username
-        except:
-            pass 
+    auth = get_auth_context(request)
+    if auth and auth.get("username") and auth.get("status") == "active":
+        return auth["username"]
 
     # 2. Handle Unauthorized
     accept = request.headers.get("Accept", "")
@@ -230,16 +228,9 @@ async def get_current_username(request: Request):
 
 # Dependency for Auth Routes (allows partial auth)
 async def get_partial_user(request: Request):
-    session_cookie = request.cookies.get("session")
-    if session_cookie:
-        try:
-            decoded = base64.b64decode(session_cookie).decode("utf-8")
-            parts = decoded.split(":")
-            username = parts[0]
-            status = parts[1] if len(parts) > 1 else None
-            return username, status
-        except:
-            pass
+    auth = get_auth_context(request)
+    if auth:
+        return auth.get("username"), auth.get("status")
     return None, None
 
 
@@ -268,9 +259,9 @@ async def login(request: Request, username: str = Form(...), password: str = For
     if success:
         # Check Force Change Password
         if user_data.get("must_change_password"):
-            session_val = base64.b64encode(f"{username}:force_change".encode("utf-8")).decode("utf-8")
+            set_auth_context(request, username, "force_change")
             response = JSONResponse({"success": True, "redirect": "/auth/change-password"})
-            response.set_cookie(key="session", value=session_val, httponly=True)
+            response.delete_cookie("session")
             return response
 
         # Discovery MFA Methods
@@ -305,18 +296,16 @@ async def login(request: Request, username: str = Form(...), password: str = For
                     trusted_username = cookie_signer.loads(trusted_cookie, max_age=30*24*60*60)
                     if trusted_username == username:
                         # Trusted - Skip MFA
-                        from roxx.core.auth.db import AdminDatabase as ADB_trust
-                        trust_role = ADB_trust.get_role(username)
-                        session_val = base64.b64encode(f"{username}:active:{trust_role}".encode("utf-8")).decode("utf-8")
+                        set_auth_context(request, username, "active")
                         response = JSONResponse({"success": True, "redirect": "/"})
-                        response.set_cookie(key="session", value=session_val, httponly=True)
+                        response.delete_cookie("session")
                         AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "trusted_device"}, username=username)
                         return response
                 except: pass
 
             # MFA Required
             request.session['mfa_username'] = username # Store for verification steps
-            session_val = base64.b64encode(f"{username}:mfa_pending".encode("utf-8")).decode("utf-8")
+            set_auth_context(request, username, "mfa_pending")
             
             response = JSONResponse({
                 "success": True,
@@ -324,16 +313,14 @@ async def login(request: Request, username: str = Form(...), password: str = For
                 "username": username,
                 "mfa_methods": mfa_methods
             })
-            response.set_cookie(key="session", value=session_val, httponly=True)
+            response.delete_cookie("session")
             AuditManager.log(request, "LOGIN_MFA_REQUIRED", "INFO", {"username": username, "mfa_methods": mfa_methods}, username=username)
             return response
 
         # No MFA - Login
-        from roxx.core.auth.db import AdminDatabase
-        user_role = AdminDatabase.get_role(username)
-        session_val = base64.b64encode(f"{username}:active:{user_role}".encode("utf-8")).decode("utf-8")
+        user_role = set_auth_context(request, username, "active")["role"]
         response = JSONResponse({"success": True, "redirect": "/dashboard"})
-        response.set_cookie(key="session", value=session_val, httponly=True)
+        response.delete_cookie("session")
         AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "password_only", "role": user_role}, username=username)
         return response
     
@@ -345,6 +332,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
 async def logout(request: Request):
     response = RedirectResponse(url="/login")
     response.delete_cookie("session")
+    response.delete_cookie("roxx_session")
     AuditManager.log(request, "LOGOUT", "INFO", username=request.session.get("username"))
     request.session.clear() # Clear specific session storage if used
     # Clear MFA session data
@@ -356,23 +344,14 @@ async def logout(request: Request):
 async def mfa_verification_page(request: Request):
     """MFA verification page"""
     # Check if user has valid mfa_pending session
-    session_cookie = request.cookies.get("session")
-    if not session_cookie:
+    auth = get_auth_context(request)
+    if not auth or auth.get("status") != "mfa_pending":
         return RedirectResponse(url="/login", status_code=303)
     
-    try:
-        decoded = base64.b64decode(session_cookie).decode("utf-8")
-        username, status = decoded.split(":", 1)
-        
-        if status != "mfa_pending":
-            return RedirectResponse(url="/login", status_code=303)
-        
-        return templates.TemplateResponse("mfa_verify.html", {
-            "request": request,
-            "username": username
-        })
-    except:
-        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("mfa_verify.html", {
+        "request": request,
+        "username": auth["username"]
+    })
 
 @app.post("/auth/mfa/verify")
 @limiter.limit("5/minute")
@@ -388,16 +367,10 @@ async def mfa_verify_unified(request: Request):
     trust_device = data.get('trust_device', False)
 
     # Validate Session
-    session_cookie = request.cookies.get("session")
-    if not session_cookie:
-        raise HTTPException(status_code=401, detail="Session expired")
-    try:
-        decoded = base64.b64decode(session_cookie).decode("utf-8")
-        username, status = decoded.split(":", 1)
-        if status != "mfa_pending":
-             raise HTTPException(status_code=401, detail="Invalid session state")
-    except:
+    auth = get_auth_context(request)
+    if not auth or auth.get("status") != "mfa_pending":
         raise HTTPException(status_code=401, detail="Invalid session")
+    username = auth["username"]
 
     # Verification Logic
     verified = False
@@ -433,11 +406,9 @@ async def mfa_verify_unified(request: Request):
              request.session.pop(f"mfa_code_{mfa_type}", None)
              
     if verified:
-        from roxx.core.auth.db import AdminDatabase as ADB_mfa
-        mfa_role = ADB_mfa.get_role(username)
-        session_val = base64.b64encode(f"{username}:active:{mfa_role}".encode("utf-8")).decode("utf-8")
+        set_auth_context(request, username, "active")
         response = JSONResponse({"success": True})
-        response.set_cookie(key="session", value=session_val, httponly=True)
+        response.delete_cookie("session")
         
         # Cleanup
         request.session.pop('mfa_username', None)
@@ -456,11 +427,10 @@ async def mfa_cert_verify(request: Request):
     from roxx.core.security.cert_auth import CertAuthManager
     from roxx.core.auth.cert_db import CertDatabase
     
-    session_cookie = request.cookies.get("session")
-    try:
-        decoded = base64.b64decode(session_cookie).decode("utf-8")
-        username, status = decoded.split(":", 1)
-    except: return JSONResponse({"success": False, "detail": "Session Error"}, status_code=401)
+    auth = get_auth_context(request)
+    if not auth or auth.get("status") != "mfa_pending":
+        return JSONResponse({"success": False, "detail": "Session Error"}, status_code=401)
+    username = auth["username"]
 
     cert_info = CertAuthManager.get_cert_info(request)
     if not cert_info:
@@ -470,11 +440,9 @@ async def mfa_cert_verify(request: Request):
     stored_user = CertDatabase.get_user_by_fingerprint(cert_info['fingerprint'])
     
     if stored_user and stored_user == username:
-        from roxx.core.auth.db import AdminDatabase as ADB_cert
-        cert_role = ADB_cert.get_role(username)
-        session_val = base64.b64encode(f"{username}:active:{cert_role}".encode("utf-8")).decode("utf-8")
+        set_auth_context(request, username, "active")
         response = JSONResponse({"success": True})
-        response.set_cookie(key="session", value=session_val, httponly=True)
+        response.delete_cookie("session")
         AuditManager.log(request, "MFA_SUCCESS", "INFO", {"username": username, "method": "client_cert", "fingerprint": cert_info['fingerprint']}, username=username)
         return response
         
@@ -526,11 +494,9 @@ async def change_password(
         })
 
     # Success -> Active Session
-    from roxx.core.auth.db import AdminDatabase as ADB_chpw
-    chpw_role = ADB_chpw.get_role(username)
-    session_val = base64.b64encode(f"{username}:active:{chpw_role}".encode("utf-8")).decode("utf-8")
+    set_auth_context(request, username, "active")
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie(key="session", value=session_val, httponly=True)
+    response.delete_cookie("session")
     return response
 
 @app.get("/auth/mfa-challenge", response_class=HTMLResponse)
@@ -547,9 +513,9 @@ async def mfa_challenge(request: Request, code: str = Form(...)):
         return RedirectResponse("/login")
 
     if AuthManager.verify_mfa(username, code):
-        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        set_auth_context(request, username, "active")
         response = RedirectResponse(url="/", status_code=303)
-        response.set_cookie(key="session", value=session_val, httponly=True)
+        response.delete_cookie("session")
         return response
     
     return templates.TemplateResponse("mfa_challenge.html", {
@@ -600,13 +566,8 @@ from fido2.utils import websafe_encode, websafe_decode
 @app.get("/api/webauthn/authenticate/options")
 async def webauthn_auth_options(request: Request):
     """Generate auth options"""
-    session_cookie = request.cookies.get("session")
-    username = None
-    if session_cookie:
-        try:
-            decoded = base64.b64decode(session_cookie).decode("utf-8")
-            username, _ = decoded.split(":", 1)
-        except: pass
+    auth = get_auth_context(request)
+    username = auth.get("username") if auth else None
     
     if not username:
         username = request.session.get('mfa_username')
@@ -625,13 +586,8 @@ async def webauthn_auth_options(request: Request):
 async def webauthn_auth_verify(request: Request):
     """Verify auth response"""
     state = request.session.get("webauthn_auth_state")
-    session_cookie = request.cookies.get("session")
-    username = None
-    if session_cookie:
-        try:
-            decoded = base64.b64decode(session_cookie).decode("utf-8")
-            username, _ = decoded.split(":", 1)
-        except: pass
+    auth = get_auth_context(request)
+    username = auth.get("username") if auth else None
     if not username:
         username = request.session.get('mfa_username')
         
@@ -643,11 +599,9 @@ async def webauthn_auth_verify(request: Request):
     
     if success:
         if request.session.get('mfa_username'):
-             from roxx.core.auth.db import AdminDatabase as ADB_wa
-             wa_role = ADB_wa.get_role(username)
-             session_val = base64.b64encode(f"{username}:active:{wa_role}".encode("utf-8")).decode("utf-8")
+             set_auth_context(request, username, "active")
              response = JSONResponse({"success": True, "redirect": "/"})
-             response.set_cookie(key="session", value=session_val, httponly=True)
+             response.delete_cookie("session")
              request.session.pop('mfa_username', None)
              return response
         else:
@@ -678,7 +632,7 @@ def get_page_context(request: Request, username: str, active_page: str, **kwargs
     }
     return context
 
-@app.get("/logs-view", response_class=HTMLResponse)
+@app.get("/logs-view", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_LOGS))])
 async def logs_view_page(request: Request, current_user: str = Depends(get_current_username)):
     """System Logs Page"""
     return templates.TemplateResponse("logs.html", get_page_context(
@@ -700,7 +654,7 @@ async def totp_enroll_page(request: Request, current_user: str = Depends(get_cur
         title="TOTP Enrollment"
     ))
 
-@app.get("/config/mfa-gateways", response_class=HTMLResponse)
+@app.get("/config/mfa-gateways", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def config_mfa_gateways_page(request: Request, current_user: str = Depends(get_current_username)):
     """MFA Gateways Configuration Page"""
     return templates.TemplateResponse("config_mfa_gateways.html", get_page_context(
@@ -708,7 +662,7 @@ async def config_mfa_gateways_page(request: Request, current_user: str = Depends
         title="MFA Gateways"
     ))
 
-@app.get("/nps-migration", response_class=HTMLResponse)
+@app.get("/nps-migration", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def nps_migration_page(request: Request, current_user: str = Depends(get_current_username)):
     """NPS Migration Assistant Page"""
     return templates.TemplateResponse("nps_migration.html", get_page_context(
@@ -716,7 +670,7 @@ async def nps_migration_page(request: Request, current_user: str = Depends(get_c
         title="NPS Migration"
     ))
 
-@app.post("/api/nps/analyze")
+@app.post("/api/nps/analyze", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def api_nps_analyze(request: Request, file: UploadFile = File(...)):
     """API to analyze NPS XML file"""
     try:
@@ -741,7 +695,7 @@ async def api_nps_analyze(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/nps/import")
+@app.post("/api/nps/import", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def api_nps_import(request: Request):
     """API to actually import the analyzed data"""
     data = request.session.get("nps_import_buffer")
@@ -777,13 +731,13 @@ async def api_nps_import(request: Request):
     
     return {"success": True, "message": f"Successfully imported {import_count} clients and backend stubs."}
 
-@app.get("/api/health/backends")
+@app.get("/api/health/backends", dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
 async def get_backend_health():
     """Returns actual status of authentication backends"""
     from roxx.core.health import HealthManager
     return await HealthManager.get_backend_status()
 
-@app.get("/api/metrics/auth")
+@app.get("/api/metrics/auth", dependencies=[Depends(require_action(Action.VIEW_DASHBOARD))])
 async def get_auth_metrics():
     """
     Returns real authentication success/failure metrics from the Audit Database.
@@ -817,7 +771,7 @@ from datetime import timedelta
 
 # ... (API endpoints remain unchanged) ...
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_DASHBOARD))])
 async def dashboard(request: Request, current_user: str = Depends(get_current_username)):
     """Dashboard page"""
     import os # Added for os.name check
@@ -861,7 +815,7 @@ async def dashboard(request: Request, current_user: str = Depends(get_current_us
     ))
 
 
-@app.get("/users", response_class=HTMLResponse)
+@app.get("/users", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
 async def users_page(request: Request, current_user: str = Depends(get_current_username)):
     """User management page"""
     # Simple parse of users.conf if it exists
@@ -885,21 +839,21 @@ async def users_page(request: Request, current_user: str = Depends(get_current_u
     ))
 
 
-@app.get("/config", response_class=HTMLResponse)
+@app.get("/config", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
 async def config_page(request: Request, current_user: str = Depends(get_current_username)):
     """Configuration page"""
     return templates.TemplateResponse("config.html", get_page_context(
         request, current_user, "settings"
     ))
 
-@app.get("/config/api-tokens", response_class=HTMLResponse)
+@app.get("/config/api-tokens", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_API_TOKENS))])
 async def api_tokens_page(request: Request, current_user: str = Depends(get_current_username)):
     """API Tokens Management"""
     return templates.TemplateResponse("api_tokens.html", get_page_context(
         request, current_user, "settings"
     ))
 
-@app.get("/settings/mfa", response_class=HTMLResponse)
+@app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def mfa_settings_page(request: Request, current_user: str = Depends(get_current_username)):
     """MFA Settings Page"""
     return templates.TemplateResponse("mfa_settings.html", get_page_context(
@@ -910,21 +864,21 @@ async def mfa_settings_page(request: Request, current_user: str = Depends(get_cu
 # ------------------------------------------------------------------------------
 # Authentication Provider Configuration
 # ------------------------------------------------------------------------------
-@app.get("/config/auth-providers", response_class=HTMLResponse)
+@app.get("/config/auth-providers", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def auth_providers_page(request: Request, current_user: str = Depends(get_current_username)):
     """Authentication providers configuration page"""
     return templates.TemplateResponse("auth_providers.html", get_page_context(
         request, current_user, "settings"
     ))
 
-@app.get("/config/auth-providers/logs", response_class=HTMLResponse)
+@app.get("/config/auth-providers/logs", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def auth_providers_logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """Authentication Provider Debug Logs"""
     return templates.TemplateResponse("auth_providers_logs.html", get_page_context(
         request, current_user, "settings"
     ))
 
-@app.get("/api/auth-providers", dependencies=[Depends(get_current_username)])
+@app.get("/api/auth-providers", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def list_auth_providers():
     """List all authentication providers"""
     from roxx.core.auth.config_db import ConfigManager
@@ -935,7 +889,7 @@ async def list_auth_providers():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/sys/integrity", dependencies=[Depends(get_current_username)])
+@app.get("/api/sys/integrity", dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
 async def check_integrity():
     """Hidden integrity check for the owner"""
     from roxx.core.integrity import IntegrityManager
@@ -946,7 +900,7 @@ async def crown_jewel():
     """Hidden easter egg to prove ownership"""
     return HTMLResponse("<h1>RoXX is the true king. Built by tsautier.</h1><p>RadX is a peasant.</p>")
 
-@app.post("/api/auth-providers", dependencies=[Depends(get_current_username)])
+@app.post("/api/auth-providers", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def create_auth_provider(request: Request):
     """Create a new authentication provider"""
     from roxx.core.auth.config_db import ConfigManager
@@ -973,7 +927,7 @@ async def create_auth_provider(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/api/auth-providers/{provider_id}", dependencies=[Depends(get_current_username)])
+@app.put("/api/auth-providers/{provider_id}", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def update_auth_provider(provider_id: int, request: Request):
     """Update an authentication provider"""
     from roxx.core.auth.config_db import ConfigManager
@@ -996,7 +950,7 @@ async def update_auth_provider(provider_id: int, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/auth-providers/{provider_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/auth-providers/{provider_id}", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def delete_auth_provider(provider_id: int):
     """Delete an authentication provider"""
     from roxx.core.auth.config_db import ConfigManager
@@ -1012,7 +966,7 @@ async def delete_auth_provider(provider_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/auth-providers/test", dependencies=[Depends(get_current_username)])
+@app.post("/api/auth-providers/test", dependencies=[Depends(require_action(Action.MANAGE_AUTH_PROVIDERS))])
 async def test_auth_provider(request: Request):
     """Test authentication provider configuration"""
     from roxx.core.auth.config_db import ConfigManager
@@ -1040,21 +994,21 @@ async def test_auth_provider(request: Request):
 # ------------------------------------------------------------------------------
 # RADIUS User Authentication Backends
 # ------------------------------------------------------------------------------
-@app.get("/config/radius-backends", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+@app.get("/config/radius-backends", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def radius_backends_page(request: Request, current_user: str = Depends(get_current_username)):
     """RADIUS backends configuration page"""
     return templates.TemplateResponse("radius_backends.html", get_page_context(
         request, current_user, "settings"
     ))
 
-@app.get("/config/radius-backends/logs", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+@app.get("/config/radius-backends/logs", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def radius_backends_logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """RADIUS Backend Debug Logs"""
     return templates.TemplateResponse("radius_backends_logs.html", get_page_context(
         request, current_user, "settings"
     ))
 
-@app.get("/api/radius-backends", dependencies=[Depends(get_current_username)])
+@app.get("/api/radius-backends", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def list_radius_backends():
     """List all RADIUS backends"""
     from roxx.core.radius_backends.config_db import RadiusBackendDB
@@ -1065,7 +1019,7 @@ async def list_radius_backends():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/radius-backends", dependencies=[Depends(get_current_username)])
+@app.post("/api/radius-backends", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def create_radius_backend(request: Request):
     """Create a new RADIUS backend"""
     from roxx.core.radius_backends.config_db import RadiusBackendDB
@@ -1096,7 +1050,7 @@ async def create_radius_backend(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/api/radius-backends/{backend_id}", dependencies=[Depends(get_current_username)])
+@app.put("/api/radius-backends/{backend_id}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def update_radius_backend(backend_id: int, request: Request):
     """Update a RADIUS backend"""
     from roxx.core.radius_backends.config_db import RadiusBackendDB
@@ -1124,7 +1078,7 @@ async def update_radius_backend(backend_id: int, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/radius-backends/{backend_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/radius-backends/{backend_id}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def delete_radius_backend(backend_id: int):
     """Delete a RADIUS backend"""
     from roxx.core.radius_backends.config_db import RadiusBackendDB
@@ -1143,7 +1097,7 @@ async def delete_radius_backend(backend_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/radius-backends/test", dependencies=[Depends(get_current_username)])
+@app.post("/api/radius-backends/test", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def test_radius_backend(request: Request):
     """Test RADIUS backend configuration"""
     from roxx.core.radius_backends.manager import RadiusBackendManager
@@ -1227,13 +1181,13 @@ async def get_audit_logs(
 # ------------------------------------------------------------------------------
 # API Tokens Management
 # ------------------------------------------------------------------------------
-@app.get("/api/tokens", dependencies=[Depends(get_current_username)])
+@app.get("/api/tokens", dependencies=[Depends(require_action(Action.MANAGE_API_TOKENS))])
 async def list_api_tokens():
     """List all API tokens (admin only)"""
     tokens = APITokenManager.list_tokens()
     return {"tokens": tokens}
 
-@app.post("/api/tokens", dependencies=[Depends(get_current_username)])
+@app.post("/api/tokens", dependencies=[Depends(require_action(Action.MANAGE_API_TOKENS))])
 async def generate_api_token(request: Request):
     """Generate a new API token"""
     data = await request.json()
@@ -1249,7 +1203,7 @@ async def generate_api_token(request: Request):
     else:
         raise HTTPException(status_code=400, detail=message)
 
-@app.delete("/api/tokens/{token_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/tokens/{token_id}", dependencies=[Depends(require_action(Action.MANAGE_API_TOKENS))])
 async def revoke_api_token(token_id: int, hard_delete: bool = False):
     """Revoke or Delete an API token"""
     if hard_delete:
@@ -1264,7 +1218,7 @@ async def revoke_api_token(token_id: int, hard_delete: bool = False):
 
 
 
-@app.get("/api/system/info", dependencies=[Depends(get_current_username)])
+@app.get("/api/system/info", dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
 async def system_info():
     """Get system information"""
     return JSONResponse({
@@ -1286,7 +1240,7 @@ async def health_check():
 # ------------------------------------------------------------------------------
 # Admin Management API
 # ------------------------------------------------------------------------------
-@app.get("/admins", response_class=HTMLResponse)
+@app.get("/admins", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_ADMINS))])
 async def admins_page(request: Request, current_user: str = Depends(get_current_username)):
     """Admin management page"""
     is_admin = True # Todo: Check if super-admin? For now all admins are equal.
@@ -1297,7 +1251,7 @@ async def admins_page(request: Request, current_user: str = Depends(get_current_
         admins=admins_list
     ))
 
-@app.post("/api/admins", dependencies=[Depends(get_current_username)])
+@app.post("/api/admins", dependencies=[Depends(require_role(Role.SUPERADMIN))])
 async def create_admin(
     request: Request,
     username: str = Form(...),
@@ -1328,7 +1282,7 @@ async def create_admin(
     else:
         raise HTTPException(status_code=400, detail=message)
 
-@app.delete("/api/admins/{username}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/admins/{username}", dependencies=[Depends(require_role(Role.SUPERADMIN))])
 async def delete_admin(username: str, request: Request, current_user: str = Depends(get_current_username)):
     """Delete an admin (superadmin only)"""
     # RBAC check — only superadmin can delete
@@ -1345,7 +1299,7 @@ async def delete_admin(username: str, request: Request, current_user: str = Depe
     else:
         raise HTTPException(status_code=400, detail=message)
 
-@app.put("/api/admins/{username}/role", dependencies=[Depends(get_current_username)])
+@app.put("/api/admins/{username}/role", dependencies=[Depends(require_role(Role.SUPERADMIN))])
 async def change_admin_role(username: str, request: Request, current_user: str = Depends(get_current_username)):
     """Change an admin's role (superadmin only)"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -1369,7 +1323,7 @@ async def change_admin_role(username: str, request: Request, current_user: str =
 # ------------------------------------------------------------------------------
 # MFA Credential Management API
 # ------------------------------------------------------------------------------
-@app.get("/admins/{username}/mfa", response_class=HTMLResponse)
+@app.get("/admins/{username}/mfa", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def admin_mfa_page(username: str, request: Request, current_user: str = Depends(get_current_username)):
     """MFA management page for a specific admin user"""
     return templates.TemplateResponse("admin_mfa.html", get_page_context(
@@ -1377,7 +1331,7 @@ async def admin_mfa_page(username: str, request: Request, current_user: str = De
         managed_username=username
     ))
 
-@app.get("/api/admins/{username}/mfa/credentials", dependencies=[Depends(get_current_username)])
+@app.get("/api/admins/{username}/mfa/credentials", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def list_user_mfa_credentials(username: str):
     """List all WebAuthn credentials for a user"""
     from roxx.core.auth.webauthn_db import WebAuthnDatabase
@@ -1395,7 +1349,7 @@ async def list_user_mfa_credentials(username: str):
         logger.error(f"Error listing credentials: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/admins/{username}/mfa/webauthn/{credential_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/admins/{username}/mfa/webauthn/{credential_id}", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def delete_webauthn_credential(username: str, credential_id: int):
     """Delete a specific WebAuthn credential"""
     from roxx.core.auth.webauthn_db import WebAuthnDatabase
@@ -1409,7 +1363,7 @@ async def delete_webauthn_credential(username: str, credential_id: int):
         logger.error(f"Error deleting credential: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/admins/{username}/mfa/totp/reset", dependencies=[Depends(get_current_username)])
+@app.post("/api/admins/{username}/mfa/totp/reset", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def reset_user_totp(username: str):
     """Reset TOTP MFA for a user"""
     from roxx.core.auth.db import AdminDatabase
@@ -1423,7 +1377,7 @@ async def reset_user_totp(username: str):
         logger.error(f"Error resetting TOTP: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/admins/{username}/mfa/status", dependencies=[Depends(get_current_username)])
+@app.get("/api/admins/{username}/mfa/status", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def get_user_mfa_status(username: str):
     """Get MFA status for a user"""
     from roxx.core.auth.db import AdminDatabase
@@ -1441,7 +1395,7 @@ async def get_user_mfa_status(username: str):
         logger.error(f"Error getting MFA status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/admins/{username}/mfa/webauthn/register/options", dependencies=[Depends(get_current_username)])
+@app.get("/api/admins/{username}/mfa/webauthn/register/options", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def admin_webauthn_register_options(request: Request, username: str):
     """Get WebAuthn registration options for an admin"""
     from roxx.core.auth.webauthn import WebAuthnManager
@@ -1467,7 +1421,7 @@ async def admin_webauthn_register_options(request: Request, username: str):
         }
     }
 
-@app.post("/api/admins/{username}/mfa/webauthn/register/verify", dependencies=[Depends(get_current_username)])
+@app.post("/api/admins/{username}/mfa/webauthn/register/verify", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def admin_webauthn_register_verify(request: Request, username: str):
     """Verify WebAuthn registration for an admin"""
     data = await request.json()
@@ -1490,7 +1444,7 @@ async def users_page(request: Request, username: str = Depends(get_current_usern
     """RADIUS User Management Page"""
     return templates.TemplateResponse("users.html", {"request": request, "username": username})
 
-@app.get("/api/users", dependencies=[Depends(get_current_username)])
+@app.get("/api/users", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
 async def get_radius_users():
     """List local RADIUS users from users.conf"""
     users_file = SystemManager.get_config_dir() / "users.conf"
@@ -1511,7 +1465,7 @@ async def get_radius_users():
                     })
     return users
 
-@app.post("/api/users", dependencies=[Depends(get_current_username)])
+@app.post("/api/users", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
 async def add_radius_user(request: Request):
     data = await request.json()
     username = data.get("username")
@@ -1520,7 +1474,7 @@ async def add_radius_user(request: Request):
         return {"success": True}
     return {"success": False}
 
-@app.delete("/api/users/{username}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/users/{username}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
 async def delete_radius_user(username: str):
     if SystemManager.delete_radius_user(username):
         return {"success": True}
@@ -1660,7 +1614,7 @@ async def webauthn_register_verify(request: Request, username: str = Depends(get
         return {"success": True}
     raise HTTPException(status_code=400, detail=msg)
 
-@app.delete("/api/webauthn/{credential_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/webauthn/{credential_id}", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def delete_webauthn_self(credential_id: int, username: str = Depends(get_current_username)):
     """Delete a WebAuthn credential for current user"""
     from roxx.core.auth.webauthn_db import WebAuthnDatabase
@@ -1737,12 +1691,12 @@ async def ssl_settings_page(request: Request, current_user: str = Depends(get_cu
         request, current_user, "settings"
     ))
 
-@app.get("/api/system/ssl/status", dependencies=[Depends(get_current_username)])
+@app.get("/api/system/ssl/status", dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def get_ssl_status():
     from roxx.core.security.cert_manager import CertManager
     return CertManager.get_status()
 
-@app.post("/api/system/ssl/upload", dependencies=[Depends(get_current_username)])
+@app.post("/api/system/ssl/upload", dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def upload_ssl_cert(request: Request):
     from roxx.core.security.cert_manager import CertManager
     
@@ -1770,7 +1724,7 @@ async def upload_ssl_cert(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/system/ssl/remove", dependencies=[Depends(get_current_username)])
+@app.post("/api/system/ssl/remove", dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def remove_ssl_cert():
     from roxx.core.security.cert_manager import CertManager
     success, msg = CertManager.remove_cert()
@@ -1784,12 +1738,12 @@ async def pki_page(request: Request, username: str = Depends(get_current_usernam
     """Internal PKI Management Page"""
     return templates.TemplateResponse("pki.html", {"request": request, "username": username})
 
-@app.get("/api/pki/status", dependencies=[Depends(get_current_username)])
+@app.get("/api/pki/status", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def get_pki_status():
     from roxx.core.security.pki import PKIManager
     return PKIManager.get_ca_status()
 
-@app.post("/api/pki/init", dependencies=[Depends(get_current_username)])
+@app.post("/api/pki/init", dependencies=[Depends(require_action(Action.MANAGE_PKI))])
 async def init_pki():
     from roxx.core.security.pki import PKIManager
     if PKIManager.create_ca():
@@ -1799,7 +1753,7 @@ async def init_pki():
 # ------------------------------------------------------------------------------
 # TOTP Routes
 # ------------------------------------------------------------------------------
-@app.post("/api/totp/generate-qr", dependencies=[Depends(get_current_username)])
+@app.post("/api/totp/generate-qr", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def generate_totp_qr(request: Request):
     """Generate a new TOTP secret and QR code"""
     username = await get_current_username(request)
@@ -1838,7 +1792,7 @@ async def generate_totp_qr(request: Request):
 # ------------------------------------------------------------------------------
 from roxx.core.auth.sms import SMSProvider
 
-@app.get("/api/config/mfa-gateways", dependencies=[Depends(get_current_username)])
+@app.get("/api/config/mfa-gateways", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def get_mfa_gateways():
     # Load from system config (mocked or JSON file)
     # Ideally should use a proper ConfigManager
@@ -1850,14 +1804,14 @@ async def get_mfa_gateways():
         "email": {"enabled": False}
     }
 
-@app.post("/api/config/mfa-gateways", dependencies=[Depends(get_current_username)])
+@app.post("/api/config/mfa-gateways", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def save_mfa_gateways(request: Request):
     data = await request.json()
     config_path = SystemManager.get_config_dir() / "mfa_gateways.json"
     config_path.write_text(json.dumps(data, indent=2))
     return {"success": True}
 
-@app.post("/api/test/sms", dependencies=[Depends(get_current_username)])
+@app.post("/api/test/sms", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def test_sms(request: Request):
     data = await request.json()
     phone = data.get("phone")
@@ -1920,7 +1874,7 @@ async def nps_migration_page(request: Request, username: str = Depends(get_curre
     """GET NPS Migration Assistant page"""
     return templates.TemplateResponse("nps_migration.html", {"request": request, "username": username})
 
-@app.post("/api/test/email", dependencies=[Depends(get_current_username)])
+@app.post("/api/test/email", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def test_email(request: Request):
     from roxx.core.auth.email import EmailProvider
     data = await request.json()
@@ -1947,7 +1901,7 @@ async def test_email(request: Request):
     result = await EmailProvider.send_email(email, subject, body, config)
     return {"success": result}
 
-@app.post("/api/mfa/cert/register", dependencies=[Depends(get_current_username)])
+@app.post("/api/mfa/cert/register", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def register_client_cert(request: Request):
     from roxx.core.security.cert_auth import CertAuthManager
     from roxx.core.auth.cert_db import CertDatabase
@@ -1962,13 +1916,13 @@ async def register_client_cert(request: Request):
     CertDatabase.add_cert(username, cert_info['fingerprint'], cert_info['common_name'], cert_info['issuer'], f"Registered: {datetime.now().strftime('%Y-%m-%d')}")
     return {"success": True, "message": "Certificate linked successfully"}
 
-@app.get("/api/mfa/cert/list", dependencies=[Depends(get_current_username)])
+@app.get("/api/mfa/cert/list", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def list_client_certs(request: Request):
     from roxx.core.auth.cert_db import CertDatabase
     username = await get_current_username(request)
     return CertDatabase.get_user_certs(username)
 
-@app.delete("/api/mfa/cert/{cert_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/mfa/cert/{cert_id}", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def delete_client_cert(cert_id: int, request: Request):
     from roxx.core.auth.cert_db import CertDatabase
     username = await get_current_username(request)
@@ -1976,7 +1930,7 @@ async def delete_client_cert(cert_id: int, request: Request):
         return {"success": True}
     raise HTTPException(status_code=404, detail="Certificate not found")
 
-@app.post("/api/system/ssl/ca", dependencies=[Depends(get_current_username)])
+@app.post("/api/system/ssl/ca", dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def upload_ca_bundle(file: UploadFile = File(...)):
     from roxx.core.security.cert_manager import CertManager
     content = (await file.read()).decode('utf-8')
@@ -1985,7 +1939,7 @@ async def upload_ca_bundle(file: UploadFile = File(...)):
         return {"success": True, "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
-@app.delete("/api/system/ssl/ca", dependencies=[Depends(get_current_username)])
+@app.delete("/api/system/ssl/ca", dependencies=[Depends(require_action(Action.MANAGE_SSL))])
 async def remove_ca_bundle():
     from roxx.core.security.cert_manager import CertManager
     success, msg = CertManager.remove_ca()
@@ -2131,14 +2085,12 @@ async def saml_acs(provider_id: int, request: Request):
             AuthManager.create_admin(username, None, auth_source='saml')
         
         # Set session
-        from roxx.core.auth.db import AdminDatabase as ADB_saml
-        saml_role = ADB_saml.get_role(username)
-        session_val = base64.b64encode(f"{username}:active:{saml_role}".encode("utf-8")).decode("utf-8")
+        set_auth_context(request, username, "active")
         
         # Redirect to original target or dashboard
         redirect_to = form_data.get('RelayState', '/dashboard')
         response = RedirectResponse(url=redirect_to, status_code=303)
-        response.set_cookie(key="session", value=session_val, httponly=True)
+        response.delete_cookie("session")
         
         AuditManager.log(request, "SAML_LOGIN_SUCCESS", "INFO", 
                         {"username": username, "provider": provider['name']}, 
@@ -2164,7 +2116,7 @@ from roxx.core.auth.tenant_db import TenantDatabase
 async def init_tenants_db():
     TenantDatabase.init()
 
-@app.get("/config/tenants", response_class=HTMLResponse)
+@app.get("/config/tenants", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def tenants_page(request: Request, current_user: str = Depends(get_current_username)):
     """Tenant Management Page (superadmin only)"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -2175,7 +2127,7 @@ async def tenants_page(request: Request, current_user: str = Depends(get_current
         request, current_user, "tenants", tenants=tenants
     ))
 
-@app.get("/api/tenants", dependencies=[Depends(get_current_username)])
+@app.get("/api/tenants", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def list_tenants(request: Request):
     """List all tenants"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -2183,7 +2135,7 @@ async def list_tenants(request: Request):
         raise HTTPException(status_code=403, detail="Superadmin access required")
     return TenantDatabase.list_tenants()
 
-@app.post("/api/tenants", dependencies=[Depends(get_current_username)])
+@app.post("/api/tenants", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def create_tenant(request: Request):
     """Create a new tenant"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -2200,7 +2152,7 @@ async def create_tenant(request: Request):
         return {"success": True, "message": msg, "tenant_id": tid}
     raise HTTPException(status_code=400, detail=msg)
 
-@app.put("/api/tenants/{tenant_id}", dependencies=[Depends(get_current_username)])
+@app.put("/api/tenants/{tenant_id}", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def update_tenant(tenant_id: int, request: Request):
     """Update a tenant"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -2217,7 +2169,7 @@ async def update_tenant(tenant_id: int, request: Request):
         return {"success": True, "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
-@app.delete("/api/tenants/{tenant_id}", dependencies=[Depends(get_current_username)])
+@app.delete("/api/tenants/{tenant_id}", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def delete_tenant(tenant_id: int, request: Request):
     """Delete a tenant"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -2228,7 +2180,7 @@ async def delete_tenant(tenant_id: int, request: Request):
         return {"success": True, "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
-@app.post("/api/tenants/{tenant_id}/admins", dependencies=[Depends(get_current_username)])
+@app.post("/api/tenants/{tenant_id}/admins", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def assign_admin_to_tenant(tenant_id: int, request: Request):
     """Assign an admin to a tenant"""
     caller_role = get_role_from_session(request) or 'admin'
@@ -2243,7 +2195,7 @@ async def assign_admin_to_tenant(tenant_id: int, request: Request):
         return {"success": True, "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
-@app.get("/api/tenants/{tenant_id}/admins", dependencies=[Depends(get_current_username)])
+@app.get("/api/tenants/{tenant_id}/admins", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
 async def get_tenant_admins(tenant_id: int, request: Request):
     """Get admins assigned to a tenant"""
     return TenantDatabase.get_tenant_admins(tenant_id)
@@ -2252,7 +2204,7 @@ async def get_tenant_admins(tenant_id: int, request: Request):
 # Duo MFA Endpoints
 # ------------------------------------------------------------------------------
 
-@app.post("/api/mfa/duo/test", dependencies=[Depends(get_current_username)])
+@app.post("/api/mfa/duo/test", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def test_duo(request: Request):
     """Test Duo API connectivity"""
     data = await request.json()
@@ -2261,7 +2213,7 @@ async def test_duo(request: Request):
     success, msg = duo.check()
     return {"success": success, "message": msg}
 
-@app.post("/api/mfa/duo/auth", dependencies=[Depends(get_current_username)])
+@app.post("/api/mfa/duo/auth", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def duo_auth(request: Request):
     """Initiate Duo authentication (push or passcode)"""
     data = await request.json()
@@ -2281,7 +2233,7 @@ async def duo_auth(request: Request):
     success, result = duo.auth(username, factor=factor, passcode=passcode)
     return {"success": success, **result}
 
-@app.post("/api/mfa/duo/status", dependencies=[Depends(get_current_username)])
+@app.post("/api/mfa/duo/status", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def duo_auth_status(request: Request):
     """Check Duo push notification status"""
     data = await request.json()
@@ -2304,7 +2256,7 @@ async def duo_auth_status(request: Request):
 # Okta MFA Endpoints
 # ------------------------------------------------------------------------------
 
-@app.post("/api/mfa/okta/test", dependencies=[Depends(get_current_username)])
+@app.post("/api/mfa/okta/test", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def test_okta(request: Request):
     """Test Okta API connectivity"""
     data = await request.json()
@@ -2313,7 +2265,7 @@ async def test_okta(request: Request):
     success, msg = okta.test_connection()
     return {"success": success, "message": msg}
 
-@app.post("/api/mfa/okta/verify", dependencies=[Depends(get_current_username)])
+@app.post("/api/mfa/okta/verify", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def okta_verify(request: Request):
     """Verify an Okta MFA factor"""
     data = await request.json()
@@ -2332,7 +2284,7 @@ async def okta_verify(request: Request):
     success, result = okta.verify_factor(username, factor_id, passcode)
     return {"success": success, **result}
 
-@app.get("/api/mfa/okta/factors/{username}", dependencies=[Depends(get_current_username)])
+@app.get("/api/mfa/okta/factors/{username}", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def okta_list_factors(username: str, request: Request):
     """List Okta MFA factors for a user"""
     from roxx.core.auth.config_db import ConfigManager
@@ -2351,7 +2303,7 @@ async def okta_list_factors(username: str, request: Request):
 # ------------------------------------------------------------------------------
 # RADIUS Backend Stats Endpoint
 # ------------------------------------------------------------------------------
-@app.get("/api/radius-backends/stats", dependencies=[Depends(get_current_username)])
+@app.get("/api/radius-backends/stats", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_BACKENDS))])
 async def radius_backend_stats():
     """Get RADIUS backend manager statistics including cache"""
     try:
@@ -2427,17 +2379,10 @@ def main():
 @app.get("/api/webauthn/login/options")
 async def webauthn_login_options(request: Request):
     """Get WebAuthn login options"""
-    session_cookie = request.cookies.get("session")
-    if not session_cookie:
-        raise HTTPException(status_code=401, detail="Session required")
-    
-    try:
-        decoded = base64.b64decode(session_cookie).decode("utf-8")
-        username, status = decoded.split(":", 1)
-        if status != "mfa_pending":
-             raise HTTPException(status_code=401, detail="Invalid session state")
-    except:
+    auth = get_auth_context(request)
+    if not auth or auth.get("status") != "mfa_pending":
         raise HTTPException(status_code=401, detail="Invalid session")
+    username = auth["username"]
 
     from roxx.core.auth.webauthn import WebAuthnManager
     options, state = WebAuthnManager.generate_authentication_options(username)
@@ -2458,15 +2403,10 @@ async def webauthn_login_verify(request: Request):
     except:
         raise HTTPException(status_code=400, detail="Invalid JSON")
         
-    session_cookie = request.cookies.get("session")
-    if not session_cookie:
+    auth = get_auth_context(request)
+    if not auth:
         raise HTTPException(status_code=401, detail="Session required")
-        
-    try:
-        decoded = base64.b64decode(session_cookie).decode("utf-8")
-        username, status = decoded.split(":", 1)
-    except:
-        raise HTTPException(status_code=401, detail="Invalid session")
+    username = auth["username"]
 
     state = request.session.get("webauthn_state")
     if not state:
@@ -2477,11 +2417,9 @@ async def webauthn_login_verify(request: Request):
     
     if success:
         # Success!
-        from roxx.core.auth.db import AdminDatabase as ADB_wa2
-        wa2_role = ADB_wa2.get_role(username)
-        session_val = base64.b64encode(f"{username}:active:{wa2_role}".encode("utf-8")).decode("utf-8")
+        set_auth_context(request, username, "active")
         response = JSONResponse({"success": True})
-        response.set_cookie(key="session", value=session_val, httponly=True)
+        response.delete_cookie("session")
         request.session.pop("webauthn_state", None)
         request.session.pop('mfa_username', None)
         return response

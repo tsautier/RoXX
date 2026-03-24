@@ -12,6 +12,8 @@ from .base import RadiusBackend
 from .ldap_backend import LdapRadiusBackend
 from .sql_backend import SqlRadiusBackend
 from .file_backend import FileRadiusBackend
+from .duo_backend import DuoRadiusBackend
+from .okta_backend import OktaRadiusBackend
 from .cache import AuthCache
 from .config_db import RadiusBackendDB
 
@@ -34,7 +36,9 @@ class RadiusBackendManager:
         'ldap': LdapRadiusBackend,
         'ntlm': LdapRadiusBackend,  # NTLM uses LDAP backend with use_ntlm flag
         'sql': SqlRadiusBackend,
-        'file': FileRadiusBackend
+        'file': FileRadiusBackend,
+        'duo_security': DuoRadiusBackend,
+        'okta': OktaRadiusBackend,
     }
     
     def __init__(self, cache_ttl: int = 300, cache_size: int = 1000):

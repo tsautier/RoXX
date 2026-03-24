@@ -7,5 +7,7 @@ Supports LDAP, NTLM, SQL (MySQL/PostgreSQL), and file-based authentication.
 
 from .base import RadiusBackend
 from .manager import RadiusBackendManager
+from .duo_backend import DuoRadiusBackend
+from .okta_backend import OktaRadiusBackend
 
-__all__ = ['RadiusBackend', 'RadiusBackendManager']
+__all__ = ['RadiusBackend', 'RadiusBackendManager', 'DuoRadiusBackend', 'OktaRadiusBackend']

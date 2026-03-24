@@ -38,8 +38,9 @@ class RadiusBackendDB:
     def init():
         """Initialize database and create tables if they don't exist"""
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        
-        with sqlite3.connect(DB_PATH) as conn:
+
+        conn = sqlite3.connect(DB_PATH)
+        try:
             # We need to recreate the table to update CHECK constraint if it's old
             # Check if table exists
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='radius_backends'")
@@ -106,6 +107,8 @@ class RadiusBackendDB:
             
             conn.commit()
             logger.info(f"RADIUS backends database initialized at {DB_PATH}")
+        finally:
+            conn.close()
     
     @staticmethod
     def list_backends(backend_type: Optional[str] = None, enabled_only: bool = False) -> List[dict]:
@@ -119,7 +122,8 @@ class RadiusBackendDB:
         Returns:
             List of backend dictionaries, ordered by priority (lower = higher priority)
         """
-        with sqlite3.connect(DB_PATH) as conn:
+        conn = sqlite3.connect(DB_PATH)
+        try:
             conn.row_factory = sqlite3.Row
             
             query = """
@@ -149,11 +153,14 @@ class RadiusBackendDB:
                 backends.append(backend)
             
             return backends
+        finally:
+            conn.close()
     
     @staticmethod
     def get_backend(backend_id: int) -> Optional[dict]:
         """Get backend by ID"""
-        with sqlite3.connect(DB_PATH) as conn:
+        conn = sqlite3.connect(DB_PATH)
+        try:
             conn.row_factory = sqlite3.Row
             
             row = conn.execute(
@@ -169,6 +176,8 @@ class RadiusBackendDB:
                 del backend['config_json']
                 return backend
             return None
+        finally:
+            conn.close()
     
     @staticmethod
     def create_backend(backend_type: str, name: str, config: dict, 
@@ -179,14 +188,15 @@ class RadiusBackendDB:
         Returns:
             (success, message, backend_id)
         """
-        ALLOWED_TYPES = ['radius_server', 'duo_security', 'ldap', 'ntlm', 'sql', 'file']
+        ALLOWED_TYPES = ['radius_server', 'duo_security', 'okta', 'ldap', 'ntlm', 'sql', 'file']
         if backend_type not in ALLOWED_TYPES:
              return False, f"Invalid backend type: {backend_type}. Allowed: {ALLOWED_TYPES}", None
         
         config_json = json.dumps(config)
         
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 cursor = conn.execute(
                     """INSERT INTO radius_backends 
                        (backend_type, name, enabled, priority, config_json)
@@ -197,6 +207,8 @@ class RadiusBackendDB:
                 backend_id = cursor.lastrowid
                 logger.info(f"Created {backend_type} backend '{name}' with ID {backend_id}")
                 return True, f"Backend created successfully", backend_id
+            finally:
+                conn.close()
         except sqlite3.IntegrityError:
             return False, f"Backend '{name}' of type '{backend_type}' already exists", None
         except Exception as e:
@@ -235,12 +247,15 @@ class RadiusBackendDB:
         params.append(backend_id)
         
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 query = f"UPDATE radius_backends SET {', '.join(updates)} WHERE id = ?"
                 conn.execute(query, params)
                 conn.commit()
                 logger.info(f"Updated backend ID {backend_id}")
                 return True, "Backend updated successfully"
+            finally:
+                conn.close()
         except Exception as e:
             logger.error(f"Error updating backend: {e}")
             return False, f"Database error: {str(e)}"
@@ -249,11 +264,14 @@ class RadiusBackendDB:
     def delete_backend(backend_id: int) -> Tuple[bool, str]:
         """Delete backend configuration"""
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.execute("DELETE FROM radius_backends WHERE id = ?", (backend_id,))
                 conn.commit()
                 logger.info(f"Deleted backend ID {backend_id}")
                 return True, "Backend deleted successfully"
+            finally:
+                conn.close()
         except Exception as e:
             logger.error(f"Error deleting backend: {e}")
             return False, f"Database error: {str(e)}"
@@ -267,7 +285,8 @@ class RadiusBackendDB:
             priority_map: Dict of {backend_id: priority}
         """
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 for backend_id, priority in priority_map.items():
                     conn.execute(
                         "UPDATE radius_backends SET priority = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -276,28 +295,36 @@ class RadiusBackendDB:
                 conn.commit()
                 logger.info(f"Updated priorities for {len(priority_map)} backends")
                 return True, "Priorities updated successfully"
+            finally:
+                conn.close()
         except Exception as e:
             logger.error(f"Error updating priorities: {e}")
             return False, f"Database error: {str(e)}"
     @staticmethod
     def list_clients() -> List[dict]:
         """List all RADIUS clients (NAS)"""
-        with sqlite3.connect(DB_PATH) as conn:
+        conn = sqlite3.connect(DB_PATH)
+        try:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM radius_clients ORDER BY shortname ASC").fetchall()
             return [dict(row) for row in rows]
+        finally:
+            conn.close()
 
     @staticmethod
     def add_client(shortname: str, ipaddr: str, secret: str, description: str = "") -> bool:
         """Add a new RADIUS client (NAS)"""
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            conn = sqlite3.connect(DB_PATH)
+            try:
                 conn.execute(
                     "INSERT INTO radius_clients (shortname, ipaddr, secret, description) VALUES (?, ?, ?, ?)",
                     (shortname, ipaddr, secret, description)
                 )
                 conn.commit()
                 return True
+            finally:
+                conn.close()
         except Exception as e:
             logger.error(f"Error adding RADIUS client: {e}")
             return False
