@@ -2,6 +2,13 @@
 
 All notable changes to RoXX will be documented in this file.
 
+## [1.0.0-beta9] - Unreleased
+
+### Planned
+- [ ] Continue post-beta8 stabilization
+- [ ] Expand integration coverage and edge-case validation
+- [ ] Reduce remaining warnings in tests and runtime
+
 ## [1.0.0-beta8] - 2026-03-24
 
 ### Major Features
@@ -52,4 +59,3 @@ All notable changes to RoXX will be documented in this file.
 ### Platform
 - Stabilized CI/CD and packaging dependencies.
 - Fixed MFA management, template unification, and SAML UI issues.
-

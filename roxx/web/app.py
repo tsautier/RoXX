@@ -64,7 +64,7 @@ logger = logging.getLogger("roxx.web")
 # App Initialization
 # ------------------------------------------------------------------------------
 
-VERSION = "1.0.0-beta8"
+VERSION = "1.0.0-beta9"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -114,7 +114,7 @@ async def add_integrity_headers(request: Request, call_next):
     """Adds ownership and integrity headers to protect against dishonest clones"""
     response = await call_next(request)
     response.headers["X-RoXX-Origin"] = "Built with Love by tsautier"
-    response.headers["X-RoXX-Build-ID"] = "ST-2026-BETA8-DRAFT-01"
+    response.headers["X-RoXX-Build-ID"] = "ST-2026-BETA9-DRAFT-01"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Developed-For"] = "SH-PX Framework (Confidential)"
     return response

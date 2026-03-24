@@ -1,6 +1,6 @@
 [project]
 name = "roxx"
-version = "1.0.0-beta8"
+version = "1.0.0-beta9"
 description = "Linux RADIUS Authentication Proxy"
 readme = "README.md"
 requires-python = ">=3.12"
