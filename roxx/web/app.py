@@ -31,6 +31,7 @@ from typing import List
 from roxx.core.auth.totp import TOTPAuthenticator
 from roxx.utils.system import SystemManager
 from roxx.core.auth.saml_provider import SAMLProvider
+from roxx.core.auth.rbac import Role, require_role, get_role_from_session, check_permission
 
 logger = logging.getLogger("roxx.web")
 
@@ -198,14 +199,17 @@ async def get_current_username(request: Request):
     """
     Verifies authentication via Session Cookie.
     Enforces 'active' status for general access.
+    Also extracts role from cookie.
     """
     # 1. Check Cookie
     session_cookie = request.cookies.get("session")
     if session_cookie:
         try:
             decoded = base64.b64decode(session_cookie).decode("utf-8")
-            if ":" in decoded:
-                username, status = decoded.split(":", 1)
+            parts = decoded.split(":")
+            if len(parts) >= 2:
+                username = parts[0]
+                status = parts[1]
                 # Only allow 'active' sessions for general routes
                 if username and status == 'active':
                     return username
@@ -230,7 +234,9 @@ async def get_partial_user(request: Request):
     if session_cookie:
         try:
             decoded = base64.b64decode(session_cookie).decode("utf-8")
-            username, status = decoded.split(":", 1)
+            parts = decoded.split(":")
+            username = parts[0]
+            status = parts[1] if len(parts) > 1 else None
             return username, status
         except:
             pass
@@ -299,7 +305,9 @@ async def login(request: Request, username: str = Form(...), password: str = For
                     trusted_username = cookie_signer.loads(trusted_cookie, max_age=30*24*60*60)
                     if trusted_username == username:
                         # Trusted - Skip MFA
-                        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+                        from roxx.core.auth.db import AdminDatabase as ADB_trust
+                        trust_role = ADB_trust.get_role(username)
+                        session_val = base64.b64encode(f"{username}:active:{trust_role}".encode("utf-8")).decode("utf-8")
                         response = JSONResponse({"success": True, "redirect": "/"})
                         response.set_cookie(key="session", value=session_val, httponly=True)
                         AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "trusted_device"}, username=username)
@@ -321,10 +329,12 @@ async def login(request: Request, username: str = Form(...), password: str = For
             return response
 
         # No MFA - Login
-        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        from roxx.core.auth.db import AdminDatabase
+        user_role = AdminDatabase.get_role(username)
+        session_val = base64.b64encode(f"{username}:active:{user_role}".encode("utf-8")).decode("utf-8")
         response = JSONResponse({"success": True, "redirect": "/dashboard"})
         response.set_cookie(key="session", value=session_val, httponly=True)
-        AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "password_only"}, username=username)
+        AuditManager.log(request, "LOGIN_SUCCESS", "INFO", {"username": username, "method": "password_only", "role": user_role}, username=username)
         return response
     
     AuditManager.log(request, "LOGIN_FAILED", "WARNING", {"username": username, "reason": "invalid_credentials"}, username=username)
@@ -423,7 +433,9 @@ async def mfa_verify_unified(request: Request):
              request.session.pop(f"mfa_code_{mfa_type}", None)
              
     if verified:
-        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        from roxx.core.auth.db import AdminDatabase as ADB_mfa
+        mfa_role = ADB_mfa.get_role(username)
+        session_val = base64.b64encode(f"{username}:active:{mfa_role}".encode("utf-8")).decode("utf-8")
         response = JSONResponse({"success": True})
         response.set_cookie(key="session", value=session_val, httponly=True)
         
@@ -458,7 +470,9 @@ async def mfa_cert_verify(request: Request):
     stored_user = CertDatabase.get_user_by_fingerprint(cert_info['fingerprint'])
     
     if stored_user and stored_user == username:
-        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        from roxx.core.auth.db import AdminDatabase as ADB_cert
+        cert_role = ADB_cert.get_role(username)
+        session_val = base64.b64encode(f"{username}:active:{cert_role}".encode("utf-8")).decode("utf-8")
         response = JSONResponse({"success": True})
         response.set_cookie(key="session", value=session_val, httponly=True)
         AuditManager.log(request, "MFA_SUCCESS", "INFO", {"username": username, "method": "client_cert", "fingerprint": cert_info['fingerprint']}, username=username)
@@ -512,7 +526,9 @@ async def change_password(
         })
 
     # Success -> Active Session
-    session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+    from roxx.core.auth.db import AdminDatabase as ADB_chpw
+    chpw_role = ADB_chpw.get_role(username)
+    session_val = base64.b64encode(f"{username}:active:{chpw_role}".encode("utf-8")).decode("utf-8")
     response = RedirectResponse(url="/", status_code=303)
     response.set_cookie(key="session", value=session_val, httponly=True)
     return response
@@ -627,7 +643,9 @@ async def webauthn_auth_verify(request: Request):
     
     if success:
         if request.session.get('mfa_username'):
-             session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+             from roxx.core.auth.db import AdminDatabase as ADB_wa
+             wa_role = ADB_wa.get_role(username)
+             session_val = base64.b64encode(f"{username}:active:{wa_role}".encode("utf-8")).decode("utf-8")
              response = JSONResponse({"success": True, "redirect": "/"})
              response.set_cookie(key="session", value=session_val, httponly=True)
              request.session.pop('mfa_username', None)
@@ -649,11 +667,13 @@ async def webauthn_auth_verify(request: Request):
 
 def get_page_context(request: Request, username: str, active_page: str, **kwargs):
     """Helper to generate standard page context with sidebar variables"""
+    user_role = get_role_from_session(request) or 'admin'
     context = {
         "request": request,
         "username": username,
         "active_page": active_page,
         "version": VERSION,
+        "user_role": user_role,
         **kwargs
     }
     return context
@@ -1279,24 +1299,43 @@ async def admins_page(request: Request, current_user: str = Depends(get_current_
 
 @app.post("/api/admins", dependencies=[Depends(get_current_username)])
 async def create_admin(
+    request: Request,
     username: str = Form(...),
     password: str = Form(None),
-    auth_source: str = Form("local")
+    auth_source: str = Form("local"),
+    role: str = Form("admin")
 ):
     """Create a new admin"""
+    # RBAC check — only superadmin can create admins
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role not in ('superadmin', 'admin'):
+        raise HTTPException(status_code=403, detail="Insufficient permissions to create admins")
+    
+    # Only superadmin can assign superadmin role
+    if role == 'superadmin' and caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Only superadmins can assign superadmin role")
+    
     # Validation
     if auth_source == "local" and not password:
         raise HTTPException(status_code=400, detail="Password required for local auth")
     
-    success, message = AuthManager.create_admin(username, password, auth_source)
+    if role not in ('superadmin', 'admin', 'auditor'):
+        raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
+    
+    success, message = AuthManager.create_admin(username, password, auth_source, role=role)
     if success:
         return {"success": True, "message": message}
     else:
         raise HTTPException(status_code=400, detail=message)
 
 @app.delete("/api/admins/{username}", dependencies=[Depends(get_current_username)])
-async def delete_admin(username: str, current_user: str = Depends(get_current_username)):
-    """Delete an admin"""
+async def delete_admin(username: str, request: Request, current_user: str = Depends(get_current_username)):
+    """Delete an admin (superadmin only)"""
+    # RBAC check — only superadmin can delete
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Only superadmins can delete admin accounts")
+    
     if username == current_user:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
         
@@ -1305,6 +1344,27 @@ async def delete_admin(username: str, current_user: str = Depends(get_current_us
         return {"success": True, "message": message}
     else:
         raise HTTPException(status_code=400, detail=message)
+
+@app.put("/api/admins/{username}/role", dependencies=[Depends(get_current_username)])
+async def change_admin_role(username: str, request: Request, current_user: str = Depends(get_current_username)):
+    """Change an admin's role (superadmin only)"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Only superadmins can change roles")
+    
+    if username == current_user:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+    
+    data = await request.json()
+    new_role = data.get('role')
+    if new_role not in ('superadmin', 'admin', 'auditor'):
+        raise HTTPException(status_code=400, detail=f"Invalid role: {new_role}")
+    
+    from roxx.core.auth.db import AdminDatabase
+    if AdminDatabase.set_role(username, new_role):
+        AuditManager.log(request, "ROLE_CHANGED", "INFO", {"target": username, "new_role": new_role}, username=current_user)
+        return {"success": True, "message": f"Role changed to {new_role}"}
+    raise HTTPException(status_code=500, detail="Failed to change role")
 
 # ------------------------------------------------------------------------------
 # MFA Credential Management API
@@ -2071,7 +2131,9 @@ async def saml_acs(provider_id: int, request: Request):
             AuthManager.create_admin(username, None, auth_source='saml')
         
         # Set session
-        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        from roxx.core.auth.db import AdminDatabase as ADB_saml
+        saml_role = ADB_saml.get_role(username)
+        session_val = base64.b64encode(f"{username}:active:{saml_role}".encode("utf-8")).decode("utf-8")
         
         # Redirect to original target or dashboard
         redirect_to = form_data.get('RelayState', '/dashboard')
@@ -2091,6 +2153,214 @@ async def saml_acs(provider_id: int, request: Request):
         AuditManager.log(request, "SAML_LOGIN_FAILED", "ERROR", 
                         {"error": str(e), "provider": provider['name']})
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ------------------------------------------------------------------------------
+# Tenant Management API
+# ------------------------------------------------------------------------------
+from roxx.core.auth.tenant_db import TenantDatabase
+
+@app.on_event("startup")
+async def init_tenants_db():
+    TenantDatabase.init()
+
+@app.get("/config/tenants", response_class=HTMLResponse)
+async def tenants_page(request: Request, current_user: str = Depends(get_current_username)):
+    """Tenant Management Page (superadmin only)"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    tenants = TenantDatabase.list_tenants()
+    return templates.TemplateResponse("tenants.html", get_page_context(
+        request, current_user, "tenants", tenants=tenants
+    ))
+
+@app.get("/api/tenants", dependencies=[Depends(get_current_username)])
+async def list_tenants(request: Request):
+    """List all tenants"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    return TenantDatabase.list_tenants()
+
+@app.post("/api/tenants", dependencies=[Depends(get_current_username)])
+async def create_tenant(request: Request):
+    """Create a new tenant"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    data = await request.json()
+    name = data.get('name', '')
+    slug = data.get('slug', '')
+    description = data.get('description', '')
+    if not name or not slug:
+        raise HTTPException(status_code=400, detail="Name and slug required")
+    success, msg, tid = TenantDatabase.create_tenant(name, slug, description)
+    if success:
+        return {"success": True, "message": msg, "tenant_id": tid}
+    raise HTTPException(status_code=400, detail=msg)
+
+@app.put("/api/tenants/{tenant_id}", dependencies=[Depends(get_current_username)])
+async def update_tenant(tenant_id: int, request: Request):
+    """Update a tenant"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    data = await request.json()
+    success, msg = TenantDatabase.update_tenant(
+        tenant_id,
+        name=data.get('name'),
+        description=data.get('description'),
+        enabled=data.get('enabled')
+    )
+    if success:
+        return {"success": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
+
+@app.delete("/api/tenants/{tenant_id}", dependencies=[Depends(get_current_username)])
+async def delete_tenant(tenant_id: int, request: Request):
+    """Delete a tenant"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    success, msg = TenantDatabase.delete_tenant(tenant_id)
+    if success:
+        return {"success": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
+
+@app.post("/api/tenants/{tenant_id}/admins", dependencies=[Depends(get_current_username)])
+async def assign_admin_to_tenant(tenant_id: int, request: Request):
+    """Assign an admin to a tenant"""
+    caller_role = get_role_from_session(request) or 'admin'
+    if caller_role != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+    data = await request.json()
+    username = data.get('username')
+    if not username:
+        raise HTTPException(status_code=400, detail="Username required")
+    success, msg = TenantDatabase.assign_admin(username, tenant_id)
+    if success:
+        return {"success": True, "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
+
+@app.get("/api/tenants/{tenant_id}/admins", dependencies=[Depends(get_current_username)])
+async def get_tenant_admins(tenant_id: int, request: Request):
+    """Get admins assigned to a tenant"""
+    return TenantDatabase.get_tenant_admins(tenant_id)
+
+# ------------------------------------------------------------------------------
+# Duo MFA Endpoints
+# ------------------------------------------------------------------------------
+
+@app.post("/api/mfa/duo/test", dependencies=[Depends(get_current_username)])
+async def test_duo(request: Request):
+    """Test Duo API connectivity"""
+    data = await request.json()
+    from roxx.core.auth.duo import DuoProvider
+    duo = DuoProvider(data)
+    success, msg = duo.check()
+    return {"success": success, "message": msg}
+
+@app.post("/api/mfa/duo/auth", dependencies=[Depends(get_current_username)])
+async def duo_auth(request: Request):
+    """Initiate Duo authentication (push or passcode)"""
+    data = await request.json()
+    username = data.get('username')
+    factor = data.get('factor', 'push')
+    passcode = data.get('passcode')
+    
+    # Load Duo config from provider
+    from roxx.core.auth.config_db import ConfigManager
+    providers = ConfigManager.list_providers(provider_type='duo')
+    if not providers:
+        raise HTTPException(status_code=404, detail="No Duo provider configured")
+    
+    config = providers[0]['config']
+    from roxx.core.auth.duo import DuoProvider
+    duo = DuoProvider(config)
+    success, result = duo.auth(username, factor=factor, passcode=passcode)
+    return {"success": success, **result}
+
+@app.post("/api/mfa/duo/status", dependencies=[Depends(get_current_username)])
+async def duo_auth_status(request: Request):
+    """Check Duo push notification status"""
+    data = await request.json()
+    txid = data.get('txid')
+    if not txid:
+        raise HTTPException(status_code=400, detail="txid required")
+    
+    from roxx.core.auth.config_db import ConfigManager
+    providers = ConfigManager.list_providers(provider_type='duo')
+    if not providers:
+        raise HTTPException(status_code=404, detail="No Duo provider configured")
+    
+    config = providers[0]['config']
+    from roxx.core.auth.duo import DuoProvider
+    duo = DuoProvider(config)
+    success, result = duo.auth_status(txid)
+    return {"success": success, **result}
+
+# ------------------------------------------------------------------------------
+# Okta MFA Endpoints
+# ------------------------------------------------------------------------------
+
+@app.post("/api/mfa/okta/test", dependencies=[Depends(get_current_username)])
+async def test_okta(request: Request):
+    """Test Okta API connectivity"""
+    data = await request.json()
+    from roxx.core.auth.okta import OktaProvider
+    okta = OktaProvider(data)
+    success, msg = okta.test_connection()
+    return {"success": success, "message": msg}
+
+@app.post("/api/mfa/okta/verify", dependencies=[Depends(get_current_username)])
+async def okta_verify(request: Request):
+    """Verify an Okta MFA factor"""
+    data = await request.json()
+    username = data.get('username')
+    factor_id = data.get('factor_id')
+    passcode = data.get('passcode')
+    
+    from roxx.core.auth.config_db import ConfigManager
+    providers = ConfigManager.list_providers(provider_type='okta')
+    if not providers:
+        raise HTTPException(status_code=404, detail="No Okta provider configured")
+    
+    config = providers[0]['config']
+    from roxx.core.auth.okta import OktaProvider
+    okta = OktaProvider(config)
+    success, result = okta.verify_factor(username, factor_id, passcode)
+    return {"success": success, **result}
+
+@app.get("/api/mfa/okta/factors/{username}", dependencies=[Depends(get_current_username)])
+async def okta_list_factors(username: str, request: Request):
+    """List Okta MFA factors for a user"""
+    from roxx.core.auth.config_db import ConfigManager
+    providers = ConfigManager.list_providers(provider_type='okta')
+    if not providers:
+        raise HTTPException(status_code=404, detail="No Okta provider configured")
+    
+    config = providers[0]['config']
+    from roxx.core.auth.okta import OktaProvider
+    okta = OktaProvider(config)
+    success, factors = okta.list_factors(username)
+    if success:
+        return factors
+    raise HTTPException(status_code=500, detail="Failed to list factors")
+
+# ------------------------------------------------------------------------------
+# RADIUS Backend Stats Endpoint
+# ------------------------------------------------------------------------------
+@app.get("/api/radius-backends/stats", dependencies=[Depends(get_current_username)])
+async def radius_backend_stats():
+    """Get RADIUS backend manager statistics including cache"""
+    try:
+        from roxx.core.radius_backends.manager import get_manager
+        mgr = get_manager()
+        return mgr.get_stats()
+    except Exception as e:
+        logger.error(f"Error getting RADIUS stats: {e}")
+        return {"error": str(e)}
 
 
 def silence_windows_proactor_reset():
@@ -2207,7 +2477,9 @@ async def webauthn_login_verify(request: Request):
     
     if success:
         # Success!
-        session_val = base64.b64encode(f"{username}:active".encode("utf-8")).decode("utf-8")
+        from roxx.core.auth.db import AdminDatabase as ADB_wa2
+        wa2_role = ADB_wa2.get_role(username)
+        session_val = base64.b64encode(f"{username}:active:{wa2_role}".encode("utf-8")).decode("utf-8")
         response = JSONResponse({"success": True})
         response.set_cookie(key="session", value=session_val, httponly=True)
         request.session.pop("webauthn_state", None)

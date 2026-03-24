@@ -29,15 +29,19 @@ class AuthManager:
         count = cursor.fetchone()[0]
         
         if count == 0:
-            logger.warning("No admins found. Creating default 'admin' user.")
+            logger.warning("No admins found. Creating default 'admin' user with superadmin role.")
             # Default password 'admin' - MUST CHANGE on first login
             # Bcrypt hash
             pw_hash = bcrypt.hashpw(b"admin", bcrypt.gensalt()).decode('utf-8')
             
             cursor.execute("""
-                INSERT INTO admins (username, password_hash, must_change_password)
-                VALUES (?, ?, 1)
+                INSERT INTO admins (username, password_hash, must_change_password, role)
+                VALUES (?, ?, 1, 'superadmin')
             """, ("admin", pw_hash))
+            conn.commit()
+        else:
+            # Ensure existing 'admin' user has superadmin role if not set
+            cursor.execute("UPDATE admins SET role = 'superadmin' WHERE username = 'admin' AND (role IS NULL OR role = 'admin')")
             conn.commit()
         
         conn.close()
@@ -133,7 +137,7 @@ class AuthManager:
         return True, dict(user)
 
     @staticmethod
-    def create_admin(username, password=None, auth_source='local', external_id=None):
+    def create_admin(username, password=None, auth_source='local', external_id=None, role='admin'):
         """Create a new admin user"""
         conn = AdminDatabase.get_connection()
         cursor = conn.cursor()
@@ -144,10 +148,11 @@ class AuthManager:
                 pw_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
             cursor.execute("""
-                INSERT INTO admins (username, password_hash, auth_source, external_id, must_change_password)
-                VALUES (?, ?, ?, ?, ?)
-            """, (username, pw_hash, auth_source, external_id, 1 if auth_source == 'local' else 0))
+                INSERT INTO admins (username, password_hash, auth_source, external_id, must_change_password, role)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (username, pw_hash, auth_source, external_id, 1 if auth_source == 'local' else 0, role))
             conn.commit()
+            logger.debug(f"[RBAC] Created admin {username} with role={role}")
             return True, "User created"
         except sqlite3.IntegrityError:
             return False, "Username already exists"
@@ -162,7 +167,7 @@ class AuthManager:
         conn = AdminDatabase.get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT username, email, auth_source, last_login FROM admins")
+        cursor.execute("SELECT username, email, auth_source, last_login, role FROM admins")
         users = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return users

@@ -55,6 +55,21 @@
         background: #f3e8ff;
         color: #6b21a8;
     }
+
+    .badge-superadmin {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge-admin {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .badge-auditor {
+        background: #f1f5f9;
+        color: #475569;
+    }
 </style>
 {% endblock %}
 
@@ -62,7 +77,7 @@
 <div class="card" style="margin-bottom: 2rem;">
     <h2 style="margin-bottom: 1.5rem;">Add New Admin</h2>
     <form id="addAdminForm"
-        style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1.5rem; align-items: end;">
+        style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 1.5rem; align-items: end;">
         <div>
             <label>Username</label>
             <input type="text" name="username" required placeholder="admin2">
@@ -82,6 +97,21 @@
             <label>Password</label>
             <input type="password" name="password" placeholder="Min 12 chars...">
         </div>
+        <div>
+            <label>Role</label>
+            <div class="select-wrapper">
+                <select name="role" id="roleSelect">
+                    {% if user_role == 'superadmin' %}
+                    <option value="admin" selected>Admin</option>
+                    <option value="auditor">Auditor</option>
+                    <option value="superadmin">Super Admin</option>
+                    {% else %}
+                    <option value="admin" selected>Admin</option>
+                    <option value="auditor">Auditor</option>
+                    {% endif %}
+                </select>
+            </div>
+        </div>
         <button type="submit" class="btn btn-primary">Create Admin</button>
     </form>
 </div>
@@ -93,6 +123,7 @@
             <thead>
                 <tr>
                     <th>Username</th>
+                    <th>Role</th>
                     <th>Source</th>
                     <th>Last Login</th>
                     <th style="text-align: right;">Actions</th>
@@ -103,6 +134,9 @@
                 <tr>
                     <td style="font-weight: 500;">{{ user.username }}</td>
                     <td>
+                        <span class="badge badge-{{ user.role or 'admin' }}">{{ (user.role or 'admin')|upper }}</span>
+                    </td>
+                    <td>
                         <span class="badge badge-{{ user.auth_source }}">{{ user.auth_source|upper }}</span>
                     </td>
                     <td>{{ user.last_login or 'Never' }}</td>
@@ -111,12 +145,21 @@
                             style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem; display: inline-block; margin-right: 0.5rem; transition: all 0.2s;">
                             <i class="fas fa-shield-alt"></i> Manage MFA
                         </a>
-                        {% if user.username != 'admin' %}
+                        {% if user_role == 'superadmin' and user.username != username %}
+                        <select onchange="changeRole('{{ user.username }}', this.value)" 
+                            style="padding: 0.4rem; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.85rem; margin-right: 0.5rem;">
+                            <option value="" disabled selected>Change Role</option>
+                            <option value="superadmin" {% if user.role == 'superadmin' %}disabled{% endif %}>Super Admin</option>
+                            <option value="admin" {% if user.role == 'admin' or not user.role %}disabled{% endif %}>Admin</option>
+                            <option value="auditor" {% if user.role == 'auditor' %}disabled{% endif %}>Auditor</option>
+                        </select>
+                        {% endif %}
+                        {% if user.username != 'admin' and user_role == 'superadmin' %}
                         <button onclick="deleteAdmin('{{ user.username }}')"
                             style="background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s;">
                             Delete
                         </button>
-                        {% else %}
+                        {% elif user.username == 'admin' %}
                         <span style="color: #94a3b8; font-size: 0.85rem;">System</span>
                         {% endif %}
                     </td>
@@ -180,11 +223,34 @@
             if (response.ok) {
                 window.location.reload();
             } else {
-                alert('Failed to delete admin');
+                const data = await response.json();
+                alert('Failed: ' + (data.detail || 'Unknown error'));
             }
         } catch (err) {
             console.error(err);
             alert('Error deleting admin');
+        }
+    }
+
+    async function changeRole(username, newRole) {
+        if (!newRole) return;
+        if (!confirm(`Change role of ${username} to ${newRole.toUpperCase()}?`)) return;
+
+        try {
+            const response = await fetch(`/api/admins/${username}/role`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({role: newRole})
+            });
+            const data = await response.json();
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Failed: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error changing role');
         }
     }
 </script>
