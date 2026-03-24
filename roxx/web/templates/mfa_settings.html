@@ -100,8 +100,13 @@
                 <p style="color: var(--text-light); margin-bottom: 1.5rem;">
                     Google Authenticator, Authy, etc.
                 </p>
+                <div id="totpStatus" style="margin-bottom: 1rem; color: var(--text-light);">
+                    Loading TOTP status...
+                </div>
                 <a href="/totp/enroll" class="btn btn-outline btn-block"
                     style="border-color: var(--border-color); color: var(--text-main);">Configure TOTP</a>
+                <button id="disableMfaBtn" onclick="disableMfa()" class="btn btn-outline btn-block mt-2"
+                    style="display:none; border-color: #fca5a5; color: #b91c1c;">Disable MFA</button>
             </div>
         </div>
     </div>
@@ -124,8 +129,6 @@
             const container = document.getElementById('webauthn-keys-list');
             if (!container) return;
             try {
-                // We use the same endpoint as the Admin page if it works for self?
-                // No, we need a self-service endpoint for /api/webauthn/list
                 const res = await fetch('/api/webauthn/list');
                 const data = await res.json();
                 const keys = data.credentials || [];
@@ -275,8 +278,45 @@
             } catch (e) { console.error(e); }
         }
 
+        async function loadMfaStatus() {
+            const statusEl = document.getElementById('totpStatus');
+            const disableBtn = document.getElementById('disableMfaBtn');
+            try {
+                const res = await fetch('/api/mfa/status');
+                const data = await res.json();
+                if (data.enabled) {
+                    const type = data.type || 'totp';
+                    const backupCodes = data.backup_codes_remaining ?? 0;
+                    statusEl.textContent = `Enabled via ${type}. Backup codes remaining: ${backupCodes}.`;
+                    disableBtn.style.display = 'block';
+                } else {
+                    statusEl.textContent = 'TOTP is not enabled yet.';
+                    disableBtn.style.display = 'none';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Failed to load MFA status.';
+                disableBtn.style.display = 'none';
+            }
+        }
+
+        async function disableMfa() {
+            if (!confirm("Disable MFA for your account?")) return;
+            try {
+                const res = await fetch('/api/mfa/disable', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.detail || 'Failed to disable MFA');
+                }
+                alert(data.message || 'MFA disabled');
+                loadMfaStatus();
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+
         // Initial Load
         loadCerts();
         loadWebAuthnKeys();
+        loadMfaStatus();
     </script>
     {% endblock %}

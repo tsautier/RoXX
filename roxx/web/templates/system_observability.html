@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Observability - RoXX{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">Observability & Health</h1>
+            <p class="mb-0 text-muted">Surface GUI des endpoints système: info, health, integrity et logs.</p>
+        </div>
+        <button class="btn btn-primary" onclick="refreshObservability()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">System Info</h6>
+                </div>
+                <div class="card-body" id="systemInfoCard">Loading...</div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Backend Health</h6>
+                </div>
+                <div class="card-body" id="backendHealthCard">Loading...</div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Integrity</h6>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadIntegrity()">Run Check</button>
+                </div>
+                <div class="card-body" id="integrityCard">Click "Run Check" to fetch the manifest.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Recent Audit Logs</h6>
+            <div class="form-inline">
+                <input id="logSearch" class="form-control form-control-sm mr-2" placeholder="Search action/user">
+                <button class="btn btn-sm btn-outline-primary" onclick="loadLogs()">Search</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Severity</th>
+                            <th>Action</th>
+                            <th>User</th>
+                            <th>IP</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsBody">
+                        <tr><td colspan="6" class="text-center text-muted">Loading logs...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadSystemInfo() {
+        const res = await fetch('/api/system/info');
+        const info = await res.json();
+        document.getElementById('systemInfoCard').innerHTML = `
+            <p><strong>OS:</strong> ${info.os || 'Unknown'}</p>
+            <p><strong>Uptime:</strong> ${info.uptime || 'Unknown'}</p>
+            <p><strong>Version:</strong> ${info.version || 'Unknown'}</p>
+            <p><strong>Config Dir:</strong><br><code>${info.config_dir || 'Unknown'}</code></p>
+            <p class="mb-0"><strong>Admin Privileges:</strong> ${info.is_admin ? 'Yes' : 'No'}</p>
+        `;
+    }
+
+    async function loadBackendHealth() {
+        const res = await fetch('/api/health/backends');
+        const data = await res.json();
+        const rows = Object.entries(data).map(([name, status]) => `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>${name}</span>
+                <span class="badge ${status === 'UP' || status === 'RUNNING' ? 'badge-success' : 'badge-danger'}">${status}</span>
+            </div>
+        `);
+        document.getElementById('backendHealthCard').innerHTML = rows.join('') || '<span class="text-muted">No backend data.</span>';
+    }
+
+    async function loadIntegrity() {
+        const card = document.getElementById('integrityCard');
+        card.innerHTML = 'Loading integrity manifest...';
+        const res = await fetch('/api/sys/integrity');
+        const payload = await res.json();
+        const entries = Object.entries(payload.checksums || {}).slice(0, 8).map(([path, digest]) => `
+            <div style="margin-bottom: 0.5rem;">
+                <div style="font-weight: 600;">${path}</div>
+                <code style="font-size: 0.8rem;">${String(digest).slice(0, 24)}...</code>
+            </div>
+        `);
+        card.innerHTML = `<p><strong>Status:</strong> ${payload.status || 'Unknown'}</p>${entries.join('') || '<span class="text-muted">No checksums returned.</span>'}`;
+    }
+
+    async function loadLogs() {
+        const search = document.getElementById('logSearch').value.trim();
+        const params = new URLSearchParams({ limit: '25' });
+        if (search) params.set('search', search);
+
+        const res = await fetch(`/api/logs?${params.toString()}`);
+        const payload = await res.json();
+        const rows = payload.logs || [];
+        document.getElementById('logsBody').innerHTML = rows.length ? rows.map(log => `
+            <tr>
+                <td>${log.timestamp || ''}</td>
+                <td>${log.severity || ''}</td>
+                <td>${log.action || ''}</td>
+                <td>${log.username || ''}</td>
+                <td>${log.ip_address || ''}</td>
+                <td><small>${JSON.stringify(log.details || {})}</small></td>
+            </tr>
+        `).join('') : '<tr><td colspan="6" class="text-center text-muted">No logs found.</td></tr>';
+    }
+
+    async function refreshObservability() {
+        await Promise.all([loadSystemInfo(), loadBackendHealth(), loadLogs()]);
+    }
+
+    document.addEventListener('DOMContentLoaded', refreshObservability);
+</script>
+{% endblock %}

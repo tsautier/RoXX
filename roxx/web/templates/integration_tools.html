@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Integration Tools - RoXX{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">Integration Tools</h1>
+            <p class="mb-0 text-muted">GUI pour les endpoints d’intégration RADIUS, Duo et Okta.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">RADIUS Auth API</h6>
+                </div>
+                <div class="card-body">
+                    <form id="radiusAuthForm">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input class="form-control" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Password / Factor Input</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <button class="btn btn-primary btn-block" type="submit">Run</button>
+                    </form>
+                    <pre id="radiusAuthResult" class="mt-3 mb-0" style="white-space: pre-wrap;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Duo Interactive Test</h6>
+                </div>
+                <div class="card-body">
+                    <form id="duoForm">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input class="form-control" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Factor</label>
+                            <select class="form-control" name="factor">
+                                <option value="push">push</option>
+                                <option value="passcode">passcode</option>
+                                <option value="phone">phone</option>
+                                <option value="sms">sms</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Passcode (optional)</label>
+                            <input class="form-control" name="passcode">
+                        </div>
+                        <button class="btn btn-primary btn-block" type="submit">Start Duo Auth</button>
+                    </form>
+                    <pre id="duoResult" class="mt-3 mb-0" style="white-space: pre-wrap;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Okta Verify Test</h6>
+                </div>
+                <div class="card-body">
+                    <form id="oktaFactorsForm">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <input class="form-control" id="oktaUsername" required>
+                        </div>
+                        <button class="btn btn-outline-primary btn-block" type="submit">Load Factors</button>
+                    </form>
+                    <form id="oktaVerifyForm" class="mt-3">
+                        <div class="form-group">
+                            <label>Factor</label>
+                            <select class="form-control" id="oktaFactorSelect"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Passcode (optional)</label>
+                            <input class="form-control" id="oktaPasscode">
+                        </div>
+                        <button class="btn btn-primary btn-block" type="submit">Verify Factor</button>
+                    </form>
+                    <pre id="oktaResult" class="mt-3 mb-0" style="white-space: pre-wrap;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function printResult(id, payload) {
+        document.getElementById(id).textContent = JSON.stringify(payload, null, 2);
+    }
+
+    document.getElementById('radiusAuthForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const response = await fetch('/api/radius-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: formData.get('username'),
+                password: formData.get('password')
+            })
+        });
+        printResult('radiusAuthResult', await response.json().catch(() => ({ detail: 'Invalid response' })));
+    });
+
+    document.getElementById('duoForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const response = await fetch('/api/mfa/duo/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: formData.get('username'),
+                factor: formData.get('factor'),
+                passcode: formData.get('passcode') || null
+            })
+        });
+        const payload = await response.json().catch(() => ({ detail: 'Invalid response' }));
+        printResult('duoResult', payload);
+
+        if (payload.txid) {
+            setTimeout(async () => {
+                const poll = await fetch('/api/mfa/duo/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ txid: payload.txid })
+                });
+                printResult('duoResult', await poll.json().catch(() => ({ detail: 'Invalid poll response' })));
+            }, 3000);
+        }
+    });
+
+    document.getElementById('oktaFactorsForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const username = document.getElementById('oktaUsername').value.trim();
+        const response = await fetch(`/api/mfa/okta/factors/${encodeURIComponent(username)}`);
+        const payload = await response.json().catch(() => []);
+        const select = document.getElementById('oktaFactorSelect');
+        select.innerHTML = '';
+
+        if (!Array.isArray(payload) || payload.length === 0) {
+            printResult('oktaResult', payload);
+            return;
+        }
+
+        payload.forEach(factor => {
+            const option = document.createElement('option');
+            option.value = factor.id;
+            option.textContent = `${factor.factorType || factor.factor_type || 'factor'} (${factor.provider || 'provider'})`;
+            select.appendChild(option);
+        });
+
+        printResult('oktaResult', payload);
+    });
+
+    document.getElementById('oktaVerifyForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const response = await fetch('/api/mfa/okta/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: document.getElementById('oktaUsername').value.trim(),
+                factor_id: document.getElementById('oktaFactorSelect').value || null,
+                passcode: document.getElementById('oktaPasscode').value || null
+            })
+        });
+        printResult('oktaResult', await response.json().catch(() => ({ detail: 'Invalid response' })));
+    });
+</script>
+{% endblock %}

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} - RoXX{% endblock %}
+{% block title %}TOTP Enrollment - RoXX{% endblock %}
 
 {% block extra_head %}
 <style>
     .totp-container {
-        max-width: 600px;
+        max-width: 760px;
         margin: 0 auto;
     }
 
@@ -15,29 +15,28 @@
         border-radius: var(--radius-md);
         margin: 1.5rem 0;
         word-break: break-all;
-        font-family: 'Consolas', monospace;
-        font-size: 1.25rem;
+        font-family: Consolas, monospace;
+        font-size: 1.15rem;
         text-align: center;
         border: 2px dashed var(--accent-color);
         color: var(--primary-color);
         font-weight: 700;
     }
 
-    .instructions {
-        background: #f0f9ff;
-        padding: 1.5rem;
-        border-radius: var(--radius-md);
-        margin-bottom: 2rem;
-        border-left: 4px solid var(--accent-color);
+    .backup-codes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+        margin-top: 1rem;
     }
 
-    .instructions ol {
-        margin-left: 1.5rem;
-        color: var(--text-main);
-    }
-
-    .instructions li {
-        margin: 0.5rem 0;
+    .backup-code {
+        background: #f8fafc;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+        text-align: center;
+        font-family: Consolas, monospace;
     }
 </style>
 {% endblock %}
@@ -45,62 +44,46 @@
 {% block content %}
 <div class="card totp-container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h1 style="font-size: 1.75rem; margin: 0;">Generate Token</h1>
+        <div>
+            <h1 style="font-size: 1.75rem; margin: 0;">Configure TOTP</h1>
+            <p style="margin: 0.5rem 0 0; color: var(--text-light);">Enrollment and verification now use the MFA self-service API directly.</p>
+        </div>
         <a href="/settings/mfa" class="btn btn-outline" style="font-size: 0.9rem; padding: 0.5rem 1rem;">Back</a>
     </div>
 
-    <div class="instructions">
-        <h3 style="margin-bottom: 0.75rem; color: var(--accent-hover);">How to enroll:</h3>
-        <ol>
-            <li>Enter your username and organization name</li>
-            <li>Click "Generate QR Code"</li>
-            <li>Scan the QR code with your authenticator app</li>
-            <li>Save the secret key securely</li>
-        </ol>
+    <div class="alert" style="background: #f0f9ff; border: 1px solid #bae6fd; color: #0c4a6e;">
+        <strong>Flow:</strong> generate the QR code, scan it in your authenticator app, then verify one code to enable MFA.
     </div>
 
-    <form id="enrollForm">
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" value="{{ username }}" required placeholder="john.doe">
-        </div>
+    <button id="startEnrollmentBtn" class="btn btn-primary" style="width: 100%;">Generate QR Code</button>
 
-        <div class="form-group">
-            <label for="issuer">Organization/Issuer</label>
-            <input type="text" id="issuer" name="issuer" value="RoXX" required>
-        </div>
-
-        <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%;">Generate QR
-            Code</button>
-    </form>
-
-    <div id="result"
-        style="display: none; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 2rem;">
-        <h3 style="color: var(--success-color); margin-bottom: 1rem; text-align: center;">✅ QR Code Generated!
-        </h3>
+    <div id="result" style="display: none; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 2rem;">
+        <h3 style="color: var(--success-color); margin-bottom: 1rem; text-align: center;">QR Code Generated</h3>
 
         <div id="qrcode" style="text-align: center; margin: 1.5rem 0;"></div>
 
         <p style="margin: 1rem 0; color: var(--text-main); text-align: center;">
-            <strong>Secret Key (save this!):</strong>
+            <strong>Secret Key:</strong>
         </p>
         <div class="secret-box" id="secret"></div>
 
-        <div class="alert"
-            style="background: #fffbeb; border: 1px solid #fef3c7; color: #b45309; font-size: 0.9rem; margin-top: 1.5rem;">
-            ⚠️ <strong>Warning:</strong> Keep this secret key secure. You will need it to recover access if you
-            lose your device.
+        <div class="alert" style="background: #fffbeb; border: 1px solid #fef3c7; color: #b45309; font-size: 0.9rem; margin-top: 1.5rem;">
+            <strong>Warning:</strong> Save the secret and backup codes before enabling MFA.
         </div>
 
-        <!-- Verification Step -->
+        <div style="margin-top: 2rem;">
+            <h4 style="margin-bottom: 0.75rem;">Backup Codes</h4>
+            <div id="backupCodes" class="backup-codes"></div>
+        </div>
+
         <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
             <h4 style="margin-bottom: 1rem;">Verify & Enable</h4>
-            <form action="/auth/mfa-setup" method="POST" style="display: flex; gap: 0.5rem;">
-                <input type="hidden" id="secretInput" name="secret">
-                <input type="text" name="code" placeholder="Enter 6-digit code" required
+            <form id="verifyEnrollmentForm" style="display: flex; gap: 0.5rem;">
+                <input type="text" id="verifyToken" name="token" placeholder="Enter 6-digit code" required
                     style="flex: 1; padding: 0.5rem;" maxlength="6" pattern="[0-9]*">
                 <button type="submit" class="btn btn-primary">Verify</button>
             </form>
+            <div id="verifyStatus" style="margin-top: 1rem; font-size: 0.95rem;"></div>
         </div>
     </div>
 </div>
@@ -108,39 +91,60 @@
 
 {% block scripts %}
 <script>
-    document.getElementById('enrollForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
+    function setStatus(message, ok = false) {
+        const status = document.getElementById('verifyStatus');
+        status.textContent = message;
+        status.style.color = ok ? 'green' : 'red';
+    }
 
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Generating...';
-
-        const formData = new FormData(e.target);
+    async function startEnrollment() {
+        const button = document.getElementById('startEnrollmentBtn');
+        button.disabled = true;
+        button.textContent = 'Generating...';
 
         try {
-            const response = await fetch('/api/totp/generate-qr', {
+            const response = await fetch('/api/mfa/enroll', { method: 'POST' });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.detail || 'Failed to generate QR code');
+            }
+
+            document.getElementById('qrcode').innerHTML = `<img src="${data.qr_code}" alt="TOTP QR Code" style="border-radius: 8px; max-width: 260px;">`;
+            document.getElementById('secret').textContent = data.secret;
+            document.getElementById('backupCodes').innerHTML = (data.backup_codes || []).map(code => `<div class="backup-code">${code}</div>`).join('');
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+            setStatus('', true);
+        } catch (error) {
+            setStatus(error.message, false);
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Generate QR Code';
+        }
+    }
+
+    async function verifyEnrollment(event) {
+        event.preventDefault();
+        const formData = new FormData();
+        formData.append('token', document.getElementById('verifyToken').value);
+
+        try {
+            const response = await fetch('/api/mfa/verify-enrollment', {
                 method: 'POST',
                 body: formData
             });
-
-            const data = await response.json();
-
-            if (data.success) {
-                document.getElementById('qrcode').innerHTML = `<img src="${data.qr_code}" alt="TOTP QR Code" style="border-radius: 8px;">`;
-                document.getElementById('secret').textContent = data.secret;
-                document.getElementById('secretInput').value = data.secret; // Set hidden input for verification
-                document.getElementById('result').style.display = 'block';
-                // Scroll to result
-                document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.detail || 'Verification failed');
             }
+            setStatus('MFA enabled successfully.', true);
         } catch (error) {
-            alert('Error generating QR code: ' + error.message);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Generate QR Code';
+            setStatus(error.message, false);
         }
-    });
+    }
+
+    document.getElementById('startEnrollmentBtn').addEventListener('click', startEnrollment);
+    document.getElementById('verifyEnrollmentForm').addEventListener('submit', verifyEnrollment);
 </script>
 {% endblock %}

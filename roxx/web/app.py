@@ -633,13 +633,37 @@ def get_page_context(request: Request, username: str, active_page: str, **kwargs
     }
     return context
 
+
+def get_system_settings_snapshot() -> dict:
+    """Return system settings merged with sane defaults."""
+    from roxx.core.auth.config_db import ConfigManager
+
+    defaults = {
+        "server_name": "RoXX RADIUS Proxy",
+        "radius_auth_port": "1812",
+        "radius_acct_port": "1813",
+        "debug_mode": "false",
+        "log_level": "INFO",
+        "audit_retention_days": "90",
+    }
+    return {**defaults, **ConfigManager.get_system_settings()}
+
+
+def normalize_system_settings_payload(data: dict) -> dict:
+    """Normalize incoming system settings payloads from JSON or form data."""
+    return {
+        "server_name": str(data.get("server_name", "RoXX RADIUS Proxy")).strip() or "RoXX RADIUS Proxy",
+        "radius_auth_port": str(data.get("radius_auth_port", "1812")).strip() or "1812",
+        "radius_acct_port": str(data.get("radius_acct_port", "1813")).strip() or "1813",
+        "log_level": str(data.get("log_level", "INFO")).strip().upper() or "INFO",
+        "audit_retention_days": str(data.get("audit_retention_days", "90")).strip() or "90",
+        "debug_mode": "true" if str(data.get("debug_mode", "false")).lower() in {"true", "1", "yes", "on"} else "false",
+    }
+
 @app.get("/logs-view", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_LOGS))])
 async def logs_view_page(request: Request, current_user: str = Depends(get_current_username)):
-    """System Logs Page"""
-    return templates.TemplateResponse("logs.html", get_page_context(
-        request, current_user, "logs",
-        title="System Logs"
-    ))
+    """Legacy logs route kept as redirect to the canonical page."""
+    return RedirectResponse(url="/logs", status_code=303)
 
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def home(request: Request):
@@ -665,11 +689,8 @@ async def config_mfa_gateways_page(request: Request, current_user: str = Depends
 
 @app.get("/nps-migration", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def nps_migration_page(request: Request, current_user: str = Depends(get_current_username)):
-    """NPS Migration Assistant Page"""
-    return templates.TemplateResponse("nps_migration.html", get_page_context(
-        request, current_user, "settings",
-        title="NPS Migration"
-    ))
+    """Legacy alias kept for backwards compatibility."""
+    return RedirectResponse(url="/config/nps-migration", status_code=303)
 
 @app.post("/api/nps/analyze", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
 async def api_nps_analyze(request: Request, file: UploadFile = File(...)):
@@ -891,6 +912,45 @@ async def users_page(request: Request, current_user: str = Depends(get_current_u
     ))
 
 
+@app.get("/api/users", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
+async def get_radius_users():
+    """List local RADIUS users from users.conf."""
+    users_file = SystemManager.get_config_dir() / "users.conf"
+    users = []
+    if users_file.exists():
+        with open(users_file, "r") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped or stripped.startswith('#'):
+                    continue
+                parts = stripped.split()
+                if len(parts) >= 4:
+                    users.append({
+                        "username": parts[0],
+                        "attribute": parts[1],
+                        "op": parts[2],
+                        "password": parts[3].strip('"')
+                    })
+    return users
+
+
+@app.post("/api/users", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
+async def add_radius_user(request: Request):
+    data = await request.json()
+    username = data.get("username")
+    password = data.get("password")
+    if SystemManager.add_radius_user(username, password):
+        return {"success": True}
+    return {"success": False}
+
+
+@app.delete("/api/users/{username}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
+async def delete_radius_user(username: str):
+    if SystemManager.delete_radius_user(username):
+        return {"success": True}
+    return {"success": False}
+
+
 @app.get("/config", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
 async def config_page(request: Request, current_user: str = Depends(get_current_username)):
     """Configuration page"""
@@ -905,7 +965,7 @@ async def api_tokens_page(request: Request, current_user: str = Depends(get_curr
         request, current_user, "settings"
     ))
 
-@app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_MFA))])
+@app.get("/settings/mfa", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def mfa_settings_page(request: Request, current_user: str = Depends(get_current_username)):
     """MFA Settings Page"""
     return templates.TemplateResponse("mfa_settings.html", get_page_context(
@@ -1211,12 +1271,12 @@ async def radius_authenticate(request: Request):
 # Audit Logs
 # ------------------------------------------------------------------------------
 
-@app.get("/logs", response_class=HTMLResponse)
+@app.get("/logs", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_LOGS))])
 async def logs_page(request: Request, current_user: str = Depends(get_current_username)):
     """Audit Logs Viewer"""
     return templates.TemplateResponse("logs.html", get_page_context(request, current_user, "logs"))
 
-@app.get("/api/logs")
+@app.get("/api/logs", dependencies=[Depends(require_action(Action.VIEW_LOGS))])
 async def get_audit_logs(
     request: Request, 
     limit: int = 100, 
@@ -1227,6 +1287,22 @@ async def get_audit_logs(
     """API to retrieve audit logs"""
     logs = AuditDatabase.get_logs(limit, offset, search)
     return {"logs": logs}
+
+
+@app.get("/system/observability", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_SYSTEM_INFO))])
+async def system_observability_page(request: Request, current_user: str = Depends(get_current_username)):
+    """System observability page for health, integrity and live diagnostics."""
+    return templates.TemplateResponse("system_observability.html", get_page_context(
+        request, current_user, "observability"
+    ))
+
+
+@app.get("/tools/integrations", response_class=HTMLResponse, dependencies=[Depends(require_role(Role.SUPERADMIN, Role.ADMIN))])
+async def integration_tools_page(request: Request, current_user: str = Depends(get_current_username)):
+    """GUI for API-only integration tooling and diagnostics."""
+    return templates.TemplateResponse("integration_tools.html", get_page_context(
+        request, current_user, "tools"
+    ))
 
 
 
@@ -1488,50 +1564,6 @@ async def admin_webauthn_register_verify(request: Request, username: str):
         return {"success": True}
     raise HTTPException(status_code=400, detail=msg)
 
-
-# ------------------------------------------------------------------------------
-# User Management API
-# ---------------------------------------------------------------------------@app.get("/users", response_class=HTMLResponse)
-async def users_page(request: Request, username: str = Depends(get_current_username)):
-    """RADIUS User Management Page"""
-    return templates.TemplateResponse("users.html", {"request": request, "username": username})
-
-@app.get("/api/users", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
-async def get_radius_users():
-    """List local RADIUS users from users.conf"""
-    users_file = SystemManager.get_config_dir() / "users.conf"
-    users = []
-    if users_file.exists():
-        with open(users_file, "r") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped or stripped.startswith('#'):
-                    continue
-                parts = stripped.split()
-                if len(parts) >= 4:
-                    users.append({
-                        "username": parts[0],
-                        "attribute": parts[1],
-                        "op": parts[2],
-                        "password": parts[3].strip('"')
-                    })
-    return users
-
-@app.post("/api/users", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
-async def add_radius_user(request: Request):
-    data = await request.json()
-    username = data.get("username")
-    password = data.get("password")
-    if SystemManager.add_radius_user(username, password):
-        return {"success": True}
-    return {"success": False}
-
-@app.delete("/api/users/{username}", dependencies=[Depends(require_action(Action.MANAGE_RADIUS_USERS))])
-async def delete_radius_user(username: str):
-    if SystemManager.delete_radius_user(username):
-        return {"success": True}
-    return {"success": False}
-
 # ------------------------------------------------------------------------------
 # Real-time Logs (WebSocket)
 # ------------------------------------------------------------------------------
@@ -1594,14 +1626,6 @@ async def websocket_endpoint(websocket: WebSocket):
         if websocket in active_log_websockets:
             active_log_websockets.remove(websocket)
 
-
-# ------------------------------------------------------------------------------
-# API Token Management
-# ------------------------------------------------------------------------------
-@app.get("/config/api-tokens", response_class=HTMLResponse)
-async def api_tokens_page(request: Request, current_user: str = Depends(get_current_username)):
-    return templates.TemplateResponse("config_api_tokens.html", get_page_context(request, current_user, "tokens"))
-
 # ------------------------------------------------------------------------------
 # MFA API Endpoints (Self-Service)
 # ------------------------------------------------------------------------------
@@ -1618,11 +1642,6 @@ async def webauthn_list_self(username: str = Depends(get_current_username)):
     except Exception as e:
         logger.error(f"Error listing self credentials: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/totp/enroll", response_class=HTMLResponse)
-async def totp_enroll_page(request: Request, username: str = Depends(get_current_username)):
-    """TOTP Enrollment Page"""
-    return templates.TemplateResponse("totp_enroll.html", get_page_context(request, username, "mfa"))
 
 @app.get("/api/webauthn/register/options")
 async def webauthn_register_options(request: Request, username: str = Depends(get_current_username)):
@@ -1805,7 +1824,7 @@ async def init_pki():
 # ------------------------------------------------------------------------------
 # TOTP Routes
 # ------------------------------------------------------------------------------
-@app.post("/api/totp/generate-qr", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
+@app.post("/api/totp/generate-qr", dependencies=[Depends(get_current_username)])
 async def generate_totp_qr(request: Request):
     """Generate a new TOTP secret and QR code"""
     username = await get_current_username(request)
@@ -1886,14 +1905,33 @@ async def test_sms(request: Request):
 # ------------------------------------------------------------------------------
 # System Settings
 # ------------------------------------------------------------------------------
-@app.get("/config/system", response_class=HTMLResponse)
+@app.get("/config/system", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
 async def config_system_get(request: Request, username: str = Depends(get_current_username)):
     """GET system settings page"""
-    from roxx.core.auth.config_db import ConfigManager
-    settings = ConfigManager.get_system_settings()
-    return templates.TemplateResponse("system_settings.html", {"request": request, "username": username, "settings": settings})
+    return templates.TemplateResponse("system_settings.html", get_page_context(
+        request, username, "settings", settings=get_system_settings_snapshot()
+    ))
 
-@app.post("/config/system")
+
+@app.get("/api/system/settings", dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
+async def get_system_settings():
+    """Return persisted system settings as JSON."""
+    return get_system_settings_snapshot()
+
+
+@app.put("/api/system/settings", dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
+async def update_system_settings(request: Request):
+    """Update persisted system settings from JSON."""
+    from roxx.core.auth.config_db import ConfigManager
+
+    data = await request.json()
+    settings = normalize_system_settings_payload(data)
+
+    if ConfigManager.update_system_settings(settings):
+        return {"success": True, "settings": settings}
+    raise HTTPException(status_code=500, detail="Failed to save settings")
+
+@app.post("/config/system", dependencies=[Depends(require_action(Action.MANAGE_SYSTEM_CONFIG))])
 async def config_system_post(
     request: Request,
     server_name: str = Form(...),
@@ -1906,25 +1944,27 @@ async def config_system_post(
 ):
     """POST system settings update"""
     from roxx.core.auth.config_db import ConfigManager
-    
-    settings = {
+
+    settings = normalize_system_settings_payload({
         "server_name": server_name,
         "radius_auth_port": radius_auth_port,
         "radius_acct_port": radius_acct_port,
         "log_level": log_level,
         "audit_retention_days": audit_retention_days,
-        "debug_mode": "true" if debug_mode else "false"
-    }
-    
+        "debug_mode": debug_mode,
+    })
+
     if ConfigManager.update_system_settings(settings):
         return RedirectResponse(url="/config?success=settings_updated", status_code=303)
     else:
         return RedirectResponse(url="/config/system?error=save_failed", status_code=303)
 
-@app.get("/config/nps-migration", response_class=HTMLResponse)
-async def nps_migration_page(request: Request, username: str = Depends(get_current_username)):
+@app.get("/config/nps-migration", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_RADIUS_CLIENTS))])
+async def config_nps_migration_page(request: Request, username: str = Depends(get_current_username)):
     """GET NPS Migration Assistant page"""
-    return templates.TemplateResponse("nps_migration.html", {"request": request, "username": username})
+    return templates.TemplateResponse("nps_migration.html", get_page_context(
+        request, username, "settings"
+    ))
 
 @app.post("/api/test/email", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
 async def test_email(request: Request):
@@ -1953,7 +1993,7 @@ async def test_email(request: Request):
     result = await EmailProvider.send_email(email, subject, body, config)
     return {"success": result}
 
-@app.post("/api/mfa/cert/register", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
+@app.post("/api/mfa/cert/register", dependencies=[Depends(get_current_username)])
 async def register_client_cert(request: Request):
     from roxx.core.security.cert_auth import CertAuthManager
     from roxx.core.auth.cert_db import CertDatabase
@@ -1968,13 +2008,13 @@ async def register_client_cert(request: Request):
     CertDatabase.add_cert(username, cert_info['fingerprint'], cert_info['common_name'], cert_info['issuer'], f"Registered: {datetime.now().strftime('%Y-%m-%d')}")
     return {"success": True, "message": "Certificate linked successfully"}
 
-@app.get("/api/mfa/cert/list", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
+@app.get("/api/mfa/cert/list", dependencies=[Depends(get_current_username)])
 async def list_client_certs(request: Request):
     from roxx.core.auth.cert_db import CertDatabase
     username = await get_current_username(request)
     return CertDatabase.get_user_certs(username)
 
-@app.delete("/api/mfa/cert/{cert_id}", dependencies=[Depends(require_action(Action.MANAGE_MFA))])
+@app.delete("/api/mfa/cert/{cert_id}", dependencies=[Depends(get_current_username)])
 async def delete_client_cert(cert_id: int, request: Request):
     from roxx.core.auth.cert_db import CertDatabase
     username = await get_current_username(request)

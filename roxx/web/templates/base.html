@@ -67,8 +67,14 @@
 
                 {% if user_role in ['superadmin', 'admin'] %}
                 <div class="nav-category">System</div>
-                <a href="/config" class="nav-item">
+                <a href="/config" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
                     <i class="fas fa-cog"></i> Config
+                </a>
+                <a href="/system/observability" class="nav-item {% if active_page == 'observability' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i> Observability
+                </a>
+                <a href="/tools/integrations" class="nav-item {% if active_page == 'tools' %}active{% endif %}">
+                    <i class="fas fa-vials"></i> Integration Tools
                 </a>
                 <a href="/config/nps-migration" class="nav-item">
                     <i class="fas fa-file-import"></i> NPS Migration
