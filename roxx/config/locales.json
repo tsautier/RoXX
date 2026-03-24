@@ -163,8 +163,8 @@
         "EN": "Enable Entra-ID external authentication [JWT Token]?\n(CHAP / MSCHAP / MSCHAPv2 not supported) "
 	},
     "se_te_033": {
-        "FR": "Indiquer le Tenant ID (id d'organisation)",
-        "EN": "Please enter the Tenant ID"
+        "FR": "Indiquer le Directory ID (id d'organisation)",
+        "EN": "Please enter the Directory ID"
 	},
     
     "se_te_034": {

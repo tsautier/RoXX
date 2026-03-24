@@ -6,7 +6,6 @@ All notable changes to RoXX will be documented in this file.
 
 ### 🚀 Planned Features
 - [ ] Advanced RBAC for Admins
-- [ ] Multi-tenant support (Virtual RADIUS)
 - [ ] Integration with more MFA providers (Duo, Okta)
 - [ ] Performance optimizations for high-concurrency 802.1X
 

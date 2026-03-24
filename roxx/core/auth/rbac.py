@@ -2,7 +2,7 @@
 Role-Based Access Control (RBAC) for RoXX Admins
 
 Roles:
-  - superadmin: Full access (manage admins, roles, system config, tenants)
+  - superadmin: Full access (manage admins, roles, system config)
   - admin:      Standard admin (manage RADIUS users/backends, MFA, view logs)
   - auditor:    Read-only (view dashboard, logs, system info — no mutations)
 """
@@ -46,9 +46,6 @@ class Action:
     MANAGE_PKI = "manage_pki"
     MANAGE_API_TOKENS = "manage_api_tokens"
 
-    # Tenants
-    MANAGE_TENANTS = "manage_tenants"
-
     # Read-only
     VIEW_DASHBOARD = "view_dashboard"
     VIEW_LOGS = "view_logs"
@@ -70,7 +67,6 @@ ROLE_PERMISSIONS: dict[str, Set[str]] = {
         Action.MANAGE_SSL,
         Action.MANAGE_PKI,
         Action.MANAGE_API_TOKENS,
-        Action.MANAGE_TENANTS,
         Action.VIEW_DASHBOARD,
         Action.VIEW_LOGS,
         Action.VIEW_SYSTEM_INFO,

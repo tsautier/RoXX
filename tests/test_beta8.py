@@ -1,6 +1,6 @@
 """
 Tests for RoXX 1.0.0-beta8 Features
-Tests RBAC, Multi-tenant, Duo/Okta providers, and Cache optimizations
+Tests RBAC, Duo/Okta providers, and Cache optimizations
 """
 
 import sys
@@ -39,7 +39,7 @@ def test_rbac_module():
     # Test superadmin has all permissions
     try:
         for action in [Action.MANAGE_ADMINS, Action.CHANGE_ROLES, Action.DELETE_ADMINS,
-                       Action.MANAGE_SYSTEM_CONFIG, Action.VIEW_DASHBOARD, Action.MANAGE_TENANTS]:
+                       Action.MANAGE_SYSTEM_CONFIG, Action.VIEW_DASHBOARD]:
             assert check_permission(Role.SUPERADMIN, action), f"Superadmin missing {action}"
         print(f"✓ Superadmin has all permissions")
         passed += 1
@@ -51,7 +51,6 @@ def test_rbac_module():
     try:
         assert not check_permission(Role.ADMIN, Action.CHANGE_ROLES)
         assert not check_permission(Role.ADMIN, Action.DELETE_ADMINS)
-        assert not check_permission(Role.ADMIN, Action.MANAGE_TENANTS)
         assert check_permission(Role.ADMIN, Action.MANAGE_RADIUS_USERS)
         print(f"✓ Admin role restrictions OK")
         passed += 1
@@ -74,85 +73,6 @@ def test_rbac_module():
 
     print(f"\nRBAC Results: {passed} passed, {failed} failed\n")
     return failed == 0
-
-
-def test_tenant_db():
-    """Test Tenant Database CRUD"""
-    print("=" * 60)
-    print("Testing Tenant Database")
-    print("=" * 60)
-
-    from roxx.core.auth.tenant_db import TenantDatabase
-
-    # Use temp DB
-    import roxx.core.auth.tenant_db as tdb
-    old_path = tdb.DB_PATH
-    tdb.DB_PATH = Path(tempfile.mktemp(suffix='.db'))
-
-    passed = 0
-    failed = 0
-
-    try:
-        TenantDatabase.init()
-        print("✓ Init OK")
-        passed += 1
-
-        # Create tenant
-        ok, msg, tid = TenantDatabase.create_tenant("Acme Corp", "acme", "Test tenant")
-        assert ok and tid is not None, f"Create failed: {msg}"
-        print(f"✓ Create tenant OK (ID: {tid})")
-        passed += 1
-
-        # Duplicate slug
-        ok2, msg2, _ = TenantDatabase.create_tenant("Acme 2", "acme", "Dup")
-        assert not ok2, "Duplicate slug should fail"
-        print(f"✓ Duplicate slug rejected OK")
-        passed += 1
-
-        # List tenants
-        tenants = TenantDatabase.list_tenants()
-        assert len(tenants) == 1
-        assert tenants[0]['name'] == 'Acme Corp'
-        print(f"✓ List tenants OK ({len(tenants)} found)")
-        passed += 1
-
-        # Get by slug
-        t = TenantDatabase.get_tenant_by_slug("acme")
-        assert t and t['name'] == 'Acme Corp'
-        print(f"✓ Get by slug OK")
-        passed += 1
-
-        # Assign admin
-        ok, msg = TenantDatabase.assign_admin("admin", tid)
-        assert ok
-        admins = TenantDatabase.get_tenant_admins(tid)
-        assert "admin" in admins
-        print(f"✓ Assign admin OK")
-        passed += 1
-
-        # Get admin tenants
-        admin_t = TenantDatabase.get_admin_tenants("admin")
-        assert len(admin_t) == 1
-        print(f"✓ Get admin tenants OK")
-        passed += 1
-
-        # Delete
-        ok, msg = TenantDatabase.delete_tenant(tid)
-        assert ok
-        tenants = TenantDatabase.list_tenants()
-        assert len(tenants) == 0
-        print(f"✓ Delete tenant OK")
-        passed += 1
-
-    except Exception as e:
-        print(f"✗ Error: {e}")
-        failed += 1
-    finally:
-        tdb.DB_PATH = old_path
-
-    print(f"\nTenant Results: {passed} passed, {failed} failed\n")
-    return failed == 0
-
 
 def test_duo_provider():
     """Test Duo Provider instantiation and signing"""
@@ -438,7 +358,6 @@ def main():
     results = {
         "RBAC Module": test_rbac_module(),
         "Admin Roles DB": test_admin_roles(),
-        "Tenant Database": test_tenant_db(),
         "Duo Provider": test_duo_provider(),
         "Okta Provider": test_okta_provider(),
         "Auth Cache (LRU)": test_cache_lru(),

@@ -89,7 +89,7 @@ Features:
 ### EntraID Setup
 
 1. Register app in Azure AD
-2. Note Client ID and Tenant ID
+2. Note Client ID and Directory ID
 3. Configure in setup wizard
 4. Set environment variables for credentials
 

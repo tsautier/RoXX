@@ -207,8 +207,8 @@ class SetupAssistant:
         """Configure EntraID"""
         console.print("\n[bold]EntraID / Azure AD Configuration[/bold]")
         
-        tenant_id = questionary.text(
-            "Azure Tenant ID:",
+        directory_id = questionary.text(
+            "Azure Directory ID:",
             style=custom_style
         ).ask()
         
@@ -223,7 +223,7 @@ class SetupAssistant:
         ).ask()
         
         self.config['entraid'] = {
-            'tenant_id': tenant_id,
+            'directory_id': directory_id,
             'client_id': client_id,
             'domain': domain
         }

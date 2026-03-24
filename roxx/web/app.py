@@ -73,12 +73,10 @@ async def lifespan(app: FastAPI):
     # 🏁 Startup Logic
     from roxx.core.auth.webauthn import WebAuthnManager
     from roxx.core.auth.cert_db import CertDatabase
-    from roxx.core.auth.tenant_db import TenantDatabase
     from roxx.core.integrity import IntegrityManager
     
     WebAuthnManager.init()
     CertDatabase.init_db()
-    TenantDatabase.init()
     
     # 🛡️ Integrity Check on Startup
     # In a production build, the expected_manifest would be signed and baked into the binary.
@@ -2200,95 +2198,6 @@ async def saml_acs(provider_id: int, request: Request):
                         {"error": str(e), "provider": provider['name']})
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ------------------------------------------------------------------------------
-# Tenant Management API
-# ------------------------------------------------------------------------------
-from roxx.core.auth.tenant_db import TenantDatabase
-
-@app.get("/config/tenants", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def tenants_page(request: Request, current_user: str = Depends(get_current_username)):
-    """Tenant Management Page (superadmin only)"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Superadmin access required")
-    tenants = TenantDatabase.list_tenants()
-    return templates.TemplateResponse(request, "tenants.html", get_page_context(
-        request, current_user, "tenants", tenants=tenants
-    ))
-
-@app.get("/api/tenants", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def list_tenants(request: Request):
-    """List all tenants"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Superadmin access required")
-    return TenantDatabase.list_tenants()
-
-@app.post("/api/tenants", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def create_tenant(request: Request):
-    """Create a new tenant"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Superadmin access required")
-    data = await request.json()
-    name = data.get('name', '')
-    slug = data.get('slug', '')
-    description = data.get('description', '')
-    if not name or not slug:
-        raise HTTPException(status_code=400, detail="Name and slug required")
-    success, msg, tid = TenantDatabase.create_tenant(name, slug, description)
-    if success:
-        return {"success": True, "message": msg, "tenant_id": tid}
-    raise HTTPException(status_code=400, detail=msg)
-
-@app.put("/api/tenants/{tenant_id}", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def update_tenant(tenant_id: int, request: Request):
-    """Update a tenant"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Superadmin access required")
-    data = await request.json()
-    success, msg = TenantDatabase.update_tenant(
-        tenant_id,
-        name=data.get('name'),
-        description=data.get('description'),
-        enabled=data.get('enabled')
-    )
-    if success:
-        return {"success": True, "message": msg}
-    raise HTTPException(status_code=400, detail=msg)
-
-@app.delete("/api/tenants/{tenant_id}", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def delete_tenant(tenant_id: int, request: Request):
-    """Delete a tenant"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Superadmin access required")
-    success, msg = TenantDatabase.delete_tenant(tenant_id)
-    if success:
-        return {"success": True, "message": msg}
-    raise HTTPException(status_code=400, detail=msg)
-
-@app.post("/api/tenants/{tenant_id}/admins", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def assign_admin_to_tenant(tenant_id: int, request: Request):
-    """Assign an admin to a tenant"""
-    caller_role = get_role_from_session(request) or 'admin'
-    if caller_role != 'superadmin':
-        raise HTTPException(status_code=403, detail="Superadmin access required")
-    data = await request.json()
-    username = data.get('username')
-    if not username:
-        raise HTTPException(status_code=400, detail="Username required")
-    success, msg = TenantDatabase.assign_admin(username, tenant_id)
-    if success:
-        return {"success": True, "message": msg}
-    raise HTTPException(status_code=400, detail=msg)
-
-@app.get("/api/tenants/{tenant_id}/admins", dependencies=[Depends(require_action(Action.MANAGE_TENANTS))])
-async def get_tenant_admins(tenant_id: int, request: Request):
-    """Get admins assigned to a tenant"""
-    return TenantDatabase.get_tenant_admins(tenant_id)
 
 # ------------------------------------------------------------------------------
 # Duo MFA Endpoints

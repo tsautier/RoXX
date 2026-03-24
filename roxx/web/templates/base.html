@@ -79,11 +79,6 @@
                 <a href="/config/nps-migration" class="nav-item">
                     <i class="fas fa-file-import"></i> NPS Migration
                 </a>
-                {% if user_role == 'superadmin' %}
-                <a href="/config/tenants" class="nav-item {% if active_page == 'tenants' %}active{% endif %}">
-                    <i class="fas fa-building"></i> Tenants
-                </a>
-                {% endif %}
                 {% endif %}
                 <a href="/logout" class="nav-item text-danger">
                     <i class="fas fa-sign-out-alt"></i> Logout
