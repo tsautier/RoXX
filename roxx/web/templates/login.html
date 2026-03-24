@@ -144,8 +144,22 @@
         }
 
         async function triggerSendOtp(type) {
-            // Implementation for sending OTP
-            // TODO: Call /api/auth/otp/send
+            try {
+                const res = await fetch('/auth/mfa/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.detail || data.message || 'Failed to send verification code');
+                }
+                if (data.message) {
+                    document.getElementById('pageSubtitle').textContent = data.message;
+                }
+            } catch (err) {
+                showError(err.message);
+            }
         }
 
         async function handleOtp(e) {

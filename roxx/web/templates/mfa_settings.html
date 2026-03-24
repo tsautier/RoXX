@@ -84,6 +84,9 @@
                 <p style="color: var(--text-light); margin-bottom: 1.5rem;">
                     Receive OTP codes via SMS.
                 </p>
+                <div id="smsStatus" style="margin-bottom: 1rem; color: var(--text-light);">
+                    Loading SMS status...
+                </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <input type="text" id="userPhone" placeholder="+1234567890" class="form-control">
                     <button onclick="savePhone()" class="btn btn-outline">Save</button>
@@ -281,14 +284,29 @@
         async function loadMfaStatus() {
             const statusEl = document.getElementById('totpStatus');
             const disableBtn = document.getElementById('disableMfaBtn');
+            const smsStatusEl = document.getElementById('smsStatus');
+            const phoneInput = document.getElementById('userPhone');
             try {
                 const res = await fetch('/api/mfa/status');
                 const data = await res.json();
+                if (phoneInput) {
+                    phoneInput.value = data.phone_number || '';
+                }
+                if (smsStatusEl) {
+                    if (!data.gateway_enabled) {
+                        smsStatusEl.textContent = 'SMS gateway is disabled by the administrator.';
+                    } else if (data.phone_number) {
+                        smsStatusEl.textContent = `SMS enabled for ${data.phone_number}.`;
+                    } else {
+                        smsStatusEl.textContent = 'No phone number configured yet.';
+                    }
+                }
                 if (data.enabled) {
-                    const type = data.type || 'totp';
+                    const methods = data.methods || [];
+                    const type = methods.length ? methods.join(', ') : (data.type || 'totp');
                     const backupCodes = data.backup_codes_remaining ?? 0;
                     statusEl.textContent = `Enabled via ${type}. Backup codes remaining: ${backupCodes}.`;
-                    disableBtn.style.display = 'block';
+                    disableBtn.style.display = methods.includes('totp') || data.type === 'totp' ? 'block' : 'none';
                 } else {
                     statusEl.textContent = 'TOTP is not enabled yet.';
                     disableBtn.style.display = 'none';
@@ -296,6 +314,38 @@
             } catch (e) {
                 statusEl.textContent = 'Failed to load MFA status.';
                 disableBtn.style.display = 'none';
+            }
+        }
+
+        async function savePhone() {
+            const phoneInput = document.getElementById('userPhone');
+            const smsStatusEl = document.getElementById('smsStatus');
+            const phoneNumber = phoneInput.value.trim();
+
+            try {
+                const res = await fetch('/api/mfa/phone', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone_number: phoneNumber })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.detail || 'Failed to save phone number');
+                }
+                if (smsStatusEl) {
+                    if (!data.gateway_enabled) {
+                        smsStatusEl.textContent = 'Phone saved, but SMS gateway is disabled.';
+                    } else if (data.phone_number) {
+                        smsStatusEl.textContent = `SMS enabled for ${data.phone_number}.`;
+                    } else {
+                        smsStatusEl.textContent = 'Phone number removed.';
+                    }
+                }
+                loadMfaStatus();
+            } catch (e) {
+                if (smsStatusEl) {
+                    smsStatusEl.textContent = `Failed to save phone number: ${e.message}`;
+                }
             }
         }
 

@@ -106,6 +106,39 @@ class AdminDatabase:
         }
 
     @classmethod
+    def get_phone_number(cls, username: str) -> str | None:
+        """Get the stored phone number for a user."""
+        conn = cls.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT phone_number FROM admins WHERE username = ?",
+            (username,),
+        ).fetchone()
+        conn.close()
+        if not row:
+            return None
+        return row["phone_number"]
+
+    @classmethod
+    def set_phone_number(cls, username: str, phone_number: str | None) -> bool:
+        """Set or clear the stored phone number for a user."""
+        try:
+            conn = cls.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE admins SET phone_number = ? WHERE username = ?",
+                (phone_number, username),
+            )
+            conn.commit()
+            updated = cursor.rowcount > 0
+            conn.close()
+            return updated
+        except Exception as e:
+            logger.error(f"Error setting phone number for {username}: {e}")
+            return False
+
+    @classmethod
     def get_role(cls, username: str) -> str:
         """Get the role for a user. Returns 'admin' as default."""
         conn = cls.get_connection()

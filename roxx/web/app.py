@@ -25,6 +25,8 @@ import logging
 import json
 import ssl
 import sqlite3
+import random
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -182,6 +184,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 from fastapi.responses import RedirectResponse
 from fastapi.security.utils import get_authorization_scheme_param
 from roxx.core.auth.manager import AuthManager
+from roxx.core.auth.db import AdminDatabase
 
 # Initialize Auth Subsystem on startup
 AuthManager.init()
@@ -227,6 +230,47 @@ async def get_current_username(request: Request):
             headers={"WWW-Authenticate": "Basic"},
         )
 
+
+def _load_mfa_gateway_config() -> dict:
+    config_path = SystemManager.get_config_dir() / "mfa_gateways.json"
+    if not config_path.exists():
+        return {"sms": {"provider": "disabled"}, "email": {"enabled": False}}
+    try:
+        return json.loads(config_path.read_text())
+    except Exception:
+        logger.exception("Failed to read MFA gateway configuration")
+        return {"sms": {"provider": "disabled"}, "email": {"enabled": False}}
+
+
+def _get_sms_gateway_config() -> dict:
+    return _load_mfa_gateway_config().get("sms", {})
+
+
+def _is_sms_gateway_enabled() -> bool:
+    config = _get_sms_gateway_config()
+    return bool(config) and config.get("provider") not in (None, "", "disabled")
+
+
+async def _send_sms_login_code(request: Request, username: str) -> str:
+    phone_number = AdminDatabase.get_phone_number(username)
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="No phone number configured")
+
+    if not _is_sms_gateway_enabled():
+        raise HTTPException(status_code=400, detail="SMS gateway is disabled")
+
+    code = f"{random.randint(0, 999999):06d}"
+    request.session["mfa_code_sms"] = code
+    sent = await SMSProvider.send_sms(
+        phone_number,
+        f"Your RoXX code is {code}",
+        _get_sms_gateway_config(),
+    )
+    if not sent:
+        request.session.pop("mfa_code_sms", None)
+        raise HTTPException(status_code=502, detail="Failed to send SMS code")
+    return phone_number
+
 # Dependency for Auth Routes (allows partial auth)
 async def get_partial_user(request: Request):
     auth = get_auth_context(request)
@@ -268,12 +312,17 @@ async def login(request: Request, username: str = Form(...), password: str = For
         # Discovery MFA Methods
         mfa_methods = []
         
-        # 1. TOTP / SMS / Email (from MFADatabase)
+        # 1. TOTP / Email (from MFADatabase)
         mfa_settings = MFADatabase.get_mfa_settings(username) or {}
         if mfa_settings.get('mfa_enabled'):
             # Current DB schema 'mfa_type' is single, but let's be robust
             m_type = mfa_settings.get('mfa_type', 'totp')
             mfa_methods.append(m_type)
+
+        # 1b. SMS can coexist as a self-service factor backed by the admin profile
+        if AdminDatabase.get_phone_number(username) and _is_sms_gateway_enabled():
+            if 'sms' not in mfa_methods:
+                mfa_methods.append('sms')
             
         # 2. WebAuthn
         from roxx.core.auth.webauthn_db import WebAuthnDatabase
@@ -419,6 +468,34 @@ async def mfa_verify_unified(request: Request):
 
     AuditManager.log(request, "MFA_FAILED", "WARNING", {"username": username, "method": mfa_type, "reason": "invalid_code"}, username=username)
     return JSONResponse({"success": False, "detail": "Invalid Code"}, status_code=400)
+
+
+@app.post("/auth/mfa/send-otp")
+@limiter.limit("5/minute")
+async def send_mfa_otp(request: Request):
+    """Send a login OTP for SMS-based MFA."""
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    auth = get_auth_context(request)
+    if not auth or auth.get("status") != "mfa_pending":
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    if data.get("type") != "sms":
+        raise HTTPException(status_code=400, detail="Unsupported MFA type")
+
+    phone_number = await _send_sms_login_code(request, auth["username"])
+    masked_phone = f"...{phone_number[-4:]}" if len(phone_number) >= 4 else phone_number
+    AuditManager.log(
+        request,
+        "MFA_OTP_SENT",
+        "INFO",
+        {"username": auth["username"], "method": "sms"},
+        username=auth["username"],
+    )
+    return {"success": True, "message": f"SMS code sent to {masked_phone}"}
 
 @app.post("/auth/mfa/cert/verify")
 async def mfa_cert_verify(request: Request):
@@ -1713,17 +1790,60 @@ async def mfa_verify_enrollment(request: Request, token: str = Form(...), userna
         return {"success": True, "message": "MFA enabled"}
     raise HTTPException(status_code=500, detail=message)
 
+
+@app.put("/api/mfa/phone")
+async def save_mfa_phone(request: Request, username: str = Depends(get_current_username)):
+    """Save or clear the current user's SMS phone number."""
+    data = await request.json()
+    phone_number = (data.get("phone_number") or "").strip()
+
+    if phone_number:
+        normalized = re.sub(r"[\s().-]", "", phone_number)
+        if not re.fullmatch(r"\+?[0-9]{8,20}", normalized):
+            raise HTTPException(status_code=400, detail="Invalid phone number format")
+        phone_number = normalized
+    else:
+        phone_number = None
+
+    if not AdminDatabase.set_phone_number(username, phone_number):
+        raise HTTPException(status_code=500, detail="Failed to save phone number")
+
+    return {
+        "success": True,
+        "phone_number": phone_number,
+        "sms_enabled": bool(phone_number) and _is_sms_gateway_enabled(),
+        "gateway_enabled": _is_sms_gateway_enabled(),
+    }
+
+
 @app.get("/api/mfa/status")
 async def mfa_status(request: Request, username: str = Depends(get_current_username)):
     """Get MFA status for current user"""
     settings = MFADatabase.get_mfa_settings(username)
+    phone_number = AdminDatabase.get_phone_number(username)
+    sms_enabled = bool(phone_number) and _is_sms_gateway_enabled()
     if settings:
+        methods = []
+        if settings["mfa_enabled"] and settings.get("mfa_type"):
+            methods.append(settings["mfa_type"])
+        if sms_enabled and "sms" not in methods:
+            methods.append("sms")
         return {
-            "enabled": settings['mfa_enabled'],
+            "enabled": settings['mfa_enabled'] or sms_enabled,
             "type": settings.get('mfa_type'),
-            "backup_codes_remaining": len(settings.get('backup_codes', []))
+            "backup_codes_remaining": len(settings.get('backup_codes', [])),
+            "phone_number": phone_number,
+            "sms_enabled": sms_enabled,
+            "gateway_enabled": _is_sms_gateway_enabled(),
+            "methods": methods,
         }
-    return {"enabled": False}
+    return {
+        "enabled": sms_enabled,
+        "phone_number": phone_number,
+        "sms_enabled": sms_enabled,
+        "gateway_enabled": _is_sms_gateway_enabled(),
+        "methods": ["sms"] if sms_enabled else [],
+    }
 
 @app.post("/api/mfa/disable")
 async def mfa_disable(request: Request, username: str = Depends(get_current_username)):
