@@ -1,7 +1,7 @@
 
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from roxx.utils.system import SystemManager
 
@@ -59,7 +59,7 @@ class AuditDatabase:
                 INSERT INTO audit_logs (timestamp, username, ip_address, action, severity, details)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
-                datetime.utcnow(),
+                datetime.now(timezone.utc),
                 username,
                 ip_address,
                 action,

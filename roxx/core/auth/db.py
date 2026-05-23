@@ -121,6 +121,21 @@ class AdminDatabase:
         return row["phone_number"]
 
     @classmethod
+    def get_email(cls, username: str) -> str | None:
+        """Get the stored email address for a user."""
+        conn = cls.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT email FROM admins WHERE username = ?",
+            (username,),
+        ).fetchone()
+        conn.close()
+        if not row:
+            return None
+        return row["email"]
+
+    @classmethod
     def set_phone_number(cls, username: str, phone_number: str | None) -> bool:
         """Set or clear the stored phone number for a user."""
         try:

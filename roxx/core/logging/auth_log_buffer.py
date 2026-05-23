@@ -7,7 +7,7 @@ Used for debugging Auth Providers and RADIUS Backends.
 
 from collections import deque
 from threading import Lock
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 import logging
 
@@ -55,7 +55,7 @@ class AuthLogBuffer:
         with self._lock:
             # Add timestamp if not present
             if 'timestamp' not in entry:
-                entry['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+                entry['timestamp'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
             
             self._buffer.append(entry)
     

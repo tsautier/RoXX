@@ -9,7 +9,7 @@ from pathlib import Path
 # Add roxx to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-def test_imports():
+def _run_imports_test():
     """Test that all modules can be imported"""
     print("=" * 60)
     print("Testing Python Imports")
@@ -39,6 +39,11 @@ def test_imports():
     
     print(f"\nResults: {passed} passed, {failed} failed\n")
     return failed == 0
+
+
+def test_imports():
+    """Pytest wrapper for import validation."""
+    assert _run_imports_test()
 
 
 def test_system_manager():
@@ -183,7 +188,7 @@ def main():
     all_passed = True
     
     # Run tests
-    all_passed &= test_imports()
+    all_passed &= _run_imports_test()
     test_file_structure()
     test_system_manager()
     test_service_manager()

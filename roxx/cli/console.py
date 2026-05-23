@@ -436,9 +436,9 @@ def _generate_ca(certs_dir: Path):
         ).serial_number(
             x509.random_serial_number()
         ).not_valid_before(
-            datetime.datetime.utcnow()
+            datetime.datetime.now(datetime.UTC)
         ).not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=3650)
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=3650)
         ).add_extension(
             x509.BasicConstraints(ca=True, path_length=None), critical=True,
         ).sign(private_key, hashes.SHA256())
@@ -511,9 +511,9 @@ def _generate_client_cert(certs_dir: Path):
         ).serial_number(
             x509.random_serial_number()
         ).not_valid_before(
-            datetime.datetime.utcnow()
+            datetime.datetime.now(datetime.UTC)
         ).not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=365)
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=365)
         ).sign(ca_key, hashes.SHA256())
 
         # Save

@@ -137,6 +137,50 @@ def test_sms_login_otp_send(monkeypatch, tmp_path):
     assert "Your RoXX code is" in captured["message"]
 
 
+def test_email_login_otp_send(monkeypatch, tmp_path):
+    auth = {"username": "alice", "status": "mfa_pending", "role": None}
+    monkeypatch.setattr("roxx.core.auth.rbac.get_auth_context", lambda request: auth)
+    monkeypatch.setattr(web_app, "get_auth_context", lambda request: auth)
+    monkeypatch.setattr("roxx.web.app.SystemManager.get_config_dir", lambda: tmp_path)
+    (tmp_path / "mfa_gateways.json").write_text(json.dumps({
+        "email": {
+            "enabled": True,
+            "smtp_server": "smtp.example.com",
+            "smtp_port": 587,
+            "from_email": "roxx@example.com",
+            "use_tls": True,
+        }
+    }))
+
+    captured = {}
+
+    monkeypatch.setattr(
+        "roxx.core.auth.db.AdminDatabase.get_email",
+        lambda username: "alice@example.com",
+    )
+    monkeypatch.setattr(
+        "roxx.web.app.AdminDatabase.get_email",
+        lambda username: "alice@example.com",
+    )
+
+    async def fake_send_email(to_email, subject, body, config):
+        captured["to_email"] = to_email
+        captured["subject"] = subject
+        captured["body"] = body
+        captured["config"] = config
+        return True
+
+    monkeypatch.setattr("roxx.core.auth.email.EmailProvider.send_email", fake_send_email)
+
+    client = TestClient(web_app.app)
+    response = client.post("/auth/mfa/send-otp", json={"type": "email"})
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert captured["to_email"] == "alice@example.com"
+    assert "verification code is" in captured["body"]
+
+
 def test_sensitive_pages_require_auth():
     client = TestClient(web_app.app)
 
@@ -237,6 +281,9 @@ def test_nps_import_respects_selected_entries(monkeypatch):
             return {
                 "selected_clients": ["Client A|10.0.0.1"],
                 "selected_servers": ["Branch|192.168.1.11"],
+                "server_secrets": {
+                    "Branch|192.168.1.11": "branch-secret"
+                }
             }
 
     added_clients = []
@@ -260,3 +307,4 @@ def test_nps_import_respects_selected_entries(monkeypatch):
     assert added_clients[0][1] == "10.0.0.1"
     assert len(created_backends) == 1
     assert created_backends[0][1].startswith("NPS_Branch_192_168_1_11")
+    assert created_backends[0][2]["secret"] == "branch-secret"

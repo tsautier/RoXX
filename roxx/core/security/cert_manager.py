@@ -3,7 +3,7 @@ import ssl
 from pathlib import Path
 from typing import Tuple, Optional
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -149,9 +149,9 @@ class CertManager:
             ).serial_number(
                 x509.random_serial_number()
             ).not_valid_before(
-                datetime.utcnow() - timedelta(minutes=1)
+                datetime.now(timezone.utc) - timedelta(minutes=1)
             ).not_valid_after(
-                datetime.utcnow() + timedelta(days=365)
+                datetime.now(timezone.utc) + timedelta(days=365)
             ).add_extension(
                 x509.SubjectAlternativeName(sans),
                 critical=False,

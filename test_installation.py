@@ -61,7 +61,7 @@ def check_structure():
     
     return all_exist
 
-def test_imports():
+def _run_import_test():
     """Test les imports Python"""
     print("\nTesting Python imports...")
     
@@ -84,6 +84,11 @@ def test_imports():
         print(f"\n❌ Import error: {e}")
         return False
 
+
+def test_imports():
+    """Pytest wrapper for import validation."""
+    assert _run_import_test()
+
 def main():
     """Main test function"""
     print("=" * 60)
@@ -93,7 +98,7 @@ def main():
     
     deps_ok = check_dependencies()
     struct_ok = check_structure()
-    imports_ok = test_imports()
+    imports_ok = _run_import_test()
     
     print("\n" + "=" * 60)
     if deps_ok and struct_ok and imports_ok:

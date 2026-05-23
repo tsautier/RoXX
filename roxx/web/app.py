@@ -27,7 +27,7 @@ import ssl
 import sqlite3
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 
@@ -256,6 +256,64 @@ def _is_sms_gateway_enabled() -> bool:
     return bool(config) and config.get("provider") not in (None, "", "disabled")
 
 
+def _get_email_gateway_config() -> dict:
+    return _load_mfa_gateway_config().get("email", {})
+
+
+def _is_email_gateway_enabled() -> bool:
+    config = _get_email_gateway_config()
+    return bool(config) and bool(config.get("enabled"))
+
+
+def _store_login_otp(request: Request, mfa_type: str, code: str, ttl_seconds: int = 300) -> None:
+    request.session[f"mfa_code_{mfa_type}"] = {
+        "code": code,
+        "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)).isoformat(),
+    }
+
+
+def _consume_login_otp(request: Request, mfa_type: str, code: str) -> bool:
+    key = f"mfa_code_{mfa_type}"
+    stored = request.session.get(key)
+    if not stored:
+        return False
+
+    if isinstance(stored, str):
+        matches = stored == code
+        if matches:
+            request.session.pop(key, None)
+        return matches
+
+    if not isinstance(stored, dict):
+        request.session.pop(key, None)
+        return False
+
+    expires_at = stored.get("expires_at")
+    stored_code = stored.get("code")
+    if not stored_code or not expires_at:
+        request.session.pop(key, None)
+        return False
+
+    try:
+        expiry = datetime.fromisoformat(expires_at)
+    except ValueError:
+        request.session.pop(key, None)
+        return False
+
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+
+    if expiry < datetime.now(timezone.utc):
+        request.session.pop(key, None)
+        return False
+
+    if stored_code != code:
+        return False
+
+    request.session.pop(key, None)
+    return True
+
+
 async def _send_sms_login_code(request: Request, username: str) -> str:
     phone_number = AdminDatabase.get_phone_number(username)
     if not phone_number:
@@ -265,7 +323,7 @@ async def _send_sms_login_code(request: Request, username: str) -> str:
         raise HTTPException(status_code=400, detail="SMS gateway is disabled")
 
     code = f"{random.randint(0, 999999):06d}"
-    request.session["mfa_code_sms"] = code
+    _store_login_otp(request, "sms", code)
     sent = await SMSProvider.send_sms(
         phone_number,
         f"Your RoXX code is {code}",
@@ -275,6 +333,30 @@ async def _send_sms_login_code(request: Request, username: str) -> str:
         request.session.pop("mfa_code_sms", None)
         raise HTTPException(status_code=502, detail="Failed to send SMS code")
     return phone_number
+
+
+async def _send_email_login_code(request: Request, username: str) -> str:
+    from roxx.core.auth.email import EmailProvider
+
+    email_address = AdminDatabase.get_email(username)
+    if not email_address:
+        raise HTTPException(status_code=400, detail="No email address configured")
+
+    if not _is_email_gateway_enabled():
+        raise HTTPException(status_code=400, detail="Email gateway is disabled")
+
+    code = f"{random.randint(0, 999999):06d}"
+    _store_login_otp(request, "email", code)
+    sent = await EmailProvider.send_email(
+        email_address,
+        "Your RoXX verification code",
+        f"Your RoXX verification code is {code}",
+        _get_email_gateway_config(),
+    )
+    if not sent:
+        request.session.pop("mfa_code_email", None)
+        raise HTTPException(status_code=502, detail="Failed to send email code")
+    return email_address
 
 # Dependency for Auth Routes (allows partial auth)
 async def get_partial_user(request: Request):
@@ -449,16 +531,7 @@ async def mfa_verify_unified(request: Request):
              verified = True
              
     elif mfa_type in ['sms', 'email']:
-         # Verify OTP against stored secret/cache
-         # Since we don't have a Redis cache in this Phase yet, we check 'mfa_enrollment' or session
-         # But usually for login we generated a code and stored it in session.
-         # TODO: Implement send/verify logic with session storage for code.
-         # For now, placeholder or check static secret? NO.
-         # Let's assume the 'send' endpoint stored it in user session.
-         session_code = request.session.get(f"mfa_code_{mfa_type}")
-         if session_code and session_code == code:
-             verified = True
-             request.session.pop(f"mfa_code_{mfa_type}", None)
+         verified = _consume_login_otp(request, mfa_type, code)
              
     if verified:
         set_auth_context(request, username, "active")
@@ -478,7 +551,7 @@ async def mfa_verify_unified(request: Request):
 @app.post("/auth/mfa/send-otp")
 @limiter.limit("5/minute")
 async def send_mfa_otp(request: Request):
-    """Send a login OTP for SMS-based MFA."""
+    """Send a login OTP for SMS or email MFA."""
     try:
         data = await request.json()
     except Exception:
@@ -488,19 +561,28 @@ async def send_mfa_otp(request: Request):
     if not auth or auth.get("status") != "mfa_pending":
         raise HTTPException(status_code=401, detail="Invalid session")
 
-    if data.get("type") != "sms":
+    otp_type = data.get("type")
+    if otp_type == "sms":
+        phone_number = await _send_sms_login_code(request, auth["username"])
+        masked_target = f"...{phone_number[-4:]}" if len(phone_number) >= 4 else phone_number
+        message = f"SMS code sent to {masked_target}"
+    elif otp_type == "email":
+        email_address = await _send_email_login_code(request, auth["username"])
+        local_part, _, domain = email_address.partition("@")
+        masked_local = local_part[:2] + "***" if len(local_part) > 2 else "***"
+        masked_target = f"{masked_local}@{domain}" if domain else masked_local
+        message = f"Email code sent to {masked_target}"
+    else:
         raise HTTPException(status_code=400, detail="Unsupported MFA type")
 
-    phone_number = await _send_sms_login_code(request, auth["username"])
-    masked_phone = f"...{phone_number[-4:]}" if len(phone_number) >= 4 else phone_number
     AuditManager.log(
         request,
         "MFA_OTP_SENT",
         "INFO",
-        {"username": auth["username"], "method": "sms"},
+        {"username": auth["username"], "method": otp_type},
         username=auth["username"],
     )
-    return {"success": True, "message": f"SMS code sent to {masked_phone}"}
+    return {"success": True, "message": message}
 
 @app.post("/auth/mfa/cert/verify")
 async def mfa_cert_verify(request: Request):
@@ -809,6 +891,7 @@ async def api_nps_import(request: Request):
     selection = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     selected_clients = set(selection.get("selected_clients", []))
     selected_servers = set(selection.get("selected_servers", []))
+    server_secrets = selection.get("server_secrets", {})
     
     from roxx.core.radius_backends.config_db import RadiusBackendDB
     
@@ -832,11 +915,17 @@ async def api_nps_import(request: Request):
         server_key = f"{server['group']}|{server['address']}"
         if selected_servers and server_key not in selected_servers:
             continue
+        shared_secret = (server_secrets.get(server_key) or "").strip()
+        if not shared_secret:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing shared secret for remote server {server['group']} ({server['address']})"
+            )
         name = f"NPS_{server['group']}_{server['address']}".replace(".", "_")
         success, _, _ = RadiusBackendDB.create_backend(
             backend_type='radius_server',
             name=name,
-            config={"server": server["address"], "port": 1812, "secret": "TODO_MANUAL_INPUT"},
+            config={"server": server["address"], "port": 1812, "secret": shared_secret},
             enabled=True,
             priority=200 # Lower priority for imported servers
         )

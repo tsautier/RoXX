@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def test_rbac_module():
+def _run_rbac_module():
     """Test RBAC module basics"""
     print("=" * 60)
     print("Testing RBAC Module")
@@ -74,7 +74,7 @@ def test_rbac_module():
     print(f"\nRBAC Results: {passed} passed, {failed} failed\n")
     return failed == 0
 
-def test_duo_provider():
+def _run_duo_provider():
     """Test Duo Provider instantiation and signing"""
     print("=" * 60)
     print("Testing Duo Provider")
@@ -114,7 +114,7 @@ def test_duo_provider():
     return failed == 0
 
 
-def test_okta_provider():
+def _run_okta_provider():
     """Test Okta Provider instantiation"""
     print("=" * 60)
     print("Testing Okta Provider")
@@ -145,7 +145,7 @@ def test_okta_provider():
     return failed == 0
 
 
-def test_cache_lru():
+def _run_cache_lru():
     """Test improved AuthCache with LRU"""
     print("=" * 60)
     print("Testing AuthCache (LRU)")
@@ -213,7 +213,7 @@ def test_cache_lru():
     return failed == 0
 
 
-def test_connection_pool():
+def _run_connection_pool():
     """Test ConnectionPool"""
     print("=" * 60)
     print("Testing Connection Pool")
@@ -279,7 +279,7 @@ def test_connection_pool():
     return failed == 0
 
 
-def test_admin_roles():
+def _run_admin_roles():
     """Test AdminDatabase role methods"""
     print("=" * 60)
     print("Testing Admin Role DB Methods")
@@ -348,6 +348,30 @@ def test_admin_roles():
     return failed == 0
 
 
+def test_rbac_module():
+    assert _run_rbac_module()
+
+
+def test_duo_provider():
+    assert _run_duo_provider()
+
+
+def test_okta_provider():
+    assert _run_okta_provider()
+
+
+def test_cache_lru():
+    assert _run_cache_lru()
+
+
+def test_connection_pool():
+    assert _run_connection_pool()
+
+
+def test_admin_roles():
+    assert _run_admin_roles()
+
+
 def main():
     print("\n")
     print("╔" + "=" * 58 + "╗")
@@ -356,12 +380,12 @@ def main():
     print()
 
     results = {
-        "RBAC Module": test_rbac_module(),
-        "Admin Roles DB": test_admin_roles(),
-        "Duo Provider": test_duo_provider(),
-        "Okta Provider": test_okta_provider(),
-        "Auth Cache (LRU)": test_cache_lru(),
-        "Connection Pool": test_connection_pool(),
+        "RBAC Module": _run_rbac_module(),
+        "Admin Roles DB": _run_admin_roles(),
+        "Duo Provider": _run_duo_provider(),
+        "Okta Provider": _run_okta_provider(),
+        "Auth Cache (LRU)": _run_cache_lru(),
+        "Connection Pool": _run_connection_pool(),
     }
 
     print("=" * 60)

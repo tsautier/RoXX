@@ -2,12 +2,25 @@
 
 All notable changes to RoXX will be documented in this file.
 
-## [1.0.0-beta9] - Unreleased
+## [1.0.0-beta9] - 2026-05-23
 
-### Planned
-- [ ] Continue post-beta8 stabilization
-- [ ] Expand integration coverage and edge-case validation
-- [ ] Reduce remaining warnings in tests and runtime
+### Platform Hardening
+- Reworked remaining warning-prone test files so pytest no longer reports `PytestReturnNotNoneWarning`.
+- Migrated RoXX UTC timestamp generation to timezone-aware datetimes across audit logging, PKI, certificate management, and CLI certificate generation.
+- Reduced release noise so the suite now passes with only two third-party `pyasn1` deprecation warnings remaining.
+
+### MFA And Identity
+- Completed login OTP handling for both SMS and email factors using session-backed expiring verification codes.
+- Added admin email lookup support required for email-based login OTP delivery.
+- Removed stale MFA TODO logic and aligned the implementation with the actual login UX.
+
+### Admin Portal
+- Normalized legacy `alert()` usage behind the toast notification system for base-template admin pages, improving consistency without breaking existing flows.
+- Improved NPS Migration so remote RADIUS server imports require a real shared secret instead of creating unusable backends with placeholder secrets.
+- Updated the NPS import preview to collect and validate per-server secrets before import.
+
+### Verification
+- Full test suite passing at release cut: `115 passed`.
 
 ## [1.0.0-beta8] - 2026-03-24
 

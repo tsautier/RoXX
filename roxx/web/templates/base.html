@@ -113,6 +113,36 @@
 
     <!-- Toast Notification System -->
     <script src="/static/js/toast.js"></script>
+    <script>
+        window.roxxNotify = function (message, fallbackType = 'info') {
+            const text = String(message || '').trim();
+            const normalized = text.toLowerCase();
+
+            let type = fallbackType;
+            let title = 'Info';
+            if (normalized.startsWith('error')) {
+                type = 'error';
+                title = 'Error';
+            } else if (normalized.startsWith('failed') || normalized.startsWith('fail')) {
+                type = 'error';
+                title = 'Failed';
+            } else if (normalized.startsWith('success')) {
+                type = 'success';
+                title = 'Success';
+            } else if (normalized.startsWith('warning')) {
+                type = 'warning';
+                title = 'Warning';
+            }
+
+            const parts = text.split(':');
+            const body = parts.length > 1 ? parts.slice(1).join(':').trim() : text;
+            showToast(type, title, body || text);
+        };
+
+        window.alert = function (message) {
+            window.roxxNotify(message);
+        };
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>
