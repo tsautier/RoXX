@@ -2,6 +2,13 @@
 
 All notable changes to RoXX will be documented in this file.
 
+## [1.0.0-beta10] - Unreleased
+
+### Planned
+- [ ] Continue post-beta9 stabilization and UX cleanup
+- [ ] Reduce remaining third-party and dependency warning noise where possible
+- [ ] Expand deeper integration and edge-case validation
+
 ## [1.0.0-beta9] - 2026-05-23
 
 ### Platform Hardening
