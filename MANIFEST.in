@@ -3,10 +3,6 @@ include README.md
 include LICENSE
 include CHANGELOG.md
 include QUICKSTART.md
-include TESTING.md
-include SUMMARY.md
-include CODE_COMPARISON.md
-include FREERADIUS_INTEGRATION.md
 include BUILD.md
 include roxx_logo.png
 include requirements.txt

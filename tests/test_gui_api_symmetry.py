@@ -195,6 +195,15 @@ def test_sensitive_pages_require_auth():
     assert mfa_status.status_code == 401
 
 
+def test_liveness_probe_is_public_and_minimal():
+    client = TestClient(web_app.app)
+
+    response = client.get("/livez", headers={"accept": "application/json"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "service": "roxx-web"}
+
+
 def test_pki_endpoints_expose_ca_and_certificates(monkeypatch, tmp_path):
     allow_role(monkeypatch, "superadmin")
 

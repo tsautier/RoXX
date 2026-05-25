@@ -4,7 +4,7 @@ version = "1.0.0-beta10"
 description = "Linux RADIUS Authentication Proxy"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "AGPL-3.0-or-later"}
+license = "AGPL-3.0-or-later"
 authors = []
 
 dependencies = [
@@ -16,7 +16,6 @@ dependencies = [
     "pydantic>=2.0.0",
     "loguru>=0.7.0",
     "msal>=1.24.0",
-    "ldap3>=2.9.0",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "python-multipart>=0.0.6",
@@ -37,9 +36,6 @@ dependencies = [
     "redis==7.1.0",
     "slowapi==0.1.9",
     "pywin32>=308; platform_system == 'Windows'",
-
-
-
 ]
 
 [project.optional-dependencies]
@@ -53,6 +49,7 @@ roxx-setup = "roxx.cli.setup:main"
 roxx-web = "roxx.web.app:main"
 roxx-server = "roxx.cli.server:main"
 roxx-service = "roxx.cli.service:main"
+roxx-windows-service = "roxx.cli.windows_service:main"
 
 [tool.setuptools]
 include-package-data = true

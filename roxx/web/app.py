@@ -1559,6 +1559,12 @@ async def health_check():
     return {"status": "healthy", "service": "roxx-web"}
 
 
+@app.get("/livez")
+async def liveness_check():
+    """Unauthenticated liveness probe for service supervisors."""
+    return {"status": "ok", "service": "roxx-web"}
+
+
 # ------------------------------------------------------------------------------
 # Admin Management API
 # ------------------------------------------------------------------------------

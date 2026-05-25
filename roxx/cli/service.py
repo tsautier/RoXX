@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import platform
 from pathlib import Path
 
 
@@ -77,8 +76,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_arg_parser().parse_args()
     if args.command == "print-systemd":
-        if platform.system() == "Windows":
-            raise SystemExit("systemd unit generation is only available on Linux")
         print(
             render_systemd_unit(
                 binary_path=Path(args.binary),

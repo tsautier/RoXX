@@ -39,7 +39,7 @@ This guide covers production deployment of RoXX RADIUS Authentication Proxy for 
 - **RAM:** 2 GB
 - **Disk:** 10 GB
 - **Network:** 1 Gbps NIC
-- **Python:** 3.8+
+- **Python:** 3.12+
 
 ### Recommended (Production)
 - **OS:** Ubuntu 22.04 LTS or RHEL 9
@@ -47,7 +47,7 @@ This guide covers production deployment of RoXX RADIUS Authentication Proxy for 
 - **RAM:** 8 GB
 - **Disk:** 50 GB SSD
 - **Network:** 10 Gbps NIC (redundant)
-- **Python:** 3.10+
+- **Python:** 3.12+
 
 ### For High Availability
 - **Servers:** 2+ (active/standby or load balanced)
@@ -135,34 +135,42 @@ HEALTHCHECK --interval=30s --timeout=3s \
 CMD ["python", "-m", "roxx.web.app"]
 ```
 
-### Method 3: System Service
+### Method 3: Linux systemd Service
 
-Create `/etc/systemd/system/roxx.service`:
+Generate the service unit from the installed RoXX package:
+
+```bash
+sudo -u roxx /opt/roxx/app/venv/bin/roxx-service print-systemd \
+  --binary /opt/roxx/app/venv/bin/roxx-server \
+  --user roxx \
+  --group roxx \
+  --working-directory /opt/roxx/app \
+  --config-dir /etc/roxx \
+  --data-dir /var/lib/roxx \
+  --log-dir /var/log/roxx | sudo tee /etc/systemd/system/roxx.service
+```
+
+The generated unit contains this restart policy:
 
 ```ini
 [Unit]
-Description=RoXX RADIUS Authentication Proxy
-After=network.target freeradius.service
-Wants=freeradius.service
+Description=RoXX Web Server
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=roxx
 Group=roxx
 WorkingDirectory=/opt/roxx/app
-Environment="PATH=/opt/roxx/app/venv/bin"
-ExecStart=/opt/roxx/app/venv/bin/python -m roxx.web.app
+Environment=ROXX_CONFIG_DIR=/etc/roxx
+Environment=ROXX_DATA_DIR=/var/lib/roxx
+Environment=ROXX_LOG_DIR=/var/log/roxx
+ExecStart=/opt/roxx/app/venv/bin/roxx-server
 Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/roxx /etc/roxx
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=multi-user.target
@@ -174,6 +182,29 @@ sudo systemctl daemon-reload
 sudo systemctl enable roxx
 sudo systemctl start roxx
 sudo systemctl status roxx
+sudo journalctl -u roxx -f
+curl -k https://127.0.0.1:8000/livez
+```
+
+### Method 4: Windows Service
+
+Install the package with the Windows service dependency, then register the service from an elevated PowerShell prompt:
+
+```powershell
+py -3.12 -m pip install .[build]
+py -3.12 -m pip install pywin32
+roxx-windows-service install
+roxx-windows-service start
+Get-Service RoXXWebServer
+```
+
+Service logs are available through Windows Event Viewer under the Application log. The service wrapper uses the same `roxx-server` runtime and requests a graceful shutdown before Windows stops the process.
+
+To stop or remove it:
+
+```powershell
+roxx-windows-service stop
+roxx-windows-service remove
 ```
 
 ---

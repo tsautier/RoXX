@@ -3,8 +3,8 @@
 **Modern RADIUS proxy with integrated admin portal, multi-factor authentication, and enterprise identity provider support.**
 
 ![Version](https://img.shields.io/badge/version-1.0.0--beta10-blue)
-![Python](https://img.shields.io/badge/python-3.8%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-green)
 
 ---
 
@@ -37,7 +37,7 @@
 
 ## 📋 Requirements
 
-- **Python**: 3.8 or higher
+- **Python**: 3.12 or higher
 - **Operating System**: Linux (Ubuntu/Debian recommended) or WSL2
 - **Database**: SQLite (included)
 - **Optional**: 

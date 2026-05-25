@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import threading
 
 try:  # pragma: no cover - exercised only on Windows with pywin32 installed
@@ -51,4 +50,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
