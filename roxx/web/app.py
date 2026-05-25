@@ -2572,45 +2572,9 @@ def silence_windows_proactor_reset():
 silence_windows_proactor_reset()
 
 def main():
-    import uvicorn
-    from roxx.core.security.cert_manager import CertManager
-    
-    ssl_cert, ssl_key = CertManager.get_cert_paths()
-    ca_bundle = CertManager.get_ca_paths()
-    ssl_enabled = ssl_cert.exists() and ssl_key.exists()
-    
-    # Auto-generate if missing (Best for Beta/QuickStart)
-    if not ssl_enabled:
-        print("[Core] No SSL Certificates found. Generating self-signed certificate...")
-        success, msg = CertManager.generate_self_signed_cert()
-        if success:
-            print(f"[Core] {msg}")
-            ssl_enabled = True
-        else:
-            print(f"[Core] Failed to generate SSL: {msg}. Falling back to HTTP.")
+    from roxx.server.runtime import run_web_server
 
-    config_kwargs = {
-        "host": "0.0.0.0",
-        "port": 8000,
-        "log_level": "info",
-        "app": "roxx.web.app:app"
-    }
-    
-    if ssl_enabled:
-        print(f"[Core] Starting in HTTPS mode with {ssl_cert}")
-        config_kwargs["ssl_certfile"] = str(ssl_cert)
-        config_kwargs["ssl_keyfile"] = str(ssl_key)
-        
-        if ca_bundle.exists():
-            print(f"[Core] Enabling Client Certificate Auth with CA: {ca_bundle}")
-            config_kwargs["ssl_ca_certs"] = str(ca_bundle)
-            config_kwargs["ssl_cert_reqs"] = ssl.CERT_OPTIONAL
-    else:
-        print("[Core] CRITICAL ERROR: SSL is required but could not be enabled. Plaintext mode is disabled.")
-        import sys
-        sys.exit(1)
-
-    uvicorn.run(**config_kwargs)
+    raise SystemExit(run_web_server())
 
 
 

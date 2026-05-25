@@ -1,17 +1,22 @@
 [Unit]
-Description=RoXX Admin Web Interface (v1.0.0-beta7)
-After=network.target
+Description=RoXX Web Server
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=kali
-Group=kali
-WorkingDirectory=/home/kali/shares/C/SH-PX
-Environment=PYTHONPATH=/home/kali/shares/C/SH-PX
-Environment=ROXX_CONFIG_DIR=/home/kali/.roxx
-ExecStart=/usr/bin/python3 -m roxx.web.app
+User=roxx
+Group=roxx
+WorkingDirectory=/opt/roxx
+Environment=ROXX_CONFIG_DIR=/etc/roxx
+Environment=ROXX_DATA_DIR=/var/lib/roxx
+Environment=ROXX_LOG_DIR=/var/log/roxx
+ExecStart=/opt/roxx/roxx-server
 Restart=always
 RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=multi-user.target
+

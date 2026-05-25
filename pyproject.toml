@@ -36,6 +36,7 @@ dependencies = [
     "fido2>=2.1.1",
     "redis==7.1.0",
     "slowapi==0.1.9",
+    "pywin32>=308; platform_system == 'Windows'",
 
 
 
@@ -43,12 +44,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0.0", "black>=23.0.0", "ruff>=0.1.0"]
+build = ["pyinstaller>=6.11.0"]
 
 [project.scripts]
 roxx = "roxx.__main__:main"
 roxx-console = "roxx.cli.console:main"
 roxx-setup = "roxx.cli.setup:main"
 roxx-web = "roxx.web.app:main"
+roxx-server = "roxx.cli.server:main"
+roxx-service = "roxx.cli.service:main"
 
 [tool.setuptools]
 include-package-data = true
