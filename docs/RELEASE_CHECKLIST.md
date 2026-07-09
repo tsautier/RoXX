@@ -16,6 +16,7 @@ Use this checklist for every tagged release.
 - Run `python -m build`.
 - Run `python -m pip check`.
 - Run `python scripts/build_binaries.py` on Windows when validating executables locally.
+- Run `sh scripts/build_linux_packages.sh` in a Linux environment with nFPM.
 - Smoke check `dist/bin/roxx.exe --help`.
 - Smoke check `dist/bin/roxx.exe service print-systemd`.
 - Smoke check `dist/bin/roxx.exe server` with `GET /livez` and `GET /readyz`.
@@ -31,10 +32,15 @@ Use this checklist for every tagged release.
 
 - Confirm the release contains the Windows zip archive.
 - Confirm the release contains the raw `roxx.exe` asset.
+- Confirm the release contains one raw Linux application, one `.deb`, and one `.rpm`.
+- Confirm both SPDX SBOM files are present.
+- Verify GitHub provenance and SBOM attestations with `gh attestation verify`.
+- When signing secrets are configured, verify `roxx.exe` has a valid Authenticode signature.
 - Confirm the release does not contain legacy split executables such as `roxx-server.exe`, `roxx-service.exe`, `roxx-setup.exe`, or `roxx-windows-service.exe`.
 - Confirm `SHA256SUMS.txt` is present.
 - Confirm the workflow asset verification step passed.
 - Download at least one executable and compare its SHA256 with `SHA256SUMS.txt`.
+- Confirm the Windows ZIP contains exactly one executable plus install, uninstall, and upgrade scripts.
 
 ## 5. Post-Release Smoke Checks
 
@@ -44,6 +50,8 @@ Use this checklist for every tagged release.
 - Register the Windows service in a test environment with `roxx.exe windows-service ...` and verify start/stop behavior.
 - Generate a Linux systemd unit with `roxx service print-systemd` and confirm its `ExecStart` ends in `roxx server`.
 - Validate the Windows executable path with `roxx.exe service print-systemd`.
+- Install and remove both Linux package formats in disposable hosts or containers.
+- Exercise `scripts/upgrade_linux.sh` and `scripts/upgrade_windows.ps1` rollback paths.
 
 ## 6. Rollback
 

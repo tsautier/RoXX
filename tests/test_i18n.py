@@ -2,8 +2,6 @@
 Unit tests for I18n system
 """
 
-import pytest
-from pathlib import Path
 
 from roxx.utils.i18n import I18n, translate, set_locale, get_locale
 

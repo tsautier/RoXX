@@ -1,0 +1,27 @@
+[Unit]
+Description=RoXX Web Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=roxx
+Group=roxx
+WorkingDirectory=/var/lib/roxx
+Environment=ROXX_CONFIG_DIR=/etc/roxx
+Environment=ROXX_DATA_DIR=/var/lib/roxx
+Environment=ROXX_LOG_DIR=/var/log/roxx
+EnvironmentFile=-/etc/roxx/roxx.env
+ExecStart=/usr/bin/roxx server
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/etc/roxx /var/lib/roxx /var/log/roxx
+
+[Install]
+WantedBy=multi-user.target

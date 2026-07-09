@@ -1,7 +1,7 @@
 import os
 import ssl
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple
 import shutil
 from datetime import datetime, timedelta, timezone
 from cryptography import x509

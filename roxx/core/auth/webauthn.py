@@ -2,9 +2,7 @@
 WebAuthn Manager using fido2 library
 """
 import logging
-import json
-import base64
-from fido2.webauthn import PublicKeyCredentialRpEntity, PublicKeyCredentialUserEntity, PublicKeyCredentialParameters
+from fido2.webauthn import PublicKeyCredentialRpEntity, PublicKeyCredentialUserEntity
 from fido2.server import Fido2Server
 from fido2.utils import websafe_encode, websafe_decode
 from roxx.core.auth.webauthn_db import WebAuthnDatabase
@@ -248,4 +246,3 @@ class WebAuthnManager:
         except Exception as e:
             logger.error(f"WebAuthn authentication failed: {e}")
             return False, str(e)
-from datetime import datetime

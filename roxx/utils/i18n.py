@@ -33,7 +33,7 @@ class I18n:
                     with open(path, 'r', encoding='utf-8') as f:
                         self.translations = json.load(f)
                     return
-                except (json.JSONDecodeError, IOError, UnicodeDecodeError) as e:
+                except (json.JSONDecodeError, IOError, UnicodeDecodeError):
                     # If error, continue with next file
                     continue
 

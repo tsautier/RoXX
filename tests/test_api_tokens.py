@@ -2,7 +2,6 @@
 Unit tests for API Tokens functionality
 """
 
-import pytest
 from roxx.core.auth.api_tokens import APITokenManager
 
 

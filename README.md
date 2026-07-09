@@ -39,7 +39,7 @@
 ## 📋 Requirements
 
 - **Python**: 3.12 or higher
-- **Operating System**: Linux (Ubuntu/Debian recommended) or WSL2
+- **Operating System**: Linux, Windows 10/11, or Windows Server 2022/2025
 - **Database**: SQLite (included)
 - **Optional**: 
   - LDAP/AD server for directory integration
@@ -61,16 +61,18 @@ python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install .
 ```
 
-### 2. Initialize Database
+### 2. Bootstrap And Start
 
 ```bash
-python3 -m roxx.web.app
+sudo ROXX_CONFIG_DIR=/etc/roxx ROXX_DATA_DIR=/var/lib/roxx ROXX_LOG_DIR=/var/log/roxx \
+  roxx setup --non-interactive --hostname roxx.example.com
+roxx server
 ```
 
-The admin portal will start on `http://localhost:8000`
+The server uses HTTPS by default and listens on port `8000`.
 
 **Default credentials:**
 - Username: `admin`
@@ -217,6 +219,10 @@ ROXX_DB_PATH=/etc/roxx/roxx.db
 # Security
 ROXX_SECRET_KEY=your-secret-key-here
 ROXX_SESSION_TIMEOUT=3600
+ROXX_SECURITY_PROFILE=production
+ROXX_SECURE_COOKIES=true
+ROXX_HSTS=true
+ROXX_METRICS_TOKEN=your-monitoring-token
 
 # SAML
 ROXX_SAML_SP_ENTITY_ID=https://your-domain.com
@@ -242,6 +248,13 @@ Access the dashboard at `/dashboard` for:
 - Disk space
 - Active sessions
 - Recent authentication events
+
+Service endpoints:
+
+- `GET /livez` for liveness.
+- `GET /readyz` for local storage, database, and optional dependency readiness.
+- `GET /metrics` for Prometheus metrics; set `ROXX_METRICS_TOKEN` to protect it.
+- `roxx audit export --output audit.jsonl` for SIEM-compatible JSON Lines export.
 
 ### Audit Logs
 
@@ -281,17 +294,17 @@ Enable debug logging:
 
 ```bash
 export ROXX_DEBUG=true
-python3 -m roxx.web.app
+roxx server
 ```
 
 ---
 
 ## 📖 Documentation
 
-- **User Guide**: See `/docs/user-guide.md`
-- **API Reference**: See `/docs/api-reference.md`
-- **SAML Setup**: See `/docs/saml-setup.md`
-- **LDAP/AD Setup**: See `/docs/ldap-setup.md`
+- **Production operations, HA, upgrade and rollback**: See `docs/OPERATIONS.md`
+- **Deployment**: See `docs/DEPLOYMENT_GUIDE.md`
+- **SAML Setup**: See `docs/saml-setup.md`
+- **RBAC**: See `docs/RBAC.md`
 
 ---
 
@@ -312,7 +325,7 @@ Contributions are welcome! Please:
 
 ## 📄 License
 
-This project is licensed under the GNU Affero General Public License (AGPLv3) - see the [LICENSE](file:///c:/RoXX/LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License (AGPLv3) - see the [LICENSE](LICENSE) file for details.
 
 This license requires that users who interact with the software over a network must have access to the source code of the exact version they are using, including any modifications.
 

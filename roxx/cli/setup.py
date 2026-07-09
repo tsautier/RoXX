@@ -3,22 +3,25 @@ RoXX Setup Assistant - Linux Interactive Configuration
 Replacement for bin/setup (1157 lines Bash)
 """
 
+import argparse
+import json
+import shutil
 import sys
 import os
 from pathlib import Path
-from typing import Optional, Dict, List
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich import box
 import questionary
 from questionary import Style
 
 from roxx.utils.system import SystemManager
-from roxx.utils.i18n import translate as _, set_locale, get_locale
+from roxx.utils.i18n import set_locale
 from roxx.core.services import ServiceManager
 from roxx.core.security.cert_manager import CertManager
+from roxx.setup.bootstrap import bootstrap_production
+from roxx import __version__
 
 console = Console()
 service_mgr = ServiceManager()
@@ -39,6 +42,7 @@ class SetupAssistant:
     def __init__(self):
         self.config_dir = SystemManager.get_config_dir()
         self.data_dir = SystemManager.get_data_dir()
+        self.os_type = SystemManager.get_os()
         self.config = {}
     def show_welcome(self):
         """Display welcome screen"""
@@ -46,7 +50,7 @@ class SetupAssistant:
         
         welcome = Panel.fit(
             "[bold cyan]RoXX Setup Assistant[/bold cyan]\n"
-            f"[dim]v1.0-beta - Linux Configuration Wizard[/dim]\n\n"
+            f"[dim]v{__version__} - Production Configuration Wizard[/dim]\n\n"
             f"[yellow]OS:[/yellow] {self.os_type.title()}\n"
             f"[yellow]Config:[/yellow] {self.config_dir}",
             border_style="cyan",
@@ -430,8 +434,17 @@ class SetupAssistant:
             style=custom_style
         ).ask()
         
-        # TODO: Copy files to config directory
-        console.print("[yellow]ℹ[/yellow] Certificate import functionality coming soon.")
+        source_cert = Path(cert_file).expanduser().resolve()
+        source_key = Path(key_file).expanduser().resolve()
+        if not source_cert.is_file() or not source_key.is_file():
+            raise FileNotFoundError("Certificate and private-key files must exist")
+        destination_cert, destination_key = CertManager.get_cert_paths()
+        destination_cert.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_cert, destination_cert)
+        shutil.copy2(source_key, destination_key)
+        if os.name != "nt":
+            destination_key.chmod(0o600)
+        console.print(f"[green]✓[/green] Certificate imported: {destination_cert}")
     
     def save_configuration(self):
         """Save configuration to file"""
@@ -494,10 +507,32 @@ class SetupAssistant:
 
 def main():
     """Main entry point"""
+    parser = argparse.ArgumentParser(description="RoXX setup assistant")
+    parser.add_argument("--non-interactive", action="store_true")
+    parser.add_argument("--hostname", default="localhost")
+    parser.add_argument("--binary", type=Path, default=Path("roxx"))
+    parser.add_argument("--working-directory", type=Path, default=Path.cwd())
+    parser.add_argument("--install-service", action="store_true")
+    parser.add_argument("--user", default=os.getenv("USER", "roxx"))
+    parser.add_argument("--group", default=os.getenv("USER", "roxx"))
+    args = parser.parse_args()
+
+    if args.non_interactive:
+        result = bootstrap_production(
+            hostname=args.hostname,
+            binary_path=args.binary,
+            working_directory=args.working_directory,
+            user=args.user,
+            group=args.group,
+            install_service=args.install_service,
+        )
+        console.print_json(json.dumps(result.__dict__))
+        return
+
     # Check admin privileges
     if not SystemManager.is_admin():
         console.print("\n[bold red]⚠ Warning:[/bold red] This program requires administrator privileges.")
-        console.print("  • sudo python -m roxx.cli.setup", style="cyan")
+        console.print("  • sudo roxx setup", style="cyan")
         
         sys.exit(1)
     

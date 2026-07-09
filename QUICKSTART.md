@@ -10,7 +10,7 @@ Get started with RoXX in minutes!
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/roxx.git
+git clone https://github.com/tsautier/RoXX.git
 cd roxx
 
 # Install dependencies
@@ -33,7 +33,7 @@ pip install roxx
 ### 1. Launch Admin Console
 
 ```bash
-roxx-console
+roxx
 ```
 
 Features:
@@ -45,7 +45,7 @@ Features:
 ### 2. Run Setup Wizard
 
 ```bash
-roxx-setup
+roxx setup
 ```
 
 The wizard will guide you through:
@@ -58,7 +58,7 @@ The wizard will guide you through:
 ### 3. Start Web Interface
 
 ```bash
-roxx-web
+roxx server
 ```
 
 Access at: http://localhost:8000
@@ -74,7 +74,7 @@ Features:
 
 ### TOTP Setup
 
-1. Run setup wizard: `roxx-setup`
+1. Run setup wizard: `roxx setup`
 2. Select TOTP as authentication method
 3. Generate QR codes via web interface
 4. Scan with Google/Microsoft Authenticator
@@ -133,7 +133,7 @@ python test_installation.py
 
 Run with administrator/sudo privileges:
 ```bash
-sudo roxx-console
+sudo roxx
 ```
 
 ### Module Not Found
@@ -145,7 +145,7 @@ pip install -r requirements.txt
 
 ### Port Already in Use (Web Interface)
 
-Change the port in `roxx/web/app.py` or kill the process using port 8000.
+Set `ROXX_PORT` to another available port or stop the process currently using port 8000.
 
 ---
 

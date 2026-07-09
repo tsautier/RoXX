@@ -1,7 +1,6 @@
 import xml.etree.ElementTree as ET
 import logging
 from typing import List, Dict, Any
-import os
 
 logger = logging.getLogger("roxx.utils.nps_importer")
 

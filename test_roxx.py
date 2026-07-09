@@ -130,9 +130,9 @@ def test_totp():
         
         # Vérifier que le code est valide
         if totp.verify(code):
-            print(f"✓ Code verification: OK")
+            print("✓ Code verification: OK")
         else:
-            print(f"✗ Code verification: FAILED")
+            print("✗ Code verification: FAILED")
             
     except Exception as e:
         print(f"✗ TOTP test failed: {e}")

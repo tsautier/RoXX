@@ -1,223 +1,60 @@
-# Build and Packaging Guide for RoXX
+# Build And Packaging Guide
 
-## 🔨 Building RoXX
-
-### Prerequisites
+## Python Package
 
 ```bash
-# Install development dependencies
-pip install -e ".[dev]"
-```
-
----
-
-## 📦 Packaging Options
-
-### 1. Python Package (pip)
-
-**Build wheel and source distribution**:
-
-```bash
-# Install build tools
-pip install build
-
-# Build package
+python -m pip install build
 python -m build
-
-# This creates:
-# - dist/roxx-1.0.0b0-py3-none-any.whl
-# - dist/roxx-1.0.0b0.tar.gz
 ```
 
-**Install locally**:
+The wheel exposes one command: `roxx`.
+
+## Standalone Application
+
+Install build dependencies and build the application for the current operating system:
 
 ```bash
-pip install dist/roxx-1.0.0b0-py3-none-any.whl
+python -m pip install .[build]
+python scripts/build_binaries.py
 ```
 
-**Upload to PyPI** (when ready):
+Windows produces only `dist/bin/roxx.exe`. Linux produces only `dist/bin/roxx`.
+
+## Linux Packages
+
+nFPM `v2.47.0` is used by CI to wrap the standalone Linux application, systemd unit and lifecycle scripts:
 
 ```bash
-pip install twine
-twine upload dist/*
+go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+export PATH="$(go env GOPATH)/bin:$PATH"
+export ROXX_VERSION="$(python -c 'import roxx; print(roxx.__version__)')"
+sh scripts/build_linux_packages.sh
 ```
 
----
+Outputs are written under `dist/packages/` as `.deb` and `.rpm` files.
 
-### 2. Linux Package (.deb)
+## Windows Package
 
-**Using stdeb**:
+The tagged release workflow creates a ZIP containing one executable plus PowerShell scripts for installation, removal and guarded upgrade:
 
-```bash
-# Install stdeb
-pip install stdeb
+- `roxx.exe`
+- `install_windows.ps1`
+- `uninstall_windows.ps1`
+- `upgrade_windows.ps1`
 
-# Create Debian package
-python setup.py --command-packages=stdeb.command bdist_deb
+No secondary application executable is generated.
 
-# Output: deb_dist/python3-roxx_1.0.0b0-1_all.deb
-```
+## Supply Chain
 
-**Install**:
+Every tagged release generates SHA256 checksums and SPDX 2.3 SBOMs. GitHub Actions signs provenance and SBOM attestations with `actions/attest@v4`. Authenticode signing runs only when `ROXX_WINDOWS_CERTIFICATE` and `ROXX_WINDOWS_CERTIFICATE_PASSWORD` repository secrets are configured.
 
-```bash
-sudo dpkg -i deb_dist/python3-roxx_1.0.0b0-1_all.deb
-```
-
----
-
-### 3. Linux Package (.rpm)
-
-**Using setup.py**:
+## Verification
 
 ```bash
-# Create RPM
-python setup.py bdist_rpm
-
-# Output: dist/roxx-1.0.0b0-1.noarch.rpm
-```
-
-**Install**:
-
-```bash
-sudo rpm -i dist/roxx-1.0.0b0-1.noarch.rpm
-```
-
----
-
-### 4. Docker Image
-
-```bash
-docker build -t roxx .
-```
-
----
-
-## 🧪 Testing
-
-### Run Unit Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=roxx --cov-report=html
-
-# Run specific test file
-pytest tests/test_system.py
-
-# Run with verbose output
-pytest -v
-```
-
-### Test Coverage Report
-
-```bash
-# Generate HTML coverage report
-pytest --cov=roxx --cov-report=html
-
-# Open in browser
-xdg-open htmlcov/index.html
-```
-
----
-
-## 📋 Pre-Release Checklist
-
-- [ ] All tests passing (`pytest`)
-- [ ] Code formatted (`black roxx/`)
-- [ ] Linting clean (`ruff check roxx/`)
-- [ ] Version updated in:
-  - [ ] `pyproject.toml`
-  - [ ] `roxx/__init__.py`
-  - [ ] `README.md`
-- [ ] Documentation updated
-- [ ] CHANGELOG.md updated
-- [ ] Logo and assets included
-
----
-
-## 🚀 Release Process
-
-### 1. Tag Release
-
-```bash
-git tag -a v1.0.0-beta -m "Release 1.0.0-beta"
-git push origin v1.0.0-beta
-```
-
-### 2. Build for Linux
-```bash
+python -m ruff check . --select=E9,F63,F7,F82
+python -m pytest
 python -m build
-# The Python package will be in `dist/`.
-python setup.py bdist_deb
-python setup.py bdist_rpm
+python -m pip check
 ```
 
-### 3. Create GitHub Release
-
-1. Go to GitHub Releases
-2. Create new release from tag `v1.0.0-beta`
-3. Upload artifacts:
-   - `dist/roxx-1.0.0b0-py3-none-any.whl`
-   - `deb_dist/python3-roxx_1.0.0b0-1_all.deb` (Debian)
-   - `dist/roxx-1.0.0b0-1.noarch.rpm` (RPM)
-
----
-
-## 📝 Distribution Channels
-
-### PyPI (Python Package Index)
-
-```bash
-twine upload dist/*.whl dist/*.tar.gz
-```
-
-Users install with:
-```bash
-pip install roxx
-```
-
-### Docker Hub
-
-```bash
-docker push yourregistry/roxx:latest
-```
-
----
-
-## 📊 Build Sizes (Approximate)
-
-| Package Type | Size | Notes |
-|--------------|------|-------|
-| Python wheel | ~50 KB | Requires Python installed |
-| Linux deb | ~50 KB | Requires Python installed |
-| Docker image | ~200 MB | Includes Python runtime |
-
----
-
-## 🎯 Continuous Integration
-
-### GitHub Actions (Example)
-
-```yaml
-name: Build and Test
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.12']
-    
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - run: pip install -e ".[dev]"
-    - run: pytest
-```
+Also smoke-test the standalone application with `--help`, `service print-systemd`, `server`, `/livez`, `/readyz`, and its generated log file before publishing.

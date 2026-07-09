@@ -6,7 +6,7 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from roxx.core.radius_backends.manager import RadiusBackendManager
 from roxx.core.auth.mfa_db import MFADatabase
 from roxx.core.auth.mfa import MFAManager

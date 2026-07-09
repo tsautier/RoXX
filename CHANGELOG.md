@@ -2,6 +2,41 @@
 
 All notable changes to RoXX will be documented in this file.
 
+## [Unreleased]
+
+### Reliability And Operations
+- Added rotating service logs shared by Linux and Windows server runs.
+- Expanded readiness with SQLite and optional named TCP backend checks that expose only booleans.
+- Added repeated start, probe, shutdown, and restart integration coverage with captured server logs.
+- Added automated Linux and Windows upgrade scripts with readiness-based rollback.
+
+### Security And Observability
+- Added development, standard, and production security profiles with persistent-secret enforcement, secure cookies, HSTS, CSP, referrer policy, and permissions policy.
+- Added Prometheus metrics at `/metrics` with optional bearer-token protection.
+- Added `roxx audit export` JSON Lines output for SIEM and archival pipelines.
+- Extracted operational routes into a dedicated FastAPI router module.
+
+### Packaging And Supply Chain
+- Added standalone Linux builds plus Debian and RPM packaging through nFPM.
+- Added Windows install, uninstall, and upgrade scripts while retaining exactly one Windows executable.
+- Added conditional Authenticode signing, SPDX 2.3 SBOM generation, SHA256 manifests, and signed GitHub/Sigstore provenance and SBOM attestations.
+- Added a compatibility matrix for Ubuntu 22.04/24.04 and Windows Server 2022/2025.
+
+### Deployment
+- Added a non-interactive production bootstrap that generates runtime directories, persistent secret configuration, TLS material, and optional systemd installation.
+- Added hardened systemd units and direct `roxx service install/remove/status` commands.
+- Added active/passive Keepalived and load-balanced HAProxy examples with production operations guidance.
+- Updated Docker, build, quick-start, deployment, release, upgrade, rollback, and roadmap documentation.
+
+### Code Quality
+- Applied 80 safe Ruff fixes, reducing the known lint backlog from 162 findings to 75 before manual follow-up.
+
+### Verification
+- Full local suite passing: `135 passed` with two third-party `pyasn1` deprecation warnings.
+- Syntax-critical Ruff checks, ShellCheck, workflow YAML parsing, PowerShell parsing, package build, dependency checks, and Git whitespace checks passed.
+- Local PyInstaller build produced exactly one `roxx.exe`; executable probes, protected metrics, rotating logs, production TLS rejection, bootstrap, and ZIP composition smoke checks passed.
+- Native Linux binary, `.deb`, `.rpm`, installation lifecycle, and GitHub attestations remain assigned to Ubuntu CI because WSL virtualization, Docker, Go, and nFPM are unavailable on the local Windows host.
+
 ## [1.0.2] - 2026-07-10
 
 ### Unified Application Command

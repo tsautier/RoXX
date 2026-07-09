@@ -1,6 +1,12 @@
+import logging
 from pathlib import Path
 
-from roxx.cli.service import build_arg_parser, render_systemd_unit
+import pytest
+
+from roxx.cli.service import build_arg_parser, install_systemd_unit, render_systemd_unit
+from roxx.core.readiness import collect_readiness_checks
+from roxx.core.security.profiles import SecurityProfile
+from roxx.server.logging import configure_service_logging
 from roxx.server.runtime import ServerRuntimeConfig, build_uvicorn_config
 
 
@@ -67,9 +73,63 @@ def test_render_systemd_unit_contains_restart_policy():
     assert "ExecStart=/opt/roxx/roxx server" in unit
     assert "Restart=always" in unit
     assert "User=roxx" in unit
+    assert "NoNewPrivileges=true" in unit
+    assert "EnvironmentFile=-/etc/roxx/roxx.env" in unit
 
 
 def test_systemd_helper_defaults_to_unified_roxx_launcher():
     args = build_arg_parser().parse_args(["print-systemd"])
 
     assert args.binary == "roxx"
+
+
+def test_systemd_install_dry_run_does_not_write(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr("roxx.cli.service.platform.system", lambda: "Linux")
+    unit_path = tmp_path / "roxx.service"
+
+    install_systemd_unit(unit_path, "[Service]\nExecStart=roxx server\n", dry_run=True)
+
+    assert not unit_path.exists()
+    assert "ExecStart=roxx server" in capsys.readouterr().out
+
+
+def test_security_profile_requires_secret_in_production(monkeypatch):
+    monkeypatch.setenv("ROXX_SECURITY_PROFILE", "production")
+    monkeypatch.delenv("ROXX_SECRET_KEY", raising=False)
+
+    profile = SecurityProfile.from_env()
+
+    assert profile.secure_cookies is True
+    assert profile.hsts is True
+    with pytest.raises(RuntimeError, match="ROXX_SECRET_KEY"):
+        profile.validate(None)
+
+
+def test_production_runtime_requires_tls(monkeypatch):
+    monkeypatch.setenv("ROXX_SECURITY_PROFILE", "production")
+    monkeypatch.setenv("ROXX_SSL_REQUIRED", "false")
+
+    with pytest.raises(ValueError, match="ROXX_SSL_REQUIRED=true"):
+        ServerRuntimeConfig.from_env()
+
+
+def test_readiness_tcp_targets_do_not_expose_addresses(monkeypatch, tmp_path):
+    monkeypatch.setenv("ROXX_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("ROXX_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("ROXX_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setenv("ROXX_READINESS_TCP_TARGETS", "Primary LDAP=127.0.0.1:1")
+
+    checks = collect_readiness_checks()
+
+    assert checks["backend_primary_ldap"] is False
+    assert "127.0.0.1" not in str(checks)
+
+
+def test_service_logging_writes_rotating_log(tmp_path):
+    log_file = configure_service_logging("info", tmp_path)
+    logging.getLogger("roxx.test").info("service log smoke test")
+    for handler in logging.getLogger().handlers:
+        handler.flush()
+
+    assert log_file == tmp_path / "roxx-server.log"
+    assert "service log smoke test" in log_file.read_text(encoding="utf-8")

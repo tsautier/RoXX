@@ -1,0 +1,24 @@
+vrrp_script check_roxx {
+    script "/usr/bin/curl --fail --silent --insecure https://127.0.0.1:8000/readyz"
+    interval 2
+    fall 3
+    rise 2
+}
+
+vrrp_instance ROXX_VI {
+    state BACKUP
+    interface eth0
+    virtual_router_id 42
+    priority 100
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass REPLACE_ME
+    }
+    virtual_ipaddress {
+        10.0.10.10/24
+    }
+    track_script {
+        check_roxx
+    }
+}

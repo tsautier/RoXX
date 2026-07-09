@@ -22,16 +22,20 @@ def main():
         "mode",
         nargs="?",
         default="console",
-        choices=["console", "server", "service", "setup", "windows-service"],
+        choices=["audit", "console", "server", "service", "setup", "windows-service"],
         help=(
-            "Launch the interactive console, web server, Linux service helpers, "
-            "setup assistant, or Windows service helper"
+            "Export audit events, launch the interactive console or web server, "
+            "manage services, or run the setup assistant"
         ),
     )
     args, forwarded_args = parser.parse_known_args()
 
     try:
-        if args.mode == "server":
+        if args.mode == "audit":
+            from roxx.cli.audit import main as audit_main
+
+            _run_with_forwarded_argv("roxx audit", audit_main, forwarded_args)
+        elif args.mode == "server":
             from roxx.cli.server import main as server_main
 
             _run_with_forwarded_argv("roxx server", server_main, forwarded_args)

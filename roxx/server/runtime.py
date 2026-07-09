@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import ssl
 import threading
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from typing import Optional
 import uvicorn
 
 from roxx.core.security.cert_manager import CertManager
+from roxx.server.logging import configure_service_logging
 from roxx.utils.system import SystemManager
 
 
@@ -50,7 +52,7 @@ class ServerRuntimeConfig:
 
     @classmethod
     def from_env(cls) -> "ServerRuntimeConfig":
-        return cls(
+        config = cls(
             host=os.getenv("ROXX_HOST", "0.0.0.0"),
             port=_env_int("ROXX_PORT", 8000),
             log_level=os.getenv("ROXX_LOG_LEVEL", "info").lower(),
@@ -72,6 +74,10 @@ class ServerRuntimeConfig:
             ssl_keyfile=os.getenv("ROXX_SSL_KEYFILE"),
             ssl_ca_certs=os.getenv("ROXX_SSL_CA_CERTS"),
         )
+        if os.getenv("ROXX_SECURITY_PROFILE", "standard").lower() == "production":
+            if not config.ssl_required:
+                raise ValueError("The production security profile requires ROXX_SSL_REQUIRED=true")
+        return config
 
 
 def _resolve_ssl_paths(config: ServerRuntimeConfig) -> tuple[Optional[Path], Optional[Path], Optional[Path]]:
@@ -151,7 +157,10 @@ def run_web_server(
     config: Optional[ServerRuntimeConfig] = None,
     stop_event: Optional[threading.Event] = None,
 ) -> int:
-    server = create_server(config)
+    runtime_config = config or ServerRuntimeConfig.from_env()
+    log_file = configure_service_logging(runtime_config.log_level)
+    logging.getLogger("roxx.server").info("Service logging initialized: %s", log_file)
+    server = create_server(runtime_config)
 
     if stop_event is not None:
         def _watch_stop() -> None:
@@ -163,4 +172,3 @@ def run_web_server(
 
     server.run()
     return 0 if not server.started or server.should_exit else 1
-

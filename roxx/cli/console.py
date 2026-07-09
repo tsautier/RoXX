@@ -8,8 +8,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.layout import Layout
-from rich.live import Live
 from rich import box
 import questionary
 from questionary import Style
@@ -278,7 +276,6 @@ def manage_admins():
 def _check_admin_mfa(username):
     """Helper to check if MFA is enabled"""
     from roxx.core.auth.db import AdminDatabase
-    import sqlite3
     conn = AdminDatabase.get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT mfa_secret FROM admins WHERE username = ?", (username,))

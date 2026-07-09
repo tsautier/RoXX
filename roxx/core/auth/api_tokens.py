@@ -10,7 +10,6 @@ import secrets
 import bcrypt
 import logging
 from pathlib import Path
-from datetime import datetime
 from typing import Optional, Tuple, List
 
 logger = logging.getLogger("roxx.api_tokens")

@@ -9,11 +9,10 @@ API Docs: https://duo.com/docs/authapi
 
 import hmac
 import hashlib
-import time
 import email.utils
 import urllib.parse
 import logging
-from typing import Tuple, Optional, Dict
+from typing import Tuple, Dict
 
 import httpx
 

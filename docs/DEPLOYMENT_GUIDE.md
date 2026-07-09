@@ -61,6 +61,18 @@ This guide covers production deployment of RoXX RADIUS Authentication Proxy for 
 
 ### Method 1: Standard Installation (Recommended)
 
+Tagged releases provide a standalone Linux application, Debian package and RPM package. Packages install the single `/usr/bin/roxx` application and a hardened systemd unit:
+
+```bash
+sudo apt install ./roxx_VERSION_amd64.deb
+# or
+sudo rpm -U ./roxx-VERSION-1.x86_64.rpm
+sudo roxx setup --non-interactive --hostname roxx.example.com
+sudo systemctl start roxx
+```
+
+Source installations remain supported:
+
 ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
@@ -92,7 +104,8 @@ git clone https://github.com/tsautier/RoXX.git
 cd RoXX
 
 # Build Docker image
-docker build -t roxx:v1.0.0-beta4 .
+export ROXX_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+docker build -t roxx:v1.0.2 .
 
 # Run container
 docker run -d \
@@ -100,12 +113,13 @@ docker run -d \
   -p 8000:8000 \
   -v /etc/roxx:/etc/roxx \
   -v /var/lib/roxx:/var/lib/roxx \
-  roxx:v1.0.0-beta4
+  -e ROXX_SECRET_KEY="$ROXX_SECRET_KEY" \
+  roxx:v1.0.2
 ```
 
 **Dockerfile:**
 ```dockerfile
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -115,8 +129,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy application
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN pip install --no-cache-dir .
 
 COPY roxx/ ./roxx/
 COPY docs/ ./docs/
@@ -129,10 +143,10 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD python -c "import requests; requests.get('http://localhost:8000/api/system/info')"
+  CMD curl --fail --insecure https://127.0.0.1:8000/readyz
 
 # Run application
-CMD ["python", "-m", "roxx.web.app"]
+CMD ["roxx", "server"]
 ```
 
 ### Method 3: Linux systemd Service
@@ -166,11 +180,16 @@ WorkingDirectory=/opt/roxx/app
 Environment=ROXX_CONFIG_DIR=/etc/roxx
 Environment=ROXX_DATA_DIR=/var/lib/roxx
 Environment=ROXX_LOG_DIR=/var/log/roxx
+EnvironmentFile=-/etc/roxx/roxx.env
 ExecStart=/opt/roxx/app/venv/bin/roxx server
 Restart=always
 RestartSec=5
 TimeoutStopSec=30
 KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
 
 [Install]
 WantedBy=multi-user.target
@@ -187,6 +206,14 @@ curl -k https://127.0.0.1:8000/livez
 curl -k https://127.0.0.1:8000/readyz
 ```
 
+The helper can install or remove the unit directly:
+
+```bash
+sudo roxx service install --binary /usr/bin/roxx --working-directory /var/lib/roxx
+sudo roxx service status
+sudo roxx service remove
+```
+
 ### Method 4: Windows Service
 
 Install the package with the Windows service dependency, then register the service from an elevated PowerShell prompt:
@@ -194,8 +221,7 @@ Install the package with the Windows service dependency, then register the servi
 ```powershell
 py -3.12 -m pip install .[build]
 py -3.12 -m pip install pywin32
-roxx windows-service install
-roxx windows-service start
+.\install_windows.ps1
 Get-Service RoXXWebServer
 ```
 
@@ -204,9 +230,10 @@ Service logs are available through Windows Event Viewer under the Application lo
 To stop or remove it:
 
 ```powershell
-roxx windows-service stop
-roxx windows-service remove
+.\uninstall_windows.ps1
 ```
+
+See `docs/OPERATIONS.md` for production profiles, metrics, audit export, HA, Authenticode configuration, upgrade and automatic rollback.
 
 ---
 

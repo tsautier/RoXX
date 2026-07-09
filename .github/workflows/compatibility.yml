@@ -1,0 +1,33 @@
+name: Platform Compatibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    name: ${{ matrix.os }} / Python 3.12
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, windows-2022, windows-2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install .[dev]
+      - run: python -m pytest
+      - name: Validate unified service command
+        run: python -m roxx service print-systemd --binary /usr/bin/roxx
+      - name: Validate Windows service command parser
+        if: runner.os == 'Windows'
+        run: python -m roxx windows-service --help

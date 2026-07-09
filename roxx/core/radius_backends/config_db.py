@@ -7,7 +7,6 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
-from datetime import datetime
 
 logger = logging.getLogger("roxx.radius_backends.db")
 
@@ -206,7 +205,7 @@ class RadiusBackendDB:
                 conn.commit()
                 backend_id = cursor.lastrowid
                 logger.info(f"Created {backend_type} backend '{name}' with ID {backend_id}")
-                return True, f"Backend created successfully", backend_id
+                return True, "Backend created successfully", backend_id
             finally:
                 conn.close()
         except sqlite3.IntegrityError:

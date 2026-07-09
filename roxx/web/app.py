@@ -3,16 +3,14 @@ RoXX Web Interface - Modern FastAPI Application
 Replaces the old SimpleSAMLphp interface with a modern Python web app
 """
 
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, WebSocket, UploadFile, File
 from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.middleware.sessions import SessionMiddleware
 from roxx.core.audit.manager import AuditManager
 from roxx.core.audit.db import AuditDatabase
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from roxx.core.security.rate_limit import limiter
 import qrcode
@@ -20,18 +18,18 @@ import io
 import base64
 import os
 import secrets
-import asyncio
 import logging
 import json
-import ssl
 import sqlite3
 import random
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 
-from roxx.core.auth.totp import TOTPAuthenticator
+from roxx.core.observability import request_metrics
+from roxx.core.security.profiles import SecurityProfile
 from roxx.utils.system import SystemManager
 from roxx.core.auth.saml_provider import SAMLProvider
 from roxx.core.auth.rbac import (
@@ -42,7 +40,6 @@ from roxx.core.auth.rbac import (
     get_role_from_session,
     get_auth_context,
     set_auth_context,
-    clear_auth_context,
 )
 
 logger = logging.getLogger("roxx.web")
@@ -109,13 +106,29 @@ app = FastAPI(
 # Initialize Rate Limiter
 app.state.limiter = limiter
 
+security_profile = SecurityProfile.from_env()
+
 @app.middleware("http")
 async def add_integrity_headers(request: Request, call_next):
     """Adds ownership and integrity headers to protect against dishonest clones"""
+    started = time.perf_counter()
     response = await call_next(request)
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", "unmatched")
+    request_metrics.observe(
+        request.method,
+        route_path,
+        response.status_code,
+        time.perf_counter() - started,
+    )
     response.headers["X-RoXX-Origin"] = "Built with Love by tsautier"
     response.headers["X-RoXX-Build-ID"] = "ST-2026-1.0.2"
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
+    response.headers["Content-Security-Policy"] = security_profile.content_security_policy
+    if security_profile.hsts:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-Developed-For"] = "SH-PX Framework (Confidential)"
     return response
 
@@ -145,11 +158,12 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
     return templates.TemplateResponse(request, "429.html", {"request": request}, status_code=429)
 
 # Add SessionMiddleware for MFA enrollment (needs to be before routes)
-import secrets
 # Security Configuration
 # In production, this should be loaded from env vars or config file
 # For now, we generate if not set, but this invalidates sessions on restart
-SECRET_KEY = os.getenv("ROXX_SECRET_KEY", secrets.token_hex(32))
+configured_secret = os.getenv("ROXX_SECRET_KEY")
+security_profile.validate(configured_secret)
+SECRET_KEY = configured_secret or secrets.token_hex(32)
 
 from itsdangerous import URLSafeTimedSerializer
 cookie_signer = URLSafeTimedSerializer(SECRET_KEY, salt="roxx-mfa-trust")
@@ -159,7 +173,7 @@ app.add_middleware(
     secret_key=SECRET_KEY,
     max_age=3600,  # Session expires after 1 hour
     session_cookie="roxx_session",
-    https_only=False, # Set to True if using HTTPS
+    https_only=security_profile.secure_cookies,
     same_site="lax"
 )
 
@@ -170,6 +184,10 @@ templates = Jinja2Templates(directory=str(templates_dir))
 # Static files
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+from roxx.web.routes.observability import router as observability_router
+
+app.include_router(observability_router)
 
 
 # ------------------------------------------------------------------------------
@@ -182,7 +200,6 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Auth Logic (Database Backed)
 # ------------------------------------------------------------------------------
 from fastapi.responses import RedirectResponse
-from fastapi.security.utils import get_authorization_scheme_param
 from roxx.core.auth.manager import AuthManager
 from roxx.core.auth.db import AdminDatabase
 
@@ -724,7 +741,7 @@ async def mfa_setup(request: Request, secret: str = Form(...), code: str = Form(
 # WebAuthn Routes
 # ------------------------------------------------------------------------------
 from roxx.core.auth.webauthn import WebAuthnManager
-from fido2.utils import websafe_encode, websafe_decode
+from fido2.utils import websafe_encode
 
 
 
@@ -1024,16 +1041,13 @@ async def get_auth_metrics(period_hours: int = 24, granularity: str = "hour"):
         "granularity": granularity,
     }
 
-from datetime import timedelta
 
 # ... (API endpoints remain unchanged) ...
 
 @app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(require_action(Action.VIEW_DASHBOARD))])
 async def dashboard(request: Request, current_user: str = Depends(get_current_username)):
     """Dashboard page"""
-    import os # Added for os.name check
     import logging # Added for logger.error
-    from roxx.core.services import ServiceManager as SvcMgr
     
     logger = logging.getLogger(__name__) # Initialize logger
     
@@ -1559,45 +1573,6 @@ async def health_check():
     return {"status": "healthy", "service": "roxx-web"}
 
 
-@app.get("/livez")
-async def liveness_check():
-    """Unauthenticated liveness probe for service supervisors."""
-    return {"status": "ok", "service": "roxx-web"}
-
-
-def _check_writable_directory(path: Path) -> bool:
-    path.mkdir(parents=True, exist_ok=True)
-    probe = path / ".roxx_readyz"
-    probe.write_text("ok", encoding="utf-8")
-    probe.unlink(missing_ok=True)
-    return True
-
-
-@app.get("/readyz")
-async def readiness_check():
-    """Unauthenticated readiness probe with non-sensitive component status."""
-    checks = {
-        "config_dir": False,
-        "data_dir": False,
-        "log_dir": False,
-    }
-
-    try:
-        checks["config_dir"] = _check_writable_directory(SystemManager.get_config_dir())
-        checks["data_dir"] = _check_writable_directory(SystemManager.get_data_dir())
-        checks["log_dir"] = _check_writable_directory(SystemManager.get_log_dir())
-    except OSError:
-        pass
-
-    ready = all(checks.values())
-    payload = {
-        "status": "ok" if ready else "degraded",
-        "service": "roxx-web",
-        "checks": checks,
-    }
-    return JSONResponse(payload, status_code=200 if ready else 503)
-
-
 # ------------------------------------------------------------------------------
 # Admin Management API
 # ------------------------------------------------------------------------------
@@ -1744,7 +1719,6 @@ async def admin_webauthn_register_options(request: Request, username: str):
     request.session[f"webauthn_reg_state_{username}"] = state
     
     # Correct serialization for FIDO2 object
-    from fido2.utils import websafe_encode
     pk_options = options.public_key
     return {
         "rp": {"id": pk_options.rp.id, "name": pk_options.rp.name},
@@ -1852,7 +1826,6 @@ async def webauthn_register_options(request: Request, username: str = Depends(ge
     options, state = WebAuthnManager.generate_registration_options(username, username, rp_id=request.url.hostname)
     request.session[f"webauthn_reg_state_{username}"] = state
     
-    from fido2.utils import websafe_encode
     pk_options = options.public_key
     return {
         "publicKey": {
@@ -2596,7 +2569,6 @@ def silence_windows_proactor_reset():
     """Silences noisy ConnectionResetError on Windows asyncio/proactor"""
     import platform
     if platform.system() == 'Windows':
-        import asyncio
         from asyncio import proactor_events
         
         # Monkey patch _call_connection_lost to ignore ConnectionResetError [WinError 10054]

@@ -8,7 +8,7 @@ to reduce connection overhead under high-concurrency 802.1X loads.
 import logging
 import time
 from threading import Lock, Condition
-from typing import Any, Optional, Callable
+from typing import Any, Callable
 from collections import deque
 
 logger = logging.getLogger("roxx.radius_backends.pool")

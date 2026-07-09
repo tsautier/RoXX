@@ -237,7 +237,7 @@ Enable debug logging to see full SAML requests/responses:
 
 ```bash
 export ROXX_DEBUG=true
-python3 -m roxx.web.app
+roxx server
 ```
 
 View logs at: **Config → Auth Providers → View Debug Logs**

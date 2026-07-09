@@ -1,6 +1,6 @@
 
 try:
-    from fido2.webauthn import PublicKeyCredentialRpEntity, PublicKeyCredentialUserEntity
+    from fido2.webauthn import PublicKeyCredentialRpEntity
     print("Import successful")
     
     try:

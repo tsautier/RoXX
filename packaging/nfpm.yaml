@@ -1,0 +1,37 @@
+name: roxx
+arch: amd64
+platform: linux
+version: ${ROXX_VERSION}
+section: net
+priority: optional
+maintainer: tsautier <tsautier@users.noreply.github.com>
+description: RoXX RADIUS authentication proxy and administration service
+vendor: RoXX
+homepage: https://github.com/tsautier/RoXX
+license: AGPL-3.0-or-later
+contents:
+  - src: dist/bin/roxx
+    dst: /usr/bin/roxx
+    file_info:
+      mode: 0755
+  - src: packaging/roxx.service
+    dst: /usr/lib/systemd/system/roxx.service
+  - src: scripts/upgrade_linux.sh
+    dst: /usr/share/roxx/upgrade_linux.sh
+    file_info:
+      mode: 0755
+  - dst: /etc/roxx
+    type: dir
+    file_info:
+      mode: 0750
+  - dst: /var/lib/roxx
+    type: dir
+    file_info:
+      mode: 0750
+  - dst: /var/log/roxx
+    type: dir
+    file_info:
+      mode: 0750
+scripts:
+  postinstall: packaging/scripts/postinstall.sh
+  preremove: packaging/scripts/preremove.sh

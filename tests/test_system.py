@@ -3,7 +3,6 @@ Unit tests for SystemManager
 """
 
 import pytest
-import platform
 from pathlib import Path
 
 from roxx.utils.system import SystemManager

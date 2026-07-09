@@ -4,10 +4,8 @@ Linux service management (systemd) for RoXX
 
 import subprocess
 from enum import Enum
-from typing import Optional
 import psutil
 
-from roxx.utils.system import SystemManager
 
 
 class ServiceStatus(Enum):

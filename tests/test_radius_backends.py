@@ -2,7 +2,6 @@
 Unit tests for RADIUS backends functionality
 """
 
-import pytest
 from roxx.core.radius_backends.cache import AuthCache
 from roxx.core.radius_backends.config_db import RadiusBackendDB
 from roxx.core.radius_backends.duo_backend import DuoRadiusBackend

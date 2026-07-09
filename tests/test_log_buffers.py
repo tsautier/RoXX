@@ -2,7 +2,6 @@
 Unit tests for authentication log buffers
 """
 
-import pytest
 from roxx.core.logging.auth_log_buffer import AuthLogBuffer
 
 

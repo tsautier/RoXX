@@ -41,6 +41,8 @@ def build_binary(entry_script: str, name: str) -> None:
         "uvicorn.logging",
         "--hidden-import",
         "uvicorn.loops.auto",
+        "--exclude-module",
+        "roxx.web.mfa_routes",
     ]
     PyInstaller.__main__.run(args)
 

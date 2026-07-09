@@ -8,7 +8,6 @@
 # License, or (at your option) any later version.
 
 import hashlib
-import os
 from pathlib import Path
 from typing import Dict, List
 

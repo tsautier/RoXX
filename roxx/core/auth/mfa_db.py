@@ -6,7 +6,6 @@ Handles MFA settings storage and retrieval
 import sqlite3
 import json
 from pathlib import Path
-from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 from .mfa import MFAManager
 

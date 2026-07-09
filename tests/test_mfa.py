@@ -4,7 +4,6 @@ Unit tests for MFA Manager (TOTP, QR codes, backup codes)
 
 import pytest
 import pyotp
-import re
 from roxx.core.auth.mfa import MFAManager
 
 

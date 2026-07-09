@@ -53,7 +53,7 @@ python3 -c "from roxx.core.radius_backends.config_db import RadiusBackendDB; Rad
 
 **Via Web UI:**
 ```bash
-python -m roxx.web.app
+roxx server
 # Navigate to http://localhost:8000/config/radius-backends
 ```
 

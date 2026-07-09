@@ -220,8 +220,22 @@ def test_readiness_probe_validates_runtime_directories(monkeypatch, tmp_path):
             "config_dir": True,
             "data_dir": True,
             "log_dir": True,
+            "database": True,
         },
     }
+
+
+def test_metrics_endpoint_supports_bearer_token(monkeypatch):
+    monkeypatch.setenv("ROXX_METRICS_TOKEN", "metrics-secret")
+    client = TestClient(web_app.app)
+
+    denied = client.get("/metrics")
+    allowed = client.get("/metrics", headers={"Authorization": "Bearer metrics-secret"})
+
+    assert denied.status_code == 401
+    assert allowed.status_code == 200
+    assert "roxx_up 1" in allowed.text
+    assert "roxx_http_requests_total" in allowed.text
 
 
 def test_pki_endpoints_expose_ca_and_certificates(monkeypatch, tmp_path):

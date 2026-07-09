@@ -5,7 +5,6 @@ Linux replacement for bin/resetfactory
 
 import sys
 import shutil
-from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
@@ -92,7 +91,7 @@ def reset_factory():
                 console.print(f"    [green]✓[/green] {name} removed")
             else:
                 console.print(f"  • {name} not found: {directory}")
-                console.print(f"    [dim]⊘ Already clean[/dim]")
+                console.print("    [dim]⊘ Already clean[/dim]")
         except Exception as e:
             errors.append(f"{name}: {e}")
             console.print(f"    [red]✗[/red] Error: {e}")

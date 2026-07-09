@@ -2,7 +2,6 @@
 Unit tests for ServiceManager
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
 from roxx.core.services import ServiceManager, ServiceStatus

@@ -1,5 +1,4 @@
 
-import ssl
 import hashlib
 from typing import Optional, Dict
 
@@ -49,7 +48,7 @@ class CertAuthManager:
                 "serial": cert.get('serialNumber')
             }
             
-        except Exception as e:
+        except Exception:
             # print(f"Cert extraction error: {e}") # Debug only
             return None
             

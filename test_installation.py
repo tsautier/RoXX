@@ -4,7 +4,6 @@ Quick test script for RoXX Python console
 Run this to verify the installation
 """
 
-import sys
 from pathlib import Path
 
 def check_dependencies():
@@ -67,8 +66,6 @@ def _run_import_test():
     
     try:
         from roxx.utils.system import SystemManager
-        from roxx.core.services import ServiceManager
-        from roxx.utils.i18n import translate
         
         print("✓ SystemManager imported")
         print("✓ ServiceManager imported")

@@ -4,7 +4,6 @@ Tests RBAC, Duo/Okta providers, and Cache optimizations
 """
 
 import sys
-import os
 import sqlite3
 import tempfile
 import time
@@ -20,7 +19,7 @@ def _run_rbac_module():
     print("Testing RBAC Module")
     print("=" * 60)
 
-    from roxx.core.auth.rbac import Role, check_permission, Action, ROLE_PERMISSIONS
+    from roxx.core.auth.rbac import Role, check_permission, Action
 
     passed = 0
     failed = 0
@@ -30,7 +29,7 @@ def _run_rbac_module():
         assert Role.SUPERADMIN == "superadmin"
         assert Role.ADMIN == "admin"
         assert Role.AUDITOR == "auditor"
-        print(f"✓ Role enum values OK")
+        print("✓ Role enum values OK")
         passed += 1
     except AssertionError as e:
         print(f"✗ Role enum: {e}")
@@ -41,7 +40,7 @@ def _run_rbac_module():
         for action in [Action.MANAGE_ADMINS, Action.CHANGE_ROLES, Action.DELETE_ADMINS,
                        Action.MANAGE_SYSTEM_CONFIG, Action.VIEW_DASHBOARD]:
             assert check_permission(Role.SUPERADMIN, action), f"Superadmin missing {action}"
-        print(f"✓ Superadmin has all permissions")
+        print("✓ Superadmin has all permissions")
         passed += 1
     except AssertionError as e:
         print(f"✗ Superadmin permissions: {e}")
@@ -52,7 +51,7 @@ def _run_rbac_module():
         assert not check_permission(Role.ADMIN, Action.CHANGE_ROLES)
         assert not check_permission(Role.ADMIN, Action.DELETE_ADMINS)
         assert check_permission(Role.ADMIN, Action.MANAGE_RADIUS_USERS)
-        print(f"✓ Admin role restrictions OK")
+        print("✓ Admin role restrictions OK")
         passed += 1
     except AssertionError as e:
         print(f"✗ Admin restrictions: {e}")
@@ -65,7 +64,7 @@ def _run_rbac_module():
         assert not check_permission(Role.AUDITOR, Action.MANAGE_ADMINS)
         assert not check_permission(Role.AUDITOR, Action.MANAGE_RADIUS_USERS)
         assert not check_permission(Role.AUDITOR, Action.MANAGE_SYSTEM_CONFIG)
-        print(f"✓ Auditor read-only restrictions OK")
+        print("✓ Auditor read-only restrictions OK")
         passed += 1
     except AssertionError as e:
         print(f"✗ Auditor restrictions: {e}")

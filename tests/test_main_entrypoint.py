@@ -47,3 +47,19 @@ def test_windows_service_mode_forwards_arguments(monkeypatch):
     roxx_main.main()
 
     assert observed_argv == ["roxx windows-service", "install"]
+
+
+def test_audit_mode_forwards_arguments(monkeypatch):
+    observed_argv = []
+
+    def fake_audit_main() -> None:
+        observed_argv.extend(sys.argv)
+
+    audit_module = types.ModuleType("roxx.cli.audit")
+    audit_module.main = fake_audit_main
+    monkeypatch.setitem(sys.modules, "roxx.cli.audit", audit_module)
+    monkeypatch.setattr(sys, "argv", ["roxx", "audit", "export", "--limit", "25"])
+
+    roxx_main.main()
+
+    assert observed_argv == ["roxx audit", "export", "--limit", "25"]
