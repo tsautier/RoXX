@@ -40,7 +40,7 @@ The implementation is present, but these outcomes cannot be truthfully claimed u
 - Authenticode signing requires `ROXX_WINDOWS_CERTIFICATE` and `ROXX_WINDOWS_CERTIFICATE_PASSWORD` repository secrets.
 - Real HA validation requires at least two deployed RoXX nodes, a load balancer or virtual IP, shared operational configuration and production certificates.
 - Compatibility beyond GitHub-hosted images requires representative Windows domain policies, Linux distributions, HSMs, identity providers, RADIUS clients and network appliances.
-- Package publication and attestation run on the next tagged release; ordinary pushes run tests but do not publish release assets.
+- Package publication and attestation run on the next tagged release; the manual branch validation built and smoke-checked both platform artifact sets while skipping publication by design.
 - Native package installation/removal and real Windows service registration/removal require disposable privileged hosts; local validation covered parsers, rendering, builds, process lifecycle and packaging without changing the workstation service registry.
 
 ## Verification Baseline
@@ -48,7 +48,8 @@ The implementation is present, but these outcomes cannot be truthfully claimed u
 - `135` local tests pass on Python 3.12 for Windows.
 - The local PyInstaller build and executable smoke suite pass with exactly one `roxx.exe`.
 - Ruff critical rules, ShellCheck, workflow YAML, PowerShell syntax, wheel/sdist builds, dependency integrity and Git whitespace checks pass.
-- Linux-native builds and the four-image compatibility matrix are configured for GitHub Actions and must complete there after push.
+- Linux-native standalone, `.deb`, and `.rpm` builds passed in manual GitHub Release validation.
+- The compatibility matrix passed on Ubuntu 22.04, Ubuntu 24.04, Windows Server 2022, and Windows Server 2025 GitHub-hosted images.
 
 ## Next Review Horizon
 

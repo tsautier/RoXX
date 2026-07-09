@@ -35,7 +35,8 @@ All notable changes to RoXX will be documented in this file.
 - Full local suite passing: `135 passed` with two third-party `pyasn1` deprecation warnings.
 - Syntax-critical Ruff checks, ShellCheck, workflow YAML parsing, PowerShell parsing, package build, dependency checks, and Git whitespace checks passed.
 - Local PyInstaller build produced exactly one `roxx.exe`; executable probes, protected metrics, rotating logs, production TLS rejection, bootstrap, and ZIP composition smoke checks passed.
-- Native Linux binary, `.deb`, `.rpm`, installation lifecycle, and GitHub attestations remain assigned to Ubuntu CI because WSL virtualization, Docker, Go, and nFPM are unavailable on the local Windows host.
+- Manual GitHub Release validation passed for Windows and Linux builds, Linux `.deb`/`.rpm` metadata smoke checks, and artifact uploads; publication and attestations were skipped by design because the run targeted `master` rather than a tag.
+- The scheduled compatibility workflow passed on Ubuntu 22.04, Ubuntu 24.04, Windows Server 2022, and Windows Server 2025 GitHub-hosted images.
 
 ## [1.0.2] - 2026-07-10
 
