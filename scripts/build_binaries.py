@@ -32,6 +32,8 @@ def build_binary(entry_script: str, name: str) -> None:
         "roxx",
         "--collect-submodules",
         "roxx",
+        "--collect-data",
+        "fido2",
         "--collect-submodules",
         "fido2",
         "--collect-submodules",
@@ -52,6 +54,7 @@ def main() -> None:
 
     build_binary("roxx/__main__.py", "roxx")
     build_binary("roxx/cli/server.py", "roxx-server")
+    build_binary("roxx/cli/service.py", "roxx-service")
     build_binary("roxx/cli/setup.py", "roxx-setup")
 
     if platform.system() == "Windows":
@@ -60,4 +63,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

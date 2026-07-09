@@ -5,6 +5,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0--beta10-blue)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-green)
+[![Release](https://github.com/tsautier/RoXX/actions/workflows/release.yml/badge.svg)](https://github.com/tsautier/RoXX/actions/workflows/release.yml)
 
 ---
 
