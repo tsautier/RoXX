@@ -2,6 +2,19 @@
 
 All notable changes to RoXX will be documented in this file.
 
+## [1.0.1] - 2026-07-10
+
+### Windows Release Packaging
+- Changed the Windows PyInstaller release layout to publish a single `roxx.exe` application executable.
+- Added single-executable routing for `roxx.exe server`, `roxx.exe service ...`, `roxx.exe setup`, and `roxx.exe windows-service ...`.
+- Updated GitHub Actions smoke checks, release uploads, ZIP packaging, SHA256 generation, and release asset verification to expect only `roxx.exe`, `roxx-windows-vX.Y.Z.zip`, and `SHA256SUMS.txt`.
+- Updated release documentation and checklist to match the single Windows executable model.
+
+### Verification
+- Full test suite passing at release cut: `122 passed`.
+- Local Windows PyInstaller build completed and produced only `roxx.exe`.
+- Local smoke checks passed for CLI help, systemd unit rendering through `roxx.exe service`, and server `/livez` plus `/readyz` through `roxx.exe server`.
+
 ## [1.0.0] - 2026-07-09
 
 ### Final Release

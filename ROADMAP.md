@@ -10,6 +10,12 @@ This roadmap is intentionally practical: prioritize reliability, operational cla
 - Added `/livez` and `/readyz` probes for service supervision.
 - Added release checklist, release badge, and release asset verification.
 
+## Completed For 1.0.1
+
+- Simplified the Windows release layout to one application executable: `roxx.exe`.
+- Routed Windows application modes through `roxx.exe server`, `roxx.exe service ...`, `roxx.exe setup`, and `roxx.exe windows-service ...`.
+- Updated release packaging and asset verification so tagged releases publish only `roxx.exe`, the Windows ZIP archive, and `SHA256SUMS.txt`.
+
 ## Short Term
 
 - Reduce the existing Ruff debt in small, low-risk batches.
@@ -18,7 +24,7 @@ This roadmap is intentionally practical: prioritize reliability, operational cla
 
 ## Medium Term
 
-- Add signed release artifacts for Windows executables.
+- Add signed release artifacts for the Windows executable.
 - Add installer packaging for Windows, including service registration and removal.
 - Add Linux package formats for Debian/Ubuntu and RHEL-compatible systems.
 - Add automated upgrade and rollback documentation.

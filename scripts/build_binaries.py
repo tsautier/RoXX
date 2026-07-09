@@ -1,8 +1,7 @@
-"""Build standalone RoXX binaries with PyInstaller."""
+"""Build the standalone RoXX executable with PyInstaller."""
 
 from __future__ import annotations
 
-import platform
 import shutil
 from pathlib import Path
 
@@ -53,12 +52,6 @@ def main() -> None:
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
     build_binary("roxx/__main__.py", "roxx")
-    build_binary("roxx/cli/server.py", "roxx-server")
-    build_binary("roxx/cli/service.py", "roxx-service")
-    build_binary("roxx/cli/setup.py", "roxx-setup")
-
-    if platform.system() == "Windows":
-        build_binary("roxx/cli/windows_service.py", "roxx-windows-service")
 
 
 if __name__ == "__main__":
