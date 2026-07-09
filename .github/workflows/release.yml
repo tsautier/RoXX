@@ -76,21 +76,34 @@ jobs:
           $env:ROXX_SSL_REQUIRED = "false"
           $env:ROXX_AUTO_GENERATE_CERT = "false"
           $env:ROXX_LOG_LEVEL = "info"
+          $env:ROXX_CONFIG_DIR = Join-Path $env:RUNNER_TEMP "roxx-config"
+          $env:ROXX_DATA_DIR = Join-Path $env:RUNNER_TEMP "roxx-data"
+          $env:ROXX_LOG_DIR = Join-Path $env:RUNNER_TEMP "roxx-logs"
+          New-Item -ItemType Directory -Force -Path $env:ROXX_CONFIG_DIR, $env:ROXX_DATA_DIR, $env:ROXX_LOG_DIR
           $stdout = Join-Path $pwd "roxx-server-smoke.out.log"
           $stderr = Join-Path $pwd "roxx-server-smoke.err.log"
           $server = Start-Process -FilePath ".\dist\bin\roxx-server.exe" -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
           try {
             Start-Sleep -Seconds 8
             try {
-              $response = Invoke-WebRequest -Uri "http://127.0.0.1:8765/livez" -UseBasicParsing -TimeoutSec 20
+              $baseUrl = "http://127.0.0.1:8765"
+              $response = Invoke-WebRequest -Uri "$baseUrl/livez" -UseBasicParsing -TimeoutSec 20
             } catch {
-              $response = Invoke-WebRequest -Uri "https://127.0.0.1:8765/livez" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 20
+              $baseUrl = "https://127.0.0.1:8765"
+              $response = Invoke-WebRequest -Uri "$baseUrl/livez" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 20
             }
             if ($response.StatusCode -ne 200) {
               throw "Unexpected liveness status code: $($response.StatusCode)"
             }
             if ($response.Content -notmatch '"status"\s*:\s*"ok"') {
               throw "Unexpected liveness response: $($response.Content)"
+            }
+            $ready = Invoke-WebRequest -Uri "$baseUrl/readyz" -SkipCertificateCheck -UseBasicParsing -TimeoutSec 20
+            if ($ready.StatusCode -ne 200) {
+              throw "Unexpected readiness status code: $($ready.StatusCode)"
+            }
+            if ($ready.Content -notmatch '"status"\s*:\s*"ok"') {
+              throw "Unexpected readiness response: $($ready.Content)"
             }
           } finally {
             if ($server) {

@@ -2,12 +2,28 @@
 
 All notable changes to RoXX will be documented in this file.
 
-## [1.0.0-beta10] - Unreleased
+## [1.0.0] - 2026-07-09
 
-### Planned
-- [ ] Continue post-beta9 stabilization and UX cleanup
-- [ ] Reduce remaining third-party and dependency warning noise where possible
-- [ ] Expand deeper integration and edge-case validation
+### Final Release
+- Promoted RoXX from beta to the first stable `1.0.0` release.
+- Added the Windows PyInstaller release pipeline with tests, smoke checks, ZIP packaging, raw executable uploads, SHA256 checksums, and release asset verification.
+- Added `roxx-service.exe` generation and bundled required `fido2` data for standalone Windows server startup.
+- Added public `/livez` and `/readyz` probes for process liveness and service readiness checks.
+- Added the release workflow badge, release checklist, and project roadmap.
+- Aligned package metadata, README version badge, app version, and visible UI footer with `1.0.0`.
+
+### Verification
+- Full test suite passing at release cut: `119 passed`.
+- Local Windows PyInstaller build completed and produced `roxx.exe`, `roxx-server.exe`, `roxx-service.exe`, `roxx-setup.exe`, and `roxx-windows-service.exe`.
+- Local smoke checks passed for CLI help, systemd unit rendering, and `roxx-server.exe` `/livez`.
+
+## [1.0.0-beta10] - 2026-07-09
+
+### Release Infrastructure
+- Added production server runtime and service helpers for long-running Linux and Windows deployments.
+- Added Windows service wrapper and systemd unit generation.
+- Added Windows executable release pipeline, SHA256 checksums, and release asset verification.
+- Added release checklist and roadmap.
 
 ## [1.0.0-beta9] - 2026-05-23
 

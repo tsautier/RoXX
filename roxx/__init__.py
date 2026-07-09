@@ -2,7 +2,7 @@
 RoXX - Linux RADIUS Authentication Proxy
 """
 
-__version__ = "1.0.0-beta10"
+__version__ = "1.0.0"
 __author__ = ""
 
 from roxx.utils.system import SystemManager

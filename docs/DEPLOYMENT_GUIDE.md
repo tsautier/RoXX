@@ -184,6 +184,7 @@ sudo systemctl start roxx
 sudo systemctl status roxx
 sudo journalctl -u roxx -f
 curl -k https://127.0.0.1:8000/livez
+curl -k https://127.0.0.1:8000/readyz
 ```
 
 ### Method 4: Windows Service

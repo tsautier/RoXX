@@ -17,7 +17,7 @@ Use this checklist for every tagged release.
 - Run `python scripts/build_binaries.py` on Windows when validating executables locally.
 - Smoke check `dist/bin/roxx.exe --help`.
 - Smoke check `dist/bin/roxx-service.exe print-systemd`.
-- Smoke check `dist/bin/roxx-server.exe` with `GET /livez`.
+- Smoke check `dist/bin/roxx-server.exe` with `GET /livez` and `GET /readyz`.
 
 ## 3. Tagging
 
@@ -37,7 +37,7 @@ Use this checklist for every tagged release.
 
 - Install or unpack the Windows archive on a clean Windows host.
 - Run `roxx.exe --help`.
-- Run `roxx-server.exe` and verify `/livez`.
+- Run `roxx-server.exe` and verify `/livez` and `/readyz`.
 - Register the Windows service in a test environment and verify start/stop behavior.
 - Generate a Linux systemd unit with `roxx-service print-systemd`.
 

@@ -2,14 +2,19 @@
 
 This roadmap is intentionally practical: prioritize reliability, operational clarity, and security before large feature expansion.
 
+## Completed For 1.0.0
+
+- Stabilized Windows executable distribution with PyInstaller smoke checks in CI.
+- Added SHA256 checksum generation for Windows release assets.
+- Added clearer operator docs for Windows Service and Linux systemd deployments.
+- Added `/livez` and `/readyz` probes for service supervision.
+- Added release checklist, release badge, and release asset verification.
+
 ## Short Term
 
-- Stabilize Windows executable distribution with PyInstaller smoke checks in CI.
-- Keep release assets reproducible enough to verify with SHA256 checksums.
-- Add clearer operator docs for Windows Service and Linux systemd deployments.
 - Reduce the existing Ruff debt in small, low-risk batches.
-- Add a minimal readiness endpoint that can validate required storage and auth backends without exposing sensitive details.
 - Improve logging defaults for service mode on Windows and Linux.
+- Add more detailed readiness checks for optional authentication backends without exposing sensitive details.
 
 ## Medium Term
 

@@ -204,6 +204,26 @@ def test_liveness_probe_is_public_and_minimal():
     assert response.json() == {"status": "ok", "service": "roxx-web"}
 
 
+def test_readiness_probe_validates_runtime_directories(monkeypatch, tmp_path):
+    monkeypatch.setenv("ROXX_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.setenv("ROXX_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("ROXX_LOG_DIR", str(tmp_path / "logs"))
+    client = TestClient(web_app.app)
+
+    response = client.get("/readyz", headers={"accept": "application/json"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "service": "roxx-web",
+        "checks": {
+            "config_dir": True,
+            "data_dir": True,
+            "log_dir": True,
+        },
+    }
+
+
 def test_pki_endpoints_expose_ca_and_certificates(monkeypatch, tmp_path):
     allow_role(monkeypatch, "superadmin")
 

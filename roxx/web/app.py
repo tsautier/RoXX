@@ -64,7 +64,7 @@ logger = logging.getLogger("roxx.web")
 # App Initialization
 # ------------------------------------------------------------------------------
 
-VERSION = "1.0.0-beta10"
+VERSION = "1.0.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -114,7 +114,7 @@ async def add_integrity_headers(request: Request, call_next):
     """Adds ownership and integrity headers to protect against dishonest clones"""
     response = await call_next(request)
     response.headers["X-RoXX-Origin"] = "Built with Love by tsautier"
-    response.headers["X-RoXX-Build-ID"] = "ST-2026-BETA10-DRAFT-01"
+    response.headers["X-RoXX-Build-ID"] = "ST-2026-1.0.0"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Developed-For"] = "SH-PX Framework (Confidential)"
     return response
@@ -1563,6 +1563,39 @@ async def health_check():
 async def liveness_check():
     """Unauthenticated liveness probe for service supervisors."""
     return {"status": "ok", "service": "roxx-web"}
+
+
+def _check_writable_directory(path: Path) -> bool:
+    path.mkdir(parents=True, exist_ok=True)
+    probe = path / ".roxx_readyz"
+    probe.write_text("ok", encoding="utf-8")
+    probe.unlink(missing_ok=True)
+    return True
+
+
+@app.get("/readyz")
+async def readiness_check():
+    """Unauthenticated readiness probe with non-sensitive component status."""
+    checks = {
+        "config_dir": False,
+        "data_dir": False,
+        "log_dir": False,
+    }
+
+    try:
+        checks["config_dir"] = _check_writable_directory(SystemManager.get_config_dir())
+        checks["data_dir"] = _check_writable_directory(SystemManager.get_data_dir())
+        checks["log_dir"] = _check_writable_directory(SystemManager.get_log_dir())
+    except OSError:
+        pass
+
+    ready = all(checks.values())
+    payload = {
+        "status": "ok" if ready else "degraded",
+        "service": "roxx-web",
+        "checks": checks,
+    }
+    return JSONResponse(payload, status_code=200 if ready else 503)
 
 
 # ------------------------------------------------------------------------------
