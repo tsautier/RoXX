@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from roxx.cli.service import render_systemd_unit
+from roxx.cli.service import build_arg_parser, render_systemd_unit
 from roxx.server.runtime import ServerRuntimeConfig, build_uvicorn_config
 
 
@@ -55,7 +55,7 @@ def test_build_uvicorn_config_uses_explicit_cert_paths(monkeypatch, tmp_path):
 
 def test_render_systemd_unit_contains_restart_policy():
     unit = render_systemd_unit(
-        binary_path=Path("/opt/roxx/roxx-server"),
+        binary_path=Path("/opt/roxx/roxx"),
         user="roxx",
         group="roxx",
         working_directory=Path("/opt/roxx"),
@@ -64,7 +64,12 @@ def test_render_systemd_unit_contains_restart_policy():
         log_dir=Path("/var/log/roxx"),
     )
 
-    assert "ExecStart=/opt/roxx/roxx-server" in unit
+    assert "ExecStart=/opt/roxx/roxx server" in unit
     assert "Restart=always" in unit
     assert "User=roxx" in unit
 
+
+def test_systemd_helper_defaults_to_unified_roxx_launcher():
+    args = build_arg_parser().parse_args(["print-systemd"])
+
+    assert args.binary == "roxx"

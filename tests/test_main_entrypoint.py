@@ -20,7 +20,7 @@ def test_service_mode_forwards_arguments(monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["roxx", "service", "print-systemd", "--binary", "/opt/roxx/roxx-server"],
+        ["roxx", "service", "print-systemd", "--binary", "/opt/roxx/roxx"],
     )
 
     roxx_main.main()
@@ -29,7 +29,7 @@ def test_service_mode_forwards_arguments(monkeypatch):
         "roxx service",
         "print-systemd",
         "--binary",
-        "/opt/roxx/roxx-server",
+        "/opt/roxx/roxx",
     ]
 
 

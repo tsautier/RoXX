@@ -41,7 +41,7 @@ def check_admin():
         console.print("\n[bold red]⚠ Warning:[/bold red] This program requires administrator privileges.")
         console.print("Please run as:", style="yellow")
         
-        console.print("  • sudo roxx-console", style="cyan")
+        console.print("  • sudo roxx", style="cyan")
         
         sys.exit(1)
 

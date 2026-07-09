@@ -140,8 +140,8 @@ CMD ["python", "-m", "roxx.web.app"]
 Generate the service unit from the installed RoXX package:
 
 ```bash
-sudo -u roxx /opt/roxx/app/venv/bin/roxx-service print-systemd \
-  --binary /opt/roxx/app/venv/bin/roxx-server \
+sudo -u roxx /opt/roxx/app/venv/bin/roxx service print-systemd \
+  --binary /opt/roxx/app/venv/bin/roxx \
   --user roxx \
   --group roxx \
   --working-directory /opt/roxx/app \
@@ -166,7 +166,7 @@ WorkingDirectory=/opt/roxx/app
 Environment=ROXX_CONFIG_DIR=/etc/roxx
 Environment=ROXX_DATA_DIR=/var/lib/roxx
 Environment=ROXX_LOG_DIR=/var/log/roxx
-ExecStart=/opt/roxx/app/venv/bin/roxx-server
+ExecStart=/opt/roxx/app/venv/bin/roxx server
 Restart=always
 RestartSec=5
 TimeoutStopSec=30
@@ -194,18 +194,18 @@ Install the package with the Windows service dependency, then register the servi
 ```powershell
 py -3.12 -m pip install .[build]
 py -3.12 -m pip install pywin32
-roxx-windows-service install
-roxx-windows-service start
+roxx windows-service install
+roxx windows-service start
 Get-Service RoXXWebServer
 ```
 
-Service logs are available through Windows Event Viewer under the Application log. The service wrapper uses the same `roxx-server` runtime and requests a graceful shutdown before Windows stops the process.
+Service logs are available through Windows Event Viewer under the Application log. The service wrapper uses the same `roxx server` runtime and requests a graceful shutdown before Windows stops the process.
 
 To stop or remove it:
 
 ```powershell
-roxx-windows-service stop
-roxx-windows-service remove
+roxx windows-service stop
+roxx windows-service remove
 ```
 
 ---

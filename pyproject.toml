@@ -1,6 +1,6 @@
 [project]
 name = "roxx"
-version = "1.0.1"
+version = "1.0.2"
 description = "Linux RADIUS Authentication Proxy"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -44,12 +44,6 @@ build = ["pyinstaller>=6.11.0"]
 
 [project.scripts]
 roxx = "roxx.__main__:main"
-roxx-console = "roxx.cli.console:main"
-roxx-setup = "roxx.cli.setup:main"
-roxx-web = "roxx.web.app:main"
-roxx-server = "roxx.cli.server:main"
-roxx-service = "roxx.cli.service:main"
-roxx-windows-service = "roxx.cli.windows_service:main"
 
 [tool.setuptools]
 include-package-data = true

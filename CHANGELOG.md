@@ -2,6 +2,23 @@
 
 All notable changes to RoXX will be documented in this file.
 
+## [1.0.2] - 2026-07-10
+
+### Unified Application Command
+- Reduced pip-installed application entry points to the single `roxx` command on Linux and Windows.
+- Changed generated and bundled systemd units from the removed `roxx-server` entry point to `roxx server`.
+- Updated deployment examples to use `roxx service`, `roxx server`, and `roxx windows-service` subcommands.
+
+### Upgrade Notice
+- Existing Linux systemd units must replace `ExecStart=.../roxx-server` with `ExecStart=.../roxx server` after upgrading.
+- Operators must run `systemctl daemon-reload` and restart the service after replacing the unit.
+
+### Verification
+- Added regression coverage for the single pip command and the unified systemd `ExecStart` command.
+- Full test suite passing at release cut: `124 passed`.
+- Built wheel contains only the `roxx = roxx.__main__:main` console entry point.
+- Local Windows PyInstaller build produced only `roxx.exe`; executable liveness and readiness smoke checks passed.
+
 ## [1.0.1] - 2026-07-10
 
 ### Windows Release Packaging

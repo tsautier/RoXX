@@ -16,6 +16,12 @@ This roadmap is intentionally practical: prioritize reliability, operational cla
 - Routed Windows application modes through `roxx.exe server`, `roxx.exe service ...`, `roxx.exe setup`, and `roxx.exe windows-service ...`.
 - Updated release packaging and asset verification so tagged releases publish only `roxx.exe`, the Windows ZIP archive, and `SHA256SUMS.txt`.
 
+## Completed For 1.0.2
+
+- Unified pip-installed commands behind the single `roxx` launcher on Linux and Windows.
+- Updated generated and example systemd units to start the server with `roxx server`.
+- Documented the systemd migration required when upgrading from the legacy `roxx-server` entry point.
+
 ## Short Term
 
 - Reduce the existing Ruff debt in small, low-risk batches.

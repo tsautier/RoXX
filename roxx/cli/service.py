@@ -52,7 +52,7 @@ def render_systemd_unit(
         config_dir=_systemd_path(config_dir),
         data_dir=_systemd_path(data_dir),
         log_dir=_systemd_path(log_dir),
-        exec_start=_systemd_path(binary_path),
+        exec_start=f"{_systemd_path(binary_path)} server",
     )
 
 
@@ -63,7 +63,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=["print-systemd"],
         help="Service helper action",
     )
-    parser.add_argument("--binary", default="roxx-server", help="Path to the server binary")
+    parser.add_argument(
+        "--binary",
+        default="roxx",
+        help="Path to the unified roxx application executable",
+    )
     parser.add_argument("--user", default=os.getenv("USER", "roxx"), help="Service user")
     parser.add_argument("--group", default=os.getenv("USER", "roxx"), help="Service group")
     parser.add_argument("--working-directory", default=str(Path.cwd()), help="Working directory")

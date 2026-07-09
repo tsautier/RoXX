@@ -66,7 +66,7 @@ jobs:
         shell: pwsh
         run: |
           .\dist\bin\roxx.exe --help
-          .\dist\bin\roxx.exe service print-systemd --binary /opt/roxx/roxx-server | Select-String "Restart=always"
+          .\dist\bin\roxx.exe service print-systemd --binary /opt/roxx/roxx | Select-String "ExecStart=/opt/roxx/roxx server"
 
       - name: Smoke check server executable
         shell: pwsh

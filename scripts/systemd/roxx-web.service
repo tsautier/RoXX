@@ -11,7 +11,7 @@ WorkingDirectory=/opt/roxx
 Environment=ROXX_CONFIG_DIR=/etc/roxx
 Environment=ROXX_DATA_DIR=/var/lib/roxx
 Environment=ROXX_LOG_DIR=/var/log/roxx
-ExecStart=/opt/roxx/roxx-server
+ExecStart=/opt/roxx/roxx server
 Restart=always
 RestartSec=5
 TimeoutStopSec=30
@@ -19,4 +19,3 @@ KillSignal=SIGTERM
 
 [Install]
 WantedBy=multi-user.target
-

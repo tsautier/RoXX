@@ -7,6 +7,7 @@ Use this checklist for every tagged release.
 - Confirm `pyproject.toml` contains the intended version.
 - Confirm `README.md` displays the same version badge.
 - Confirm release notes or `CHANGELOG.md` include user-visible changes.
+- Confirm any systemd command migration is documented when the unified launcher changes.
 - Confirm the Git working tree is clean before tagging.
 
 ## 2. Local Verification
@@ -41,7 +42,8 @@ Use this checklist for every tagged release.
 - Run `roxx.exe --help`.
 - Run `roxx.exe server` and verify `/livez` and `/readyz`.
 - Register the Windows service in a test environment with `roxx.exe windows-service ...` and verify start/stop behavior.
-- Generate a Linux systemd unit with `roxx service print-systemd`, or validate the Windows executable path with `roxx.exe service print-systemd`.
+- Generate a Linux systemd unit with `roxx service print-systemd` and confirm its `ExecStart` ends in `roxx server`.
+- Validate the Windows executable path with `roxx.exe service print-systemd`.
 
 ## 6. Rollback
 
