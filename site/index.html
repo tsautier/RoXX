@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101b24" />
+    <meta
+      name="description"
+      content="RoXX is an open-source RADIUS authentication proxy with MFA, identity integrations, and an operator-focused admin portal."
+    />
+    <meta
+      property="og:title"
+      content="RoXX | RADIUS authentication infrastructure"
+    />
+    <meta
+      property="og:description"
+      content="Connect VPN access, identity providers, MFA, and operations in one open-source RADIUS proxy."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:image"
+      content="https://tsautier.github.io/RoXX/assets/roxx-hero.png"
+    />
+    <title>RoXX | RADIUS authentication infrastructure</title>
+    <link rel="icon" href="assets/roxx-logo.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="site.js"></script>
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="#top" aria-label="RoXX home"
+          ><span class="brand-mark">R</span><span>RoXX</span></a
+        >
+        <button
+          class="menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          aria-label="Open navigation"
+        >
+          <span></span><span></span><span></span>
+        </button>
+        <nav class="site-nav" id="site-nav" aria-label="Primary navigation">
+          <a href="#overview">Overview</a
+          ><a href="#architecture">Architecture</a
+          ><a href="#capabilities">Capabilities</a
+          ><a href="#download">Download</a><a href="#guide">Guide</a>
+          <a class="nav-source" href="https://github.com/tsautier/RoXX"
+            >GitHub <span aria-hidden="true">↗</span></a
+          >
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="shell hero-inner">
+          <p class="eyebrow hero-eyebrow">
+            <span class="status-dot"></span> OPEN SOURCE
+            <span class="eyebrow-divider">/</span>
+            <span data-release-version>v1.1.1</span>
+          </p>
+          <h1 id="hero-title">RoXX</h1>
+          <p class="hero-lede">
+            RADIUS authentication infrastructure for the networks you already
+            operate.
+          </p>
+          <p class="hero-detail">
+            Bring VPN access, identity providers, MFA, and daily operations
+            together in one open-source service.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#download"
+              >Get RoXX <span aria-hidden="true">↓</span></a
+            ><a
+              class="button button-outline"
+              href="https://github.com/tsautier/RoXX"
+              >View source <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <div class="hero-facts" aria-label="Project highlights">
+            <div>
+              <strong>One application</strong
+              ><span>Server, setup, and operations</span>
+            </div>
+            <div>
+              <strong>MFA ready</strong
+              ><span>TOTP, WebAuthn, and gateways</span>
+            </div>
+            <div>
+              <strong>Cross-platform</strong
+              ><span>Windows, Linux, and macOS</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        class="intro band"
+        id="overview"
+        aria-labelledby="overview-title"
+      >
+        <div class="shell intro-grid">
+          <div>
+            <p class="eyebrow">ONE POLICY POINT</p>
+            <h2 id="overview-title">Your network access, under one roof.</h2>
+          </div>
+          <p>
+            RoXX connects RADIUS clients to local and external identity sources,
+            adds multi-factor checks, and gives operators a web console for
+            configuration, users, logs, and service health.
+          </p>
+        </div>
+      </section>
+      <section
+        class="section architecture-section"
+        id="architecture"
+        aria-labelledby="architecture-title"
+      >
+        <div class="shell">
+          <div class="section-head">
+            <p class="eyebrow">ARCHITECTURE</p>
+            <h2 id="architecture-title">Follow an authentication request.</h2>
+            <p>
+              A compact service between your network edge and the identity
+              systems behind it.
+            </p>
+          </div>
+          <div class="flow" aria-label="RADIUS request flow">
+            <div class="flow-node">
+              <span class="flow-number">01 / NETWORK EDGE</span
+              ><strong>VPN and RADIUS clients</strong
+              ><span>Send authentication requests</span>
+            </div>
+            <span class="flow-arrow" aria-hidden="true">→</span>
+            <div class="flow-node flow-core">
+              <span class="flow-number">02 / ROXX</span
+              ><strong>Policy, MFA, audit</strong
+              ><span>Route and verify each request</span>
+            </div>
+            <span class="flow-arrow" aria-hidden="true">→</span>
+            <div class="flow-node">
+              <span class="flow-number">03 / IDENTITY</span
+              ><strong>Directories and backends</strong
+              ><span>LDAP, AD, SQL, and more</span>
+            </div>
+          </div>
+          <div class="architecture-notes">
+            <p>
+              <strong>Admin portal</strong><br />Manage operators, providers,
+              tokens, and logs through the web interface.
+            </p>
+            <p>
+              <strong>Service operations</strong><br />Readiness, liveness,
+              metrics, rotating logs, and audit export support deployment.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section
+        class="section capabilities-section"
+        id="capabilities"
+        aria-labelledby="capabilities-title"
+      >
+        <div class="shell">
+          <div class="section-head">
+            <p class="eyebrow">CAPABILITIES</p>
+            <h2 id="capabilities-title">Built for real access workflows.</h2>
+          </div>
+          <div class="capability-grid">
+            <article>
+              <span class="feature-index">01</span>
+              <h3>RADIUS proxy</h3>
+              <p>
+                Route authentication through configurable RADIUS backends and
+                integration points.
+              </p>
+            </article>
+            <article>
+              <span class="feature-index">02</span>
+              <h3>Identity integrations</h3>
+              <p>
+                Connect LDAP and Active Directory, SAML 2.0, Entra ID, and
+                supported external providers.
+              </p>
+            </article>
+            <article>
+              <span class="feature-index">03</span>
+              <h3>Multi-factor access</h3>
+              <p>
+                Offer TOTP, WebAuthn, and configured push or SMS gateway
+                integrations.
+              </p>
+            </article>
+            <article>
+              <span class="feature-index">04</span>
+              <h3>Operator console</h3>
+              <p>
+                Manage users and roles, inspect logs, and configure providers
+                from the admin portal.
+              </p>
+            </article>
+            <article>
+              <span class="feature-index">05</span>
+              <h3>Migration tools</h3>
+              <p>
+                Use the NPS migration assistant and FreeRADIUS integration
+                guidance.
+              </p>
+            </article>
+            <article>
+              <span class="feature-index">06</span>
+              <h3>Observable service</h3>
+              <p>
+                Use health probes, Prometheus metrics, rotating logs, and JSONL
+                audit export.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section
+        class="section download-section"
+        id="download"
+        aria-labelledby="download-title"
+      >
+        <div class="shell">
+          <div class="section-head">
+            <p class="eyebrow">DEPLOY</p>
+            <h2 id="download-title">Choose your host.</h2>
+            <p>
+              Release assets are built and smoke-checked on their target
+              platforms. Verify the published SHA256 file before installation.
+            </p>
+          </div>
+          <div
+            class="platform-tabs"
+            role="tablist"
+            aria-label="Download platform"
+          >
+            <button
+              type="button"
+              role="tab"
+              id="tab-windows"
+              aria-selected="true"
+              aria-controls="panel-windows"
+              data-platform="windows"
+            >
+              Windows</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-linux"
+              aria-selected="false"
+              aria-controls="panel-linux"
+              data-platform="linux"
+              tabindex="-1"
+            >
+              Linux</button
+            ><button
+              type="button"
+              role="tab"
+              id="tab-macos"
+              aria-selected="false"
+              aria-controls="panel-macos"
+              data-platform="macos"
+              tabindex="-1"
+            >
+              macOS
+            </button>
+          </div>
+          <div
+            class="platform-panel"
+            id="panel-windows"
+            role="tabpanel"
+            aria-labelledby="tab-windows"
+          >
+            <div>
+              <p class="platform-kicker">WINDOWS / SINGLE APPLICATION</p>
+              <h3>One roxx.exe for every mode.</h3>
+              <p>
+                Download the executable directly or use the archive with
+                PowerShell install, upgrade, and uninstall scripts.
+              </p>
+              <div class="download-links">
+                <a
+                  class="button button-primary"
+                  data-asset="roxx.exe"
+                  href="https://github.com/tsautier/RoXX/releases/latest/download/roxx.exe"
+                  >Download EXE <span aria-hidden="true">↓</span></a
+                ><a
+                  class="button button-muted"
+                  data-asset-pattern="roxx-windows-"
+                  href="https://github.com/tsautier/RoXX/releases/latest"
+                  >Installer archive <span aria-hidden="true">↗</span></a
+                >
+              </div>
+            </div>
+            <div class="command-block">
+              <div class="command-head">
+                <span>PowerShell / first run</span
+                ><button
+                  class="copy-button"
+                  type="button"
+                  data-copy="windows"
+                  aria-label="Copy Windows commands"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre id="commands-windows"><code>.\roxx.exe setup
+.\roxx.exe server</code></pre>
+            </div>
+          </div>
+          <div
+            class="platform-panel"
+            id="panel-linux"
+            role="tabpanel"
+            aria-labelledby="tab-linux"
+            hidden
+          >
+            <div>
+              <p class="platform-kicker">LINUX / STANDALONE OR PACKAGES</p>
+              <h3>Run the binary or install a package.</h3>
+              <p>
+                Use the standalone x86_64 executable, the Debian package, or the
+                RPM package. Packages include a systemd unit.
+              </p>
+              <div class="download-links">
+                <a
+                  class="button button-primary"
+                  data-asset="roxx-linux-x86_64"
+                  href="https://github.com/tsautier/RoXX/releases/latest/download/roxx-linux-x86_64"
+                  >Download binary <span aria-hidden="true">↓</span></a
+                ><a
+                  class="button button-muted"
+                  data-asset-pattern="_amd64.deb"
+                  href="https://github.com/tsautier/RoXX/releases/latest"
+                  >DEB <span aria-hidden="true">↗</span></a
+                ><a
+                  class="button button-muted"
+                  data-asset-pattern=".x86_64.rpm"
+                  href="https://github.com/tsautier/RoXX/releases/latest"
+                  >RPM <span aria-hidden="true">↗</span></a
+                >
+              </div>
+            </div>
+            <div class="command-block">
+              <div class="command-head">
+                <span>Linux / standalone</span
+                ><button
+                  class="copy-button"
+                  type="button"
+                  data-copy="linux"
+                  aria-label="Copy Linux commands"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre id="commands-linux"><code>chmod +x roxx-linux-x86_64
+./roxx-linux-x86_64 setup
+./roxx-linux-x86_64 server</code></pre>
+            </div>
+          </div>
+          <div
+            class="platform-panel"
+            id="panel-macos"
+            role="tabpanel"
+            aria-labelledby="tab-macos"
+            hidden
+          >
+            <div>
+              <p class="platform-kicker">MACOS / APPLE SILICON</p>
+              <h3>A standalone application for macOS.</h3>
+              <p>
+                Check the release asset name for its architecture. Current
+                tagged builds target the architecture of the GitHub macOS
+                runner.
+              </p>
+              <div class="download-links">
+                <a
+                  class="button button-primary"
+                  data-asset-pattern="roxx-macos-"
+                  href="https://github.com/tsautier/RoXX/releases/latest"
+                  >Download macOS build <span aria-hidden="true">↓</span></a
+                >
+              </div>
+            </div>
+            <div class="command-block">
+              <div class="command-head">
+                <span>macOS / first run</span
+                ><button
+                  class="copy-button"
+                  type="button"
+                  data-copy="macos"
+                  aria-label="Copy macOS commands"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre id="commands-macos"><code>chmod +x roxx-macos-arm64
+./roxx-macos-arm64 setup
+./roxx-macos-arm64 server</code></pre>
+            </div>
+          </div>
+          <div class="release-row">
+            <span
+              >Latest release:
+              <strong data-release-version>v1.1.1</strong></span
+            ><a
+              href="https://github.com/tsautier/RoXX/releases/latest"
+              data-release-page
+              >Release notes <span aria-hidden="true">↗</span></a
+            ><a
+              data-asset="SHA256SUMS.txt"
+              href="https://github.com/tsautier/RoXX/releases/latest/download/SHA256SUMS.txt"
+              >SHA256SUMS.txt <span aria-hidden="true">↓</span></a
+            >
+          </div>
+        </div>
+      </section>
+      <section
+        class="section guide-section"
+        id="guide"
+        aria-labelledby="guide-title"
+      >
+        <div class="shell">
+          <div class="section-head">
+            <p class="eyebrow">OPERATOR GUIDE</p>
+            <h2 id="guide-title">From first boot to day two.</h2>
+            <p>
+              Start with the short path below, then use the maintained guides
+              for production detail.
+            </p>
+          </div>
+          <div class="guide-grid">
+            <div class="guide-step">
+              <span>01 / BOOTSTRAP</span>
+              <h3>Initialize RoXX</h3>
+              <p>
+                Run <code>roxx setup</code> or the equivalent command for your
+                downloaded application. Setup generates a unique initial
+                administrator password under <code>ROXX_CONFIG_DIR</code>.
+              </p>
+              <a
+                href="https://github.com/tsautier/RoXX/blob/master/QUICKSTART.md"
+                >Quick start ↗</a
+              >
+            </div>
+            <div class="guide-step">
+              <span>02 / SECURE</span>
+              <h3>Rotate and connect</h3>
+              <p>
+                Sign in over HTTPS, change the initial password, then configure
+                identity providers, RADIUS backends, and MFA for your
+                environment.
+              </p>
+              <a
+                href="https://github.com/tsautier/RoXX/blob/master/docs/DEPLOYMENT_GUIDE.md"
+                >Deployment guide ↗</a
+              >
+            </div>
+            <div class="guide-step">
+              <span>03 / OPERATE</span>
+              <h3>Watch the service</h3>
+              <p>
+                Use <code>/livez</code>, <code>/readyz</code>, logs, metrics,
+                and audit export. Back up configuration and data before
+                upgrades.
+              </p>
+              <a
+                href="https://github.com/tsautier/RoXX/blob/master/docs/OPERATIONS.md"
+                >Operations guide ↗</a
+              >
+            </div>
+          </div>
+          <div class="guide-links">
+            <a href="https://github.com/tsautier/RoXX/blob/master/docs/RBAC.md"
+              >Role permissions ↗</a
+            ><a
+              href="https://github.com/tsautier/RoXX/blob/master/docs/saml-setup.md"
+              >SAML setup ↗</a
+            ><a
+              href="https://github.com/tsautier/RoXX/blob/master/docs/FREERADIUS_INTEGRATION.md"
+              >FreeRADIUS integration ↗</a
+            ><a href="https://github.com/tsautier/RoXX/blob/master/SECURITY.md"
+              >Security policy ↗</a
+            >
+          </div>
+        </div>
+      </section>
+      <section class="community band">
+        <div class="shell community-inner">
+          <div>
+            <p class="eyebrow">OPEN PROJECT</p>
+            <h2>Build it. Run it. Tell us what breaks.</h2>
+            <p>
+              Bug reports, deployment feedback, and focused improvements help
+              shape RoXX.
+            </p>
+          </div>
+          <div class="community-actions">
+            <a
+              class="button button-primary"
+              href="https://github.com/tsautier/RoXX/issues/new/choose"
+              >Open an issue <span aria-hidden="true">↗</span></a
+            ><a
+              class="button button-outline"
+              href="https://github.com/tsautier/RoXX/pulls"
+              >Pull requests <span aria-hidden="true">↗</span></a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <a class="brand" href="#top"
+          ><span class="brand-mark">R</span><span>RoXX</span></a
+        >
+        <p>Open-source RADIUS authentication infrastructure.</p>
+        <div>
+          <a href="https://github.com/tsautier/RoXX">Source</a
+          ><a href="https://github.com/tsautier/RoXX/issues">Issues</a
+          ><a href="https://github.com/tsautier/RoXX/blob/master/LICENSE"
+            >License</a
+          >
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

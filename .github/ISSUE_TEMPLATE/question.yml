@@ -1,0 +1,31 @@
+name: Usage question
+description: Ask about setup, integration, or operation
+title: "[Question] "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: "Check the [quick start](https://github.com/tsautier/RoXX/blob/master/QUICKSTART.md) and [deployment guide](https://github.com/tsautier/RoXX/blob/master/docs/DEPLOYMENT_GUIDE.md) first. Remove secrets and personal data before posting configuration or logs."
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Version and platform
+      placeholder: "RoXX v1.1.1 on Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context or redacted logs

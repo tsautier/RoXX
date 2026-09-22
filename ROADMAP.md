@@ -8,6 +8,13 @@ This file records what was implemented from the original short-, medium-, and lo
 - `1.0.1`: one Windows application executable with all modes routed through `roxx.exe`.
 - `1.0.2`: one pip command on every platform and systemd migration to `roxx server`.
 - `1.1.0`: production roadmap packaging, secure first-run administration, consistent runtime storage, and Windows/Linux/macOS release automation.
+- `1.1.1`: public project website, platform-specific release downloads, and structured GitHub issue forms.
+
+## Public Project Presence
+
+- Added a responsive project site with architecture, capabilities, deployment commands, operator documentation, and links to the published release assets.
+- Added GitHub Pages deployment from `site/` on `master` and manual workflow dispatch.
+- Replaced Markdown issue templates with guided bug, feature, and question forms and a security-reporting link.
 
 ## Short-Term Roadmap Implemented
 

@@ -4,6 +4,12 @@ All notable changes to RoXX will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-22
+
+- Added a public GitHub Pages website for architecture, capabilities, downloads, and operator guidance.
+- Added structured GitHub issue forms for bugs, features, and usage questions, with a private security-reporting path.
+- Updated release links and version references for the maintenance release.
+
 ## [1.1.0] - 2026-09-22
 
 ### Secure First Run

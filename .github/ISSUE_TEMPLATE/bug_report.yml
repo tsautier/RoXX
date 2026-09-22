@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible problem in RoXX
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "For suspected vulnerabilities, use the private reporting instructions in [SECURITY.md](https://github.com/tsautier/RoXX/blob/master/SECURITY.md). Remove passwords, tokens, private keys, and personal data from logs before posting."
+  - type: input
+    id: version
+    attributes:
+      label: RoXX version
+      description: Include the exact release tag or commit.
+      placeholder: v1.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Windows, Linux, macOS, Docker, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options: [Standalone executable, Windows archive, Debian package, RPM package, pip, Docker, Source checkout, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Give the smallest sequence that reproduces the problem.
+      placeholder: "1. Configure ...\n2. Run ...\n3. Observe ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Add relevant, redacted evidence and any error messages.
+      render: text
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mention relevant identity providers, RADIUS clients, proxies, or recent upgrades.

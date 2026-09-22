@@ -44,6 +44,7 @@ Use this checklist for every tagged release.
 - Confirm the workflow asset verification step passed.
 - Download every release asset and verify `SHA256SUMS.txt` in the post-upload workflow step.
 - Confirm the Windows ZIP contains exactly one executable plus install, uninstall, and upgrade scripts.
+- Confirm the GitHub Pages deployment succeeds and the public project site resolves with its images, styles, navigation, and release links.
 
 ## 5. Post-Release Smoke Checks
 

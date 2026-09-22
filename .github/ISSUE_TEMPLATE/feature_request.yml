@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose an improvement to RoXX
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the operator or user workflow and its current limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain what RoXX should do and how you would use it.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [RADIUS proxy, Identity providers, MFA, Admin portal, Operations and deployment, Documentation, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include current workarounds or related tools, if any.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: What would make this complete?
+      description: Describe an observable result or test scenario.
