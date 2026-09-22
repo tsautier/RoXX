@@ -213,7 +213,7 @@ jobs:
       - name: Generate SHA256 checksums
         working-directory: dist/release
         run: |
-          for file in roxx.exe roxx-windows-*.zip roxx-linux-x86_64 roxx-macos-* packages/* roxx-*.spdx.json; do
+          for file in bin/roxx.exe roxx-windows-*.zip roxx-linux-x86_64 roxx-macos-* packages/* roxx-*.spdx.json; do
             hash="$(sha256sum "$file" | cut -d' ' -f1)"
             printf '%s  %s\n' "$hash" "$(basename "$file")"
           done > SHA256SUMS.txt
@@ -221,7 +221,7 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: |
-            dist/release/roxx.exe
+            dist/release/bin/roxx.exe
             dist/release/roxx-windows-*.zip
             dist/release/roxx-linux-x86_64
             dist/release/roxx-macos-*
@@ -229,7 +229,7 @@ jobs:
       - name: Attest Windows SBOM
         uses: actions/attest@v4
         with:
-          subject-path: dist/release/roxx.exe
+          subject-path: dist/release/bin/roxx.exe
           sbom-path: dist/release/roxx-windows.spdx.json
       - name: Attest Linux SBOM
         uses: actions/attest@v4
@@ -245,7 +245,7 @@ jobs:
         with:
           body_path: RELEASE_NOTES_v1.1.0.md
           files: |
-            dist/release/roxx.exe
+            dist/release/bin/roxx.exe
             dist/release/roxx-windows-*.zip
             dist/release/roxx-linux-x86_64
             dist/release/roxx-macos-*
