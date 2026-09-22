@@ -6,6 +6,8 @@ on:
       - '.github/workflows/install-pilot.yml'
       - 'scripts/upgrade_linux.sh'
       - 'scripts/upgrade_windows.ps1'
+      - 'scripts/uninstall_windows.ps1'
+      - 'roxx/cli/windows_service.py'
   workflow_dispatch:
     inputs:
       release_tag:

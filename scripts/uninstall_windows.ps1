@@ -17,7 +17,15 @@ if (Test-Path -LiteralPath $executable -PathType Leaf) {
     & $executable windows-service remove
 }
 if (Test-Path -LiteralPath $InstallDirectory) {
-    Remove-Item -LiteralPath $InstallDirectory -Recurse -Force
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $InstallDirectory -Recurse -Force
+            break
+        } catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+            if ($attempt -eq 59) { throw }
+            Start-Sleep -Milliseconds 500
+        }
+    }
 }
 if (-not $KeepData) {
     $dataDirectory = Join-Path $env:ProgramData "RoXX"
