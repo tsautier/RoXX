@@ -64,6 +64,8 @@ On Windows, run elevated PowerShell:
 
 The Windows script backs up the installed executable under `%ProgramData%\RoXX\rollback`, uses the existing Windows service, polls readiness, restores the previous executable on failure, and prints recent Application event-log entries.
 
+When upgrading a Windows service installed before v1.1.2, first back up configuration and data, then stop and remove the old `RoXXWebServer` service with the old executable. Install v1.1.2 with `scripts/install_windows.ps1` so the Service Control Manager registers `roxx.exe windows-service run`. Replacing the executable without updating the registration will leave the service unable to start.
+
 ## Release Signing And Provenance
 
 The release workflow generates SHA256 checksums, SPDX 2.3 SBOMs, signed GitHub/Sigstore provenance, and signed SBOM attestations for Windows, Linux, and macOS. It downloads every published asset and validates the checksum manifest after upload. Configure both repository secrets below to additionally Authenticode-sign `roxx.exe`:

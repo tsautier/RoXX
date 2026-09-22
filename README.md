@@ -1,8 +1,10 @@
-# RoXX (v1.1.1)
+# RoXX (v1.1.2)
 
-**Modern RADIUS proxy with integrated admin portal, multi-factor authentication, and enterprise identity provider support.**
+**RADIUS authentication integration with an admin portal, multi-factor authentication, and enterprise identity provider support.**
 
-![Version](https://img.shields.io/badge/version-1.1.1-blue)
+RoXX does not listen for RADIUS packets on UDP 1812 by itself. Deploy FreeRADIUS with the documented `rlm_python3` integration for RADIUS clients; `roxx server` runs the administration web service.
+
+![Version](https://img.shields.io/badge/version-1.1.2-blue)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-green)
 [![Release](https://github.com/tsautier/RoXX/actions/workflows/release.yml/badge.svg)](https://github.com/tsautier/RoXX/actions/workflows/release.yml)
@@ -14,7 +16,7 @@
 ## 🚀 Features
 
 ### Core Functionality
-- **RADIUS Proxy**: High-performance RADIUS authentication proxy
+- **RADIUS Integration**: FreeRADIUS module and configurable upstream authentication backends
 - **NPS Migration Assistant**: Import tools for effortless transition from Microsoft NPS
 - **Multi-Backend Support**: LDAP, Active Directory, SAML 2.0 SSO, Entra ID
 - **Admin Portal**: Modern web interface with real-time analytics

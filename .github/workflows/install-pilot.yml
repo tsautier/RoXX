@@ -13,7 +13,7 @@ on:
       release_tag:
         description: Published release to install and exercise
         required: true
-        default: v1.1.1
+        default: v1.1.2
 
 permissions:
   contents: read
@@ -47,7 +47,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
-          $tag = '${{ inputs.release_tag || 'v1.1.1' }}'
+          $tag = '${{ inputs.release_tag }}'
           gh release download $tag --pattern "roxx-windows-$tag.zip" --dir $env:RUNNER_TEMP
           Expand-Archive -LiteralPath (Join-Path $env:RUNNER_TEMP "roxx-windows-$tag.zip") -DestinationPath (Join-Path $env:RUNNER_TEMP 'roxx-package')
       - name: Install, restart, upgrade, roll back, and remove
@@ -123,16 +123,21 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+      - name: Select the published Linux baseline
+        run: |
+          tag="${{ inputs.release_tag }}"
+          if [ -z "$tag" ]; then tag="$(gh release view --json tagName --jq .tagName)"; fi
+          echo "PILOT_TAG=$tag" >> "$GITHUB_ENV"
       - name: Download published Debian package and standalone executable
         run: |
-          version="${{ inputs.release_tag || 'v1.1.1' }}"
+          version="$PILOT_TAG"
           version="${version#v}"
-          gh release download "${{ inputs.release_tag || 'v1.1.1' }}" --pattern "roxx_${version}_amd64.deb" --pattern roxx-linux-x86_64 --dir "$RUNNER_TEMP"
+          gh release download "$PILOT_TAG" --pattern "roxx_${version}_amd64.deb" --pattern roxx-linux-x86_64 --dir "$RUNNER_TEMP"
       - name: Install, restart, upgrade, roll back, and remove
         shell: bash
         run: |
           set -euo pipefail
-          version="${{ inputs.release_tag || 'v1.1.1' }}"
+          version="$PILOT_TAG"
           version="${version#v}"
           package="$RUNNER_TEMP/roxx_${version}_amd64.deb"
           candidate="$RUNNER_TEMP/roxx-linux-x86_64"

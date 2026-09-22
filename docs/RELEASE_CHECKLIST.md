@@ -45,6 +45,7 @@ Use this checklist for every tagged release.
 - Download every release asset and verify `SHA256SUMS.txt` in the post-upload workflow step.
 - Confirm the Windows ZIP contains exactly one executable plus install, uninstall, and upgrade scripts.
 - Confirm the GitHub Pages deployment succeeds and the public project site resolves with its images, styles, navigation, and release links.
+- Run the Installation pilot workflow against the published tag and confirm Windows and Debian install, restart, upgrade, rollback, logs, and removal pass.
 
 ## 5. Post-Release Smoke Checks
 

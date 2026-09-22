@@ -4,6 +4,14 @@ All notable changes to RoXX will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-22
+
+- Fixed Windows service startup for the single frozen executable by dispatching service control commands through its registered service mode.
+- Waited for the Windows service executable to unlock during upgrade, rollback, and uninstall.
+- Made Linux upgrades restore the previous binary when the replacement service fails immediately.
+- Added disposable-runner installation lifecycle checks for Windows and Debian packages, covering start, stop, restart, upgrade, failed-upgrade rollback, logs, and removal.
+- Clarified that RADIUS packets reach RoXX through the documented FreeRADIUS integration; `roxx server` is the administration web service.
+
 ## [1.1.1] - 2026-09-22
 
 - Added a public GitHub Pages website for architecture, capabilities, downloads, and operator guidance.

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101b24" />
     <meta
       name="description"
-      content="RoXX is an open-source RADIUS authentication proxy with MFA, identity integrations, and an operator-focused admin portal."
+      content="RoXX integrates FreeRADIUS authentication with MFA, identity providers, and an operator-focused admin portal."
     />
     <meta
       property="og:title"
@@ -14,7 +14,7 @@
     />
     <meta
       property="og:description"
-      content="Connect VPN access, identity providers, MFA, and operations in one open-source RADIUS proxy."
+      content="Connect FreeRADIUS, identity providers, MFA, and operations with RoXX."
     />
     <meta property="og:type" content="website" />
     <meta
@@ -59,7 +59,7 @@
           <p class="eyebrow hero-eyebrow">
             <span class="status-dot"></span> OPEN SOURCE
             <span class="eyebrow-divider">/</span>
-            <span data-release-version>v1.1.1</span>
+            <span data-release-version>v1.1.2</span>
           </p>
           <h1 id="hero-title">RoXX</h1>
           <p class="hero-lede">
@@ -106,7 +106,7 @@
             <h2 id="overview-title">Your network access, under one roof.</h2>
           </div>
           <p>
-            RoXX connects RADIUS clients to local and external identity sources,
+            Through FreeRADIUS, RoXX connects RADIUS clients to identity sources,
             adds multi-factor checks, and gives operators a web console for
             configuration, users, logs, and service health.
           </p>
@@ -122,14 +122,14 @@
             <p class="eyebrow">ARCHITECTURE</p>
             <h2 id="architecture-title">Follow an authentication request.</h2>
             <p>
-              A compact service between your network edge and the identity
-              systems behind it.
+              FreeRADIUS receives network requests; RoXX provides authentication
+              integration and administration behind it.
             </p>
           </div>
           <div class="flow" aria-label="RADIUS request flow">
             <div class="flow-node">
               <span class="flow-number">01 / NETWORK EDGE</span
-              ><strong>VPN and RADIUS clients</strong
+              ><strong>VPN and RADIUS clients via FreeRADIUS</strong
               ><span>Send authentication requests</span>
             </div>
             <span class="flow-arrow" aria-hidden="true">→</span>
@@ -170,10 +170,10 @@
           <div class="capability-grid">
             <article>
               <span class="feature-index">01</span>
-              <h3>RADIUS proxy</h3>
+              <h3>RADIUS integration</h3>
               <p>
-                Route authentication through configurable RADIUS backends and
-                integration points.
+                Connect FreeRADIUS authentication to MFA and configurable
+                identity backends.
               </p>
             </article>
             <article>
@@ -406,7 +406,7 @@
           <div class="release-row">
             <span
               >Latest release:
-              <strong data-release-version>v1.1.1</strong></span
+              <strong data-release-version>v1.1.2</strong></span
             ><a
               href="https://github.com/tsautier/RoXX/releases/latest"
               data-release-page

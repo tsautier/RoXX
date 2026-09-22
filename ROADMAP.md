@@ -9,6 +9,7 @@ This file records what was implemented from the original short-, medium-, and lo
 - `1.0.2`: one pip command on every platform and systemd migration to `roxx server`.
 - `1.1.0`: production roadmap packaging, secure first-run administration, consistent runtime storage, and Windows/Linux/macOS release automation.
 - `1.1.1`: public project website, platform-specific release downloads, and structured GitHub issue forms.
+- `1.1.2`: Windows service lifecycle fix and disposable-runner Windows/Debian installation pilots.
 
 ## Public Project Presence
 
