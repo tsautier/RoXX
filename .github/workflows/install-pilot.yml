@@ -84,7 +84,11 @@ jobs:
           } finally {
             Get-Service RoXXWebServer -ErrorAction SilentlyContinue | Format-Table -AutoSize
             Get-Content (Join-Path $logs 'roxx-server.log') -Tail 40 -ErrorAction SilentlyContinue
-            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='RoXXWebServer'} -MaxEvents 15 -ErrorAction SilentlyContinue | Format-List TimeCreated,LevelDisplayName,Message
+            try {
+              Get-WinEvent -LogName Application -MaxEvents 100 -ErrorAction Stop |
+                Where-Object ProviderName -EQ 'RoXXWebServer' |
+                Select-Object -First 15 | Format-List TimeCreated,LevelDisplayName,Message
+            } catch { Write-Warning "Could not read Application events: $_" }
             if (Test-Path $binary) {
               & (Join-Path $package 'uninstall_windows.ps1') -InstallDirectory $install -KeepData
             }
