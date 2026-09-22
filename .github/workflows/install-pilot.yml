@@ -1,0 +1,160 @@
+name: Installation pilot
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/install-pilot.yml'
+      - 'scripts/upgrade_linux.sh'
+      - 'scripts/upgrade_windows.ps1'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published release to install and exercise
+        required: true
+        default: v1.1.1
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows service lifecycle
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the published Windows archive
+        shell: pwsh
+        run: |
+          $tag = '${{ inputs.release_tag || 'v1.1.1' }}'
+          gh release download $tag --pattern "roxx-windows-$tag.zip" --dir $env:RUNNER_TEMP
+          Expand-Archive -LiteralPath (Join-Path $env:RUNNER_TEMP "roxx-windows-$tag.zip") -DestinationPath (Join-Path $env:RUNNER_TEMP 'roxx-package')
+      - name: Install, restart, upgrade, roll back, and remove
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = Join-Path $env:RUNNER_TEMP 'roxx-package'
+          $install = Join-Path $env:RUNNER_TEMP 'roxx-installed'
+          $config = Join-Path $env:RUNNER_TEMP 'roxx-config'
+          $data = Join-Path $env:RUNNER_TEMP 'roxx-data'
+          $logs = Join-Path $env:RUNNER_TEMP 'roxx-logs'
+          $binary = Join-Path $install 'roxx.exe'
+          $source = Join-Path $package 'roxx.exe'
+          $probe = 'http://127.0.0.1:8000/readyz'
+          function Wait-Ready {
+            for ($i = 0; $i -lt 45; $i++) {
+              try {
+                if ((Invoke-WebRequest $probe -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) { return }
+              } catch {}
+              Start-Sleep -Seconds 1
+            }
+            throw 'RoXX did not become ready'
+          }
+          try {
+            & (Join-Path $package 'install_windows.ps1') -Source $source -InstallDirectory $install -NoStart
+            if ($LASTEXITCODE -ne 0) { throw "Installer exited with $LASTEXITCODE" }
+            $settings = @(
+              "ROXX_CONFIG_DIR=$config", "ROXX_DATA_DIR=$data", "ROXX_LOG_DIR=$logs",
+              'ROXX_HOST=127.0.0.1', 'ROXX_PORT=8000',
+              'ROXX_SSL_REQUIRED=false', 'ROXX_AUTO_GENERATE_CERT=false'
+            )
+            New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\RoXXWebServer' -Name Environment -PropertyType MultiString -Value $settings -Force | Out-Null
+            $servicePath = (Get-CimInstance Win32_Service -Filter "Name='RoXXWebServer'").PathName
+            if ($servicePath -notlike "*$binary*") { throw "Service path does not use installed roxx.exe: $servicePath" }
+            Start-Service RoXXWebServer
+            Wait-Ready
+            Stop-Service RoXXWebServer
+            (Get-Service RoXXWebServer).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+            Start-Service RoXXWebServer
+            Wait-Ready
+            & (Join-Path $package 'upgrade_windows.ps1') -Source $source -InstallDirectory $install -ProbeUrl $probe
+            Wait-Ready
+            $expectedHash = (Get-FileHash $binary -Algorithm SHA256).Hash
+            $bad = Join-Path $env:RUNNER_TEMP 'invalid-roxx.exe'
+            Set-Content -LiteralPath $bad -Value 'Not an executable' -Encoding ascii
+            $failed = $false
+            try {
+              & (Join-Path $package 'upgrade_windows.ps1') -Source $bad -InstallDirectory $install -ProbeUrl $probe
+            } catch { $failed = $true }
+            if (-not $failed) { throw 'Broken upgrade unexpectedly succeeded' }
+            if ((Get-FileHash $binary -Algorithm SHA256).Hash -ne $expectedHash) { throw 'Rollback did not restore the previous executable' }
+            Wait-Ready
+            if (-not (Test-Path (Join-Path $logs 'roxx-server.log'))) { throw 'Service log is missing' }
+          } finally {
+            Get-Service RoXXWebServer -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            Get-Content (Join-Path $logs 'roxx-server.log') -Tail 40 -ErrorAction SilentlyContinue
+            Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='RoXXWebServer'} -MaxEvents 15 -ErrorAction SilentlyContinue | Format-List TimeCreated,LevelDisplayName,Message
+            if (Test-Path $binary) {
+              & (Join-Path $package 'uninstall_windows.ps1') -InstallDirectory $install -KeepData
+            }
+          }
+          if (Get-Service RoXXWebServer -ErrorAction SilentlyContinue) { throw 'Windows service remained installed' }
+          if (Test-Path $binary) { throw 'Windows executable remained installed' }
+
+  linux:
+    name: Debian package lifecycle
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download published Debian package and standalone executable
+        run: |
+          version="${{ inputs.release_tag || 'v1.1.1' }}"
+          version="${version#v}"
+          gh release download "${{ inputs.release_tag || 'v1.1.1' }}" --pattern "roxx_${version}_amd64.deb" --pattern roxx-linux-x86_64 --dir "$RUNNER_TEMP"
+      - name: Install, restart, upgrade, roll back, and remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.release_tag || 'v1.1.1' }}"
+          version="${version#v}"
+          package="$RUNNER_TEMP/roxx_${version}_amd64.deb"
+          candidate="$RUNNER_TEMP/roxx-linux-x86_64"
+          ready() {
+            for _ in $(seq 1 45); do
+              curl --fail --silent http://127.0.0.1:8000/readyz && return 0
+              sleep 1
+            done
+            return 1
+          }
+          cleanup() {
+            sudo systemctl status roxx.service --no-pager || true
+            sudo journalctl -u roxx.service -n 50 --no-pager || true
+            sudo tail -n 40 /var/log/roxx/roxx-server.log 2>/dev/null || true
+            sudo apt-get remove -y roxx || true
+          }
+          trap cleanup EXIT
+          sudo dpkg -i "$package"
+          printf '%s\n' 'ROXX_HOST=127.0.0.1' 'ROXX_PORT=8000' 'ROXX_SSL_REQUIRED=false' 'ROXX_AUTO_GENERATE_CERT=false' |
+            sudo tee /etc/roxx/roxx.env >/dev/null
+          sudo chown root:roxx /etc/roxx/roxx.env
+          sudo chmod 0640 /etc/roxx/roxx.env
+          sudo systemctl start roxx.service
+          ready
+          sudo systemctl stop roxx.service
+          if sudo systemctl is-active --quiet roxx.service; then
+            echo 'RoXX remained active after stop' >&2
+            exit 1
+          fi
+          sudo systemctl start roxx.service
+          ready
+          sudo sh scripts/upgrade_linux.sh "$candidate" /usr/bin/roxx
+          ready
+          expected_hash="$(sha256sum /usr/bin/roxx | cut -d' ' -f1)"
+          printf '#!/bin/sh\nexit 1\n' > "$RUNNER_TEMP/invalid-roxx"
+          if sudo sh scripts/upgrade_linux.sh "$RUNNER_TEMP/invalid-roxx" /usr/bin/roxx; then
+            echo 'Broken upgrade unexpectedly succeeded' >&2
+            exit 1
+          fi
+          test "$(sha256sum /usr/bin/roxx | cut -d' ' -f1)" = "$expected_hash"
+          ready
+          sudo test -s /var/log/roxx/roxx-server.log
+          sudo apt-get remove -y roxx
+          trap - EXIT
+          if dpkg-query -W -f='${Status}' roxx 2>/dev/null | grep -q 'install ok installed'; then
+            echo 'Debian package remained installed' >&2
+            exit 1
+          fi
+          test ! -e /usr/bin/roxx

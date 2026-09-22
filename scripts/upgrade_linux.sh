@@ -14,18 +14,20 @@ if [ ! -f "$SOURCE" ]; then
     echo "Upgrade source does not exist: $SOURCE" >&2
     exit 1
 fi
+if [ ! -f "$TARGET" ]; then
+    echo "Installed RoXX does not exist: $TARGET" >&2
+    exit 1
+fi
 
 mkdir -p "$BACKUP_DIR"
-BACKUP="$BACKUP_DIR/roxx-$(date -u +%Y%m%dT%H%M%SZ)"
-if [ -f "$TARGET" ]; then
-    cp -p "$TARGET" "$BACKUP"
-fi
+BACKUP="$BACKUP_DIR/roxx-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+cp -p "$TARGET" "$BACKUP"
 
 rollback() {
     echo "Readiness check failed; rolling back." >&2
-    if [ -f "$BACKUP" ]; then
-        install -m 0755 "$BACKUP" "$TARGET"
-        systemctl restart "$SERVICE"
+    install -m 0755 "$BACKUP" "$TARGET"
+    if ! systemctl restart "$SERVICE"; then
+        echo "Rollback service restart failed." >&2
     fi
     journalctl -u "$SERVICE" -n 100 --no-pager >&2 || true
     exit 1
@@ -33,7 +35,9 @@ rollback() {
 
 systemctl stop "$SERVICE"
 install -m 0755 "$SOURCE" "$TARGET"
-systemctl start "$SERVICE"
+if ! systemctl start "$SERVICE"; then
+    rollback
+fi
 
 attempt=0
 while [ "$attempt" -lt 30 ]; do
