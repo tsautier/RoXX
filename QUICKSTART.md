@@ -55,13 +55,25 @@ The wizard will guide you through:
 - PKI configuration
 - Service configuration
 
+For a repeatable production bootstrap:
+
+```bash
+sudo ROXX_CONFIG_DIR=/etc/roxx ROXX_DATA_DIR=/var/lib/roxx ROXX_LOG_DIR=/var/log/roxx \
+  roxx setup --non-interactive --hostname roxx.example.com
+sudo cat /etc/roxx/initial-admin-credentials.txt
+```
+
+The generated administrator password must be changed at first sign-in. Its credential file is
+deleted after rotation. Set `ROXX_BOOTSTRAP_ADMIN_PASSWORD` during setup when a deployment secret
+manager supplies the initial password; RoXX will not write that value to disk.
+
 ### 3. Start Web Interface
 
 ```bash
 roxx server
 ```
 
-Access at: http://localhost:8000
+Access at: https://localhost:8000
 
 Features:
 - TOTP enrollment with QR codes

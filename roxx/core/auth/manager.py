@@ -1,12 +1,16 @@
 import logging
+import os
 import sqlite3
 import re
 import secrets
 import bcrypt
-from datetime import datetime
+from datetime import UTC, datetime
+from pathlib import Path
 from roxx.core.auth.db import AdminDatabase
 
 logger = logging.getLogger("roxx.auth")
+
+INITIAL_ADMIN_CREDENTIALS_FILENAME = "initial-admin-credentials.txt"
 
 class AuthManager:
     """
@@ -17,34 +21,123 @@ class AuthManager:
     def init():
         """Initialize Auth Subsystem"""
         AdminDatabase.init_db()
-        # Ensure default admin exists if table is empty
-        AuthManager._ensure_default_admin()
+        AuthManager._ensure_initial_admin()
 
     @staticmethod
-    def _ensure_default_admin():
-        """Create default admin/admin account if no users exist"""
+    def get_initial_credentials_path() -> Path:
+        """Return the protected file used to deliver generated bootstrap credentials."""
+        return AdminDatabase.get_db_path().parent / INITIAL_ADMIN_CREDENTIALS_FILENAME
+
+    @staticmethod
+    def _write_initial_credentials(username: str, password: str) -> Path:
+        """Write generated credentials with owner-only permissions where supported."""
+        path = AuthManager.get_initial_credentials_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        content = (
+            "RoXX initial administrator credentials\n"
+            f"Username: {username}\n"
+            f"Password: {password}\n\n"
+            "Sign in and change this password immediately. "
+            "This file is deleted after password rotation.\n"
+        )
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
+        if os.name != "nt":
+            path.chmod(0o600)
+        return path
+
+    @staticmethod
+    def _remove_initial_credentials(username: str) -> None:
+        """Remove the bootstrap credential file after the matching account rotates it."""
+        path = AuthManager.get_initial_credentials_path()
+        if not path.exists():
+            return
+        try:
+            content = path.read_text(encoding="utf-8")
+            if f"Username: {username}\n" in content:
+                path.unlink()
+        except OSError as exc:
+            logger.warning("Could not remove initial administrator credentials: %s", exc)
+
+    @staticmethod
+    def _new_initial_password() -> str:
+        """Generate a high-entropy password that also satisfies the local policy."""
+        return f"RoXX1!{secrets.token_urlsafe(24)}"
+
+    @staticmethod
+    def _ensure_initial_admin():
+        """Create or migrate the initial administrator without a shared default password."""
         conn = AdminDatabase.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT count(*) FROM admins")
-        count = cursor.fetchone()[0]
-        
-        if count == 0:
-            logger.warning("No admins found. Creating default 'admin' user with superadmin role.")
-            # Default password 'admin' - MUST CHANGE on first login
-            # Bcrypt hash
-            pw_hash = bcrypt.hashpw(b"admin", bcrypt.gensalt()).decode('utf-8')
-            
-            cursor.execute("""
-                INSERT INTO admins (username, password_hash, must_change_password, role)
-                VALUES (?, ?, 1, 'superadmin')
-            """, ("admin", pw_hash))
+        try:
+            cursor.execute("BEGIN IMMEDIATE")
+            count = cursor.execute("SELECT count(*) FROM admins").fetchone()[0]
+
+            if count == 0:
+                username = os.getenv("ROXX_BOOTSTRAP_ADMIN_USERNAME", "admin").strip()
+                supplied_password = os.getenv("ROXX_BOOTSTRAP_ADMIN_PASSWORD")
+                if not username or "\n" in username or "\r" in username:
+                    raise ValueError("ROXX_BOOTSTRAP_ADMIN_USERNAME is invalid")
+                password = supplied_password or AuthManager._new_initial_password()
+                valid, error = AuthManager.check_password_complexity(password)
+                if not valid:
+                    raise ValueError(f"ROXX_BOOTSTRAP_ADMIN_PASSWORD: {error}")
+
+                pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode(
+                    "utf-8"
+                )
+                cursor.execute("""
+                    INSERT INTO admins (username, password_hash, must_change_password, role)
+                    VALUES (?, ?, 1, 'superadmin')
+                """, (username, pw_hash))
+                if supplied_password is None:
+                    path = AuthManager._write_initial_credentials(username, password)
+                    logger.warning(
+                        "Initial administrator created. Credentials are available in %s "
+                        "until the password is changed.", path
+                    )
+                else:
+                    logger.warning(
+                        "Initial administrator created from ROXX_BOOTSTRAP_ADMIN_PASSWORD; "
+                        "password rotation is required at first sign-in."
+                    )
+            else:
+                row = cursor.execute("""
+                    SELECT username, password_hash, auth_source, must_change_password
+                    FROM admins WHERE username = 'admin'
+                """).fetchone()
+                if (
+                    row
+                    and row[2] == "local"
+                    and row[3]
+                    and row[1]
+                    and bcrypt.checkpw(b"admin", row[1].encode("utf-8"))
+                ):
+                    password = AuthManager._new_initial_password()
+                    pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode(
+                        "utf-8"
+                    )
+                    cursor.execute(
+                        "UPDATE admins SET password_hash = ? WHERE username = 'admin'",
+                        (pw_hash,),
+                    )
+                    path = AuthManager._write_initial_credentials("admin", password)
+                    logger.warning(
+                        "Legacy admin/admin credentials were disabled. Replacement credentials "
+                        "are available in %s until the password is changed.", path
+                    )
+
+                cursor.execute("""
+                    UPDATE admins SET role = 'superadmin'
+                    WHERE username = 'admin' AND (role IS NULL OR role = 'admin')
+                """)
             conn.commit()
-        else:
-            # Ensure existing 'admin' user has superadmin role if not set
-            cursor.execute("UPDATE admins SET role = 'superadmin' WHERE username = 'admin' AND (role IS NULL OR role = 'admin')")
-            conn.commit()
-        
-        conn.close()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     @staticmethod
     def verify_credentials(username, password=None):
@@ -119,22 +212,39 @@ class AuthManager:
                  logger.error(f"RADIUS Auth Error: {e}")
                  return False, None
 
-        # 4. SAML Auth (No password check here, usually done via ACS)
+        # 4. SAML Auth is accepted only by the validated ACS flow.
         elif auth_source == 'saml':
-             # SAML login is handled via /auth/saml/acs, not here usually.
-             # If we are here, it might be a re-check or error.
-             pass
+             logger.warning(f"Rejected password login for SAML user {username}")
+             return False, None
+        else:
+             logger.error(f"Unsupported authentication source for {username}: {auth_source}")
+             return False, None
 
         # Update last login
         try:
             conn = AdminDatabase.get_connection()
-            conn.execute("UPDATE admins SET last_login = ? WHERE username = ?", (datetime.now(), username))
+            conn.execute(
+                "UPDATE admins SET last_login = ? WHERE username = ?",
+                (datetime.now(UTC).isoformat(), username),
+            )
             conn.commit()
             conn.close()
         except Exception as e:
             logger.error(f"Failed to update last_login for {username}: {e}")
 
         return True, dict(user)
+
+    @staticmethod
+    def get_auth_source(username: str) -> str | None:
+        """Return the configured authentication source without authenticating the user."""
+        conn = AdminDatabase.get_connection()
+        try:
+            row = conn.execute(
+                "SELECT auth_source FROM admins WHERE username = ?", (username,)
+            ).fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
 
     @staticmethod
     def create_admin(username, password=None, auth_source='local', external_id=None, role='admin'):
@@ -241,6 +351,7 @@ class AuthManager:
         
         conn.commit()
         conn.close()
+        AuthManager._remove_initial_credentials(username)
     @staticmethod
     def setup_mfa(username):
         """

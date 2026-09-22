@@ -7,11 +7,19 @@ import json
 import logging
 from pathlib import Path
 from typing import List
+from roxx.utils.system import SystemManager
 
 logger = logging.getLogger("roxx.auth.webauthn.db")
 
 # Database path
-DB_PATH = Path.home() / ".roxx" / "webauthn.db"
+_INITIAL_DB_PATH = Path.home() / ".roxx" / "webauthn.db"
+DB_PATH = _INITIAL_DB_PATH
+
+
+def _get_db_path() -> Path:
+    if DB_PATH != _INITIAL_DB_PATH:
+        return DB_PATH
+    return SystemManager.get_config_dir() / "webauthn.db"
 
 class WebAuthnDatabase:
     """
@@ -21,9 +29,10 @@ class WebAuthnDatabase:
     @staticmethod
     def init():
         """Initialize database"""
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        
-        with sqlite3.connect(DB_PATH) as conn:
+        db_path = _get_db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with sqlite3.connect(db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS credentials (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,12 +55,12 @@ class WebAuthnDatabase:
             """)
             
             conn.commit()
-            logger.info(f"WebAuthn database initialized at {DB_PATH}")
+            logger.info(f"WebAuthn database initialized at {db_path}")
 
     @staticmethod
     def list_credentials(user_id: str) -> List[dict]:
         """List credentials for a user"""
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(_get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM credentials WHERE user_id = ? ORDER BY created_at DESC", 
@@ -79,7 +88,7 @@ class WebAuthnDatabase:
         """Add a new credential"""
         transports_json = json.dumps(transports) if transports else "[]"
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with sqlite3.connect(_get_db_path()) as conn:
                 conn.execute(
                     """INSERT INTO credentials 
                        (user_id, credential_id, public_key, sign_count, credential_name, transports)
@@ -97,7 +106,7 @@ class WebAuthnDatabase:
     @staticmethod
     def delete_credential(cred_db_id: int, user_id: str):
         """Delete a credential"""
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(_get_db_path()) as conn:
             conn.execute("DELETE FROM credentials WHERE id = ? AND user_id = ?", (cred_db_id, user_id))
             conn.commit()
             return True
@@ -105,7 +114,7 @@ class WebAuthnDatabase:
     @staticmethod
     def get_credential_by_id(credential_id: bytes):
         """Get credential by its unique Byte ID (for authentication verify)"""
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(_get_db_path()) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute("SELECT * FROM credentials WHERE credential_id = ?", (credential_id,)).fetchone()
             return dict(row) if row else None
@@ -113,7 +122,7 @@ class WebAuthnDatabase:
     @staticmethod
     def update_sign_count(cred_db_id: int, new_count: int):
         """Update signature counter after successful login"""
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(_get_db_path()) as conn:
             conn.execute(
                 "UPDATE credentials SET sign_count = ?, last_used_at = CURRENT_TIMESTAMP WHERE id = ?", 
                 (new_count, cred_db_id)

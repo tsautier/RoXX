@@ -68,6 +68,7 @@ sudo apt install ./roxx_VERSION_amd64.deb
 # or
 sudo rpm -U ./roxx-VERSION-1.x86_64.rpm
 sudo roxx setup --non-interactive --hostname roxx.example.com
+sudo cat /etc/roxx/initial-admin-credentials.txt
 sudo systemctl start roxx
 ```
 
@@ -105,7 +106,7 @@ cd RoXX
 
 # Build Docker image
 export ROXX_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-docker build -t roxx:v1.0.2 .
+docker build -t roxx:v1.1.0 .
 
 # Run container
 docker run -d \
@@ -114,7 +115,7 @@ docker run -d \
   -v /etc/roxx:/etc/roxx \
   -v /var/lib/roxx:/var/lib/roxx \
   -e ROXX_SECRET_KEY="$ROXX_SECRET_KEY" \
-  roxx:v1.0.2
+  roxx:v1.1.0
 ```
 
 **Dockerfile:**

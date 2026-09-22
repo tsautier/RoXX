@@ -19,6 +19,7 @@ class BootstrapResult:
     data_dir: str
     log_dir: str
     environment_file: str
+    initial_admin_credentials_file: str | None
     certificate_generated: bool
     service_installed: bool
 
@@ -59,6 +60,11 @@ def bootstrap_production(
     if os.name != "nt":
         environment_file.chmod(0o600)
 
+    from roxx.core.auth.manager import AuthManager
+
+    AuthManager.init()
+    initial_credentials = AuthManager.get_initial_credentials_path()
+
     cert_path, key_path = CertManager.get_cert_paths()
     certificate_generated = cert_path.exists() and key_path.exists()
     if not certificate_generated:
@@ -83,6 +89,9 @@ def bootstrap_production(
         data_dir=str(data_dir),
         log_dir=str(log_dir),
         environment_file=str(environment_file),
+        initial_admin_credentials_file=(
+            str(initial_credentials) if initial_credentials.exists() else None
+        ),
         certificate_generated=certificate_generated,
         service_installed=install_service,
     )

@@ -8,10 +8,18 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 from .mfa import MFAManager
+from roxx.utils.system import SystemManager
 
 
-DB_PATH = Path.home() / ".roxx" / "mfa.db"
+_INITIAL_DB_PATH = Path.home() / ".roxx" / "mfa.db"
+DB_PATH = _INITIAL_DB_PATH
 db_conn = None
+
+
+def _get_db_path() -> Path:
+    if DB_PATH != _INITIAL_DB_PATH:
+        return DB_PATH
+    return SystemManager.get_config_dir() / "mfa.db"
 
 
 class MFADatabase:
@@ -21,12 +29,13 @@ class MFADatabase:
     def init():
         """Initialize MFA database"""
         global db_conn
-        
+        db_path = _get_db_path()
+
         # Ensure directory exists
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
-            db_conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+            db_conn = sqlite3.connect(db_path, check_same_thread=False)
             db_conn.row_factory = sqlite3.Row
             cursor = db_conn.cursor()
             

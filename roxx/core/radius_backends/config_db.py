@@ -7,13 +7,21 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
+from roxx.utils.system import SystemManager
 
 logger = logging.getLogger("roxx.radius_backends.db")
 
 # Database path
 # Database path
 _DEFAULT_DB_PATH = Path.home() / ".roxx" / "radius_backends.db"
+_INITIAL_DB_PATH = _DEFAULT_DB_PATH
 DB_PATH = _DEFAULT_DB_PATH
+
+
+def _get_db_path() -> Path:
+    if DB_PATH != _INITIAL_DB_PATH:
+        return DB_PATH
+    return SystemManager.get_config_dir() / "radius_backends.db"
 
 
 
@@ -36,9 +44,10 @@ class RadiusBackendDB:
     @staticmethod
     def init():
         """Initialize database and create tables if they don't exist"""
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        db_path = _get_db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(db_path)
         try:
             # We need to recreate the table to update CHECK constraint if it's old
             # Check if table exists
@@ -105,7 +114,7 @@ class RadiusBackendDB:
             """)
             
             conn.commit()
-            logger.info(f"RADIUS backends database initialized at {DB_PATH}")
+            logger.info(f"RADIUS backends database initialized at {db_path}")
         finally:
             conn.close()
     
@@ -121,7 +130,7 @@ class RadiusBackendDB:
         Returns:
             List of backend dictionaries, ordered by priority (lower = higher priority)
         """
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_get_db_path())
         try:
             conn.row_factory = sqlite3.Row
             
@@ -158,7 +167,7 @@ class RadiusBackendDB:
     @staticmethod
     def get_backend(backend_id: int) -> Optional[dict]:
         """Get backend by ID"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_get_db_path())
         try:
             conn.row_factory = sqlite3.Row
             
@@ -194,7 +203,7 @@ class RadiusBackendDB:
         config_json = json.dumps(config)
         
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 cursor = conn.execute(
                     """INSERT INTO radius_backends 
@@ -246,7 +255,7 @@ class RadiusBackendDB:
         params.append(backend_id)
         
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 query = f"UPDATE radius_backends SET {', '.join(updates)} WHERE id = ?"
                 cursor = conn.execute(query, params)
@@ -265,7 +274,7 @@ class RadiusBackendDB:
     def delete_backend(backend_id: int) -> Tuple[bool, str]:
         """Delete backend configuration"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 cursor = conn.execute("DELETE FROM radius_backends WHERE id = ?", (backend_id,))
                 conn.commit()
@@ -288,7 +297,7 @@ class RadiusBackendDB:
             priority_map: Dict of {backend_id: priority}
         """
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 for backend_id, priority in priority_map.items():
                     conn.execute(
@@ -306,7 +315,7 @@ class RadiusBackendDB:
     @staticmethod
     def list_clients() -> List[dict]:
         """List all RADIUS clients (NAS)"""
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_get_db_path())
         try:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM radius_clients ORDER BY shortname ASC").fetchall()
@@ -318,7 +327,7 @@ class RadiusBackendDB:
     def add_client(shortname: str, ipaddr: str, secret: str, description: str = "") -> bool:
         """Add a new RADIUS client (NAS)"""
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 conn.execute(
                     "INSERT INTO radius_clients (shortname, ipaddr, secret, description) VALUES (?, ?, ?, ?)",

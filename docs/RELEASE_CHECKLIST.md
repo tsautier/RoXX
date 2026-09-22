@@ -5,6 +5,7 @@ Use this checklist for every tagged release.
 ## 1. Versioning
 
 - Confirm `pyproject.toml` contains the intended version.
+- Confirm `version.txt`, `roxx.__version__`, the web application, and release notes match it.
 - Confirm `README.md` displays the same version badge.
 - Confirm release notes or `CHANGELOG.md` include user-visible changes.
 - Confirm any systemd command migration is documented when the unified launcher changes.
@@ -21,6 +22,7 @@ Use this checklist for every tagged release.
 - Smoke check `dist/bin/roxx.exe service print-systemd`.
 - Smoke check `dist/bin/roxx.exe server` with `GET /livez` and `GET /readyz`.
 - Confirm `dist/bin` contains only `roxx.exe`.
+- Confirm the macOS standalone application passes CLI, server, log, liveness, and readiness smoke checks in CI.
 
 ## 3. Tagging
 
@@ -33,13 +35,14 @@ Use this checklist for every tagged release.
 - Confirm the release contains the Windows zip archive.
 - Confirm the release contains the raw `roxx.exe` asset.
 - Confirm the release contains one raw Linux application, one `.deb`, and one `.rpm`.
-- Confirm both SPDX SBOM files are present.
+- Confirm the release contains one raw macOS application for the GitHub runner architecture.
+- Confirm the Windows, Linux, and macOS SPDX SBOM files are present.
 - Verify GitHub provenance and SBOM attestations with `gh attestation verify`.
 - When signing secrets are configured, verify `roxx.exe` has a valid Authenticode signature.
 - Confirm the release does not contain legacy split executables such as `roxx-server.exe`, `roxx-service.exe`, `roxx-setup.exe`, or `roxx-windows-service.exe`.
 - Confirm `SHA256SUMS.txt` is present.
 - Confirm the workflow asset verification step passed.
-- Download at least one executable and compare its SHA256 with `SHA256SUMS.txt`.
+- Download every release asset and verify `SHA256SUMS.txt` in the post-upload workflow step.
 - Confirm the Windows ZIP contains exactly one executable plus install, uninstall, and upgrade scripts.
 
 ## 5. Post-Release Smoke Checks

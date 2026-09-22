@@ -4,7 +4,7 @@ FROM python:3.12-slim-bookworm
 # Metadata
 LABEL maintainer="Thomas Sautier"
 LABEL description="RoXX - RADIUS Authentication Proxy"
-LABEL version="1.0.2"
+LABEL version="1.1.0"
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

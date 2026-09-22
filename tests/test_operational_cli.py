@@ -51,4 +51,8 @@ def test_non_interactive_bootstrap_writes_production_environment(monkeypatch, tm
     assert "ROXX_SECURITY_PROFILE=production" in environment
     assert "ROXX_SECRET_KEY=" in environment
     assert "ROXX_SECRET_KEY" not in summary
+    assert result.initial_admin_credentials_file == str(
+        config_dir / "initial-admin-credentials.txt"
+    )
+    assert "Password:" not in summary
     assert result.certificate_generated is True

@@ -4,6 +4,17 @@ All notable changes to RoXX will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-22
+
+### Secure First Run
+- Removed the shared `admin/admin` bootstrap credential.
+- Added unique generated initial administrator passwords delivered through a protected credential file with mandatory first-login rotation.
+- Added automatic rotation for unchanged legacy `admin/admin` installations.
+- Added optional secret-manager injection through `ROXX_BOOTSTRAP_ADMIN_PASSWORD` without writing the supplied password to the credential file.
+- Added credential cleanup after successful password rotation and dedicated security regression tests.
+- Made API token, MFA, WebAuthn, and RADIUS backend databases honor `ROXX_CONFIG_DIR`, with an explicit legacy migration notice.
+- Rejected password-form authentication for SAML accounts and blocked SAML assertions from taking over existing non-SAML administrator names.
+
 ### Reliability And Operations
 - Added rotating service logs shared by Linux and Windows server runs.
 - Expanded readiness with SQLite and optional named TCP backend checks that expose only booleans.
@@ -18,6 +29,7 @@ All notable changes to RoXX will be documented in this file.
 
 ### Packaging And Supply Chain
 - Added standalone Linux builds plus Debian and RPM packaging through nFPM.
+- Added a standalone macOS application, SPDX SBOM, provenance attestation, and release verification.
 - Added Windows install, uninstall, and upgrade scripts while retaining exactly one Windows executable.
 - Added conditional Authenticode signing, SPDX 2.3 SBOM generation, SHA256 manifests, and signed GitHub/Sigstore provenance and SBOM attestations.
 - Added a compatibility matrix for Ubuntu 22.04/24.04 and Windows Server 2022/2025.
@@ -32,7 +44,9 @@ All notable changes to RoXX will be documented in this file.
 - Applied 80 safe Ruff fixes, reducing the known lint backlog from 162 findings to 75 before manual follow-up.
 
 ### Verification
-- Full local suite passing: `135 passed` with two third-party `pyasn1` deprecation warnings.
+- Full local Python 3.12 suite passing for the release candidate: `145 passed`.
+- Python dependency audit passing with no known vulnerabilities in resolved third-party packages.
+- Pre-release verification baseline before the secure-bootstrap additions: `135 passed` with two third-party `pyasn1` deprecation warnings.
 - Syntax-critical Ruff checks, ShellCheck, workflow YAML parsing, PowerShell parsing, package build, dependency checks, and Git whitespace checks passed.
 - Local PyInstaller build produced exactly one `roxx.exe`; executable probes, protected metrics, rotating logs, production TLS rejection, bootstrap, and ZIP composition smoke checks passed.
 - Manual GitHub Release validation passed for Windows and Linux builds, Linux `.deb`/`.rpm` metadata smoke checks, and artifact uploads; publication and attestations were skipped by design because the run targeted `master` rather than a tag.

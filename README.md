@@ -1,8 +1,8 @@
-# RoXX (v1.0.2)
+# RoXX (v1.1.0)
 
 **Modern RADIUS proxy with integrated admin portal, multi-factor authentication, and enterprise identity provider support.**
 
-![Version](https://img.shields.io/badge/version-1.0.2-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-green)
 [![Release](https://github.com/tsautier/RoXX/actions/workflows/release.yml/badge.svg)](https://github.com/tsautier/RoXX/actions/workflows/release.yml)
@@ -72,11 +72,15 @@ sudo ROXX_CONFIG_DIR=/etc/roxx ROXX_DATA_DIR=/var/lib/roxx ROXX_LOG_DIR=/var/log
 roxx server
 ```
 
-The server uses HTTPS by default and listens on port `8000`.
+The server uses HTTPS by default and listens on port `8000`. Setup creates the initial
+`superadmin` with a unique generated password in
+`/etc/roxx/initial-admin-credentials.txt` (or the configured `ROXX_CONFIG_DIR`). The file is
+restricted to the service account where the platform supports POSIX permissions and is deleted
+after the password is changed.
 
-**Default credentials:**
-- Username: `admin`
-- Password: `admin` (change immediately!)
+For unattended secret injection, set `ROXX_BOOTSTRAP_ADMIN_PASSWORD` only while running setup.
+The supplied password must satisfy the local password policy and is never written to the
+credential file.
 
 ### 3. Configuration
 
@@ -95,9 +99,9 @@ Key files:
 
 ### Access the Admin Portal
 
-1. Navigate to `http://localhost:8000`
-2. Login with default credentials
-3. **Change your password** under User Settings
+1. Read the generated initial credential file as the service account.
+2. Navigate to `https://localhost:8000`.
+3. Sign in and complete the mandatory password change.
 
 ### Understand Roles
 
@@ -180,7 +184,7 @@ DELETE /api/auth-providers/{id} - Delete provider
 ### Example: Create Admin User
 
 ```bash
-curl -X POST http://localhost:8000/api/admins \
+curl --insecure -X POST https://localhost:8000/api/admins \
   -H "Content-Type: application/json" \
   -d '{
     "username": "john",
@@ -193,7 +197,7 @@ curl -X POST http://localhost:8000/api/admins \
 
 ## 🔐 Security Best Practices
 
-1. **Change Default Password**: Immediately change the default admin password
+1. **Protect Bootstrap Credentials**: Read the generated credential file only from a trusted console and complete the mandatory password rotation
 2. **Enable MFA**: Require MFA for all admin users
 3. **Use HTTPS**: Deploy with proper SSL/TLS certificates
 4. **Regular Updates**: Keep dependencies up to date

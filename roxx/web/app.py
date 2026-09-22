@@ -31,6 +31,7 @@ from typing import List
 from roxx.core.observability import request_metrics
 from roxx.core.security.profiles import SecurityProfile
 from roxx.utils.system import SystemManager
+from roxx import __version__
 from roxx.core.auth.saml_provider import SAMLProvider
 from roxx.core.auth.rbac import (
     Role,
@@ -61,7 +62,7 @@ logger = logging.getLogger("roxx.web")
 # App Initialization
 # ------------------------------------------------------------------------------
 
-VERSION = "1.0.2"
+VERSION = __version__
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -122,7 +123,7 @@ async def add_integrity_headers(request: Request, call_next):
         time.perf_counter() - started,
     )
     response.headers["X-RoXX-Origin"] = "Built with Love by tsautier"
-    response.headers["X-RoXX-Build-ID"] = "ST-2026-1.0.2"
+    response.headers["X-RoXX-Build-ID"] = f"ST-2026-{VERSION}"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
@@ -439,8 +440,6 @@ async def login(request: Request, username: str = Form(...), password: str = For
         if CertDatabase.get_user_certs(username):
             if 'client_cert' not in mfa_methods:
                 mfa_methods.append('client_cert')
-
-        print(f"[DEBUG] Login for {username}: Methods={mfa_methods}, WebAuthnCreds={WebAuthnDatabase.list_credentials(username)}")
 
         if mfa_methods:
             # Check Trusted Device
@@ -2418,14 +2417,19 @@ async def saml_acs(provider_id: int, request: Request):
         from roxx.core.auth.manager import AuthManager
         username = user_data['username']
         
-        # Check if user exists, create if needed
-        try:
-            auth_success, _ = AuthManager.verify_credentials(username, None)
-            if not auth_success:
-                # Create user with external auth source
-                AuthManager.create_admin(username, None, auth_source='saml')
-        except:
-            AuthManager.create_admin(username, None, auth_source='saml')
+        # SAML assertions must never take over an existing local or LDAP administrator.
+        auth_source = AuthManager.get_auth_source(username)
+        if auth_source is None:
+            created, message = AuthManager.create_admin(username, None, auth_source='saml')
+            if not created:
+                raise HTTPException(status_code=500, detail=message)
+        elif auth_source != 'saml':
+            logger.warning(
+                "SAML identity collision rejected for %s (existing source: %s)",
+                username,
+                auth_source,
+            )
+            raise HTTPException(status_code=403, detail="SAML identity conflicts with an existing account")
         
         # Set session
         set_auth_context(request, username, "active")

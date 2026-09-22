@@ -7,6 +7,8 @@ include BUILD.md
 include roxx_logo.png
 include requirements.txt
 include pyproject.toml
+include version.txt
+include RELEASE_NOTES*.md
 
 # Include all Python files
 recursive-include roxx *.py

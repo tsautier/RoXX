@@ -12,6 +12,19 @@ sudo ROXX_CONFIG_DIR=/etc/roxx ROXX_DATA_DIR=/var/lib/roxx ROXX_LOG_DIR=/var/log
 
 Review `/etc/roxx/roxx.env`, replace generated TLS material with a certificate issued by the production CA when required, then restart the service. The production profile refuses to start without a persistent `ROXX_SECRET_KEY`, enables secure cookies and HSTS, and adds CSP, referrer and permissions-policy headers.
 
+Setup also creates a unique initial `superadmin` password in
+`/etc/roxx/initial-admin-credentials.txt`. Read it only from a trusted administrative console.
+The portal requires a password change and removes the file after rotation. Existing installations
+that still use the historical `admin/admin` bootstrap are rotated automatically at startup and
+receive replacement credentials in the same file. Passwords that operators provide through
+`ROXX_BOOTSTRAP_ADMIN_PASSWORD` are not written to disk.
+
+All SQLite databases used by the administration plane honor `ROXX_CONFIG_DIR`. Releases before
+1.1.0 could place `api_tokens.db`, `mfa.db`, `webauthn.db`, and `radius_backends.db` under
+`~/.roxx` even when a configuration directory was set. Before upgrading such an installation,
+stop RoXX, copy those files into `ROXX_CONFIG_DIR`, set ownership to the service account, and set
+mode `0600`. Do not copy live SQLite databases.
+
 ## Observability
 
 - `/livez` reports process liveness.
@@ -53,7 +66,7 @@ The Windows script backs up the installed executable under `%ProgramData%\RoXX\r
 
 ## Release Signing And Provenance
 
-The release workflow always generates SHA256 checksums, SPDX 2.3 SBOMs, signed GitHub/Sigstore provenance, and signed SBOM attestations. Configure both repository secrets below to additionally Authenticode-sign `roxx.exe`:
+The release workflow generates SHA256 checksums, SPDX 2.3 SBOMs, signed GitHub/Sigstore provenance, and signed SBOM attestations for Windows, Linux, and macOS. It downloads every published asset and validates the checksum manifest after upload. Configure both repository secrets below to additionally Authenticode-sign `roxx.exe`:
 
 - `ROXX_WINDOWS_CERTIFICATE`: base64-encoded PFX certificate.
 - `ROXX_WINDOWS_CERTIFICATE_PASSWORD`: PFX password.

@@ -52,6 +52,7 @@ ENV/
 env.bak/
 venv.bak/
 .venv/
+.venv*/
 
 # IDEs
 .vscode/
@@ -65,6 +66,7 @@ venv.bak/
 *.log
 *.tmp
 /tmp/
+/tmp-smoke-*/
 *.bak
 *.orig
 
@@ -74,6 +76,7 @@ venv.bak/
 *.p12
 *.pfx
 secrets.txt
+initial-admin-credentials.txt
 totp_secrets.txt
 *.conf.local
 config.local.json

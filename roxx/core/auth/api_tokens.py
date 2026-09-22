@@ -11,13 +11,21 @@ import bcrypt
 import logging
 from pathlib import Path
 from typing import Optional, Tuple, List
+from roxx.utils.system import SystemManager
 
 logger = logging.getLogger("roxx.api_tokens")
 
 # Database path
 # Database path settings
 _DEFAULT_DB_PATH = Path.home() / ".roxx" / "api_tokens.db"
+_INITIAL_DB_PATH = _DEFAULT_DB_PATH
 DB_PATH = _DEFAULT_DB_PATH
+
+
+def _get_db_path() -> Path:
+    if DB_PATH != _INITIAL_DB_PATH:
+        return DB_PATH
+    return SystemManager.get_config_dir() / "api_tokens.db"
 
 
 
@@ -44,9 +52,10 @@ class APITokenManager:
     @staticmethod
     def init():
         """Initialize API tokens database"""
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        db_path = _get_db_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(db_path)
         try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS api_tokens (
@@ -59,7 +68,7 @@ class APITokenManager:
                 )
             """)
             conn.commit()
-            logger.info(f"API tokens database initialized at {DB_PATH}")
+            logger.info(f"API tokens database initialized at {db_path}")
         finally:
             conn.close()
     
@@ -84,7 +93,7 @@ class APITokenManager:
             # Hash token for storage
             token_hash = bcrypt.hashpw(raw_token.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 conn.execute(
                     "INSERT INTO api_tokens (name, token_hash) VALUES (?, ?)",
@@ -115,7 +124,7 @@ class APITokenManager:
             (valid: bool, token_name: str or None)
         """
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 conn.row_factory = sqlite3.Row
                 
@@ -156,7 +165,7 @@ class APITokenManager:
             List of token info dictionaries
         """
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 conn.row_factory = sqlite3.Row
                 
@@ -186,7 +195,7 @@ class APITokenManager:
             (success: bool, message: str)
         """
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 conn.execute(
                     "UPDATE api_tokens SET enabled = 0 WHERE id = ?",
@@ -218,7 +227,7 @@ class APITokenManager:
             (success: bool, message: str)
         """
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(_get_db_path())
             try:
                 conn.execute("DELETE FROM api_tokens WHERE id = ?", (token_id,))
                 conn.commit()
