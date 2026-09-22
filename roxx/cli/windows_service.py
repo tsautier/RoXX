@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import threading
 
 try:  # pragma: no cover - exercised only on Windows with pywin32 installed
@@ -23,6 +24,7 @@ if win32serviceutil is not None:  # pragma: no branch
         _svc_name_ = "RoXXWebServer"
         _svc_display_name_ = "RoXX Web Server"
         _svc_description_ = "Runs the RoXX HTTPS admin server as a Windows service."
+        _exe_args_ = "windows-service run"
 
         def __init__(self, args):
             super().__init__(args)
@@ -45,6 +47,11 @@ def main() -> None:
         raise SystemExit(
             "Windows service support requires pywin32 and is only available on Windows builds."
         )
+    if sys.argv[1:] == ["run"]:
+        servicemanager.Initialize()
+        servicemanager.PrepareToHostSingle(RoXXWindowsService)
+        servicemanager.StartServiceCtrlDispatcher()
+        return
     win32serviceutil.HandleCommandLine(RoXXWindowsService)
 
 
