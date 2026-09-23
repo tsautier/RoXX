@@ -90,50 +90,31 @@ ROLE_PERMISSIONS: dict[str, Set[str]] = {
 }
 
 
-def _resolve_role(username: str) -> str:
+def _resolve_role(username: str) -> Optional[str]:
     from roxx.core.auth.db import AdminDatabase
     return AdminDatabase.get_role(username)
 
 
 def get_auth_context(request: Request) -> Optional[dict]:
-    """
-    Return the authenticated session context from the signed Starlette session.
-    Legacy unsigned cookies are migrated lazily, but role is always resolved
-    server-side from the database.
-    """
+    """Validate a signed session against the current administrator role."""
     auth = request.session.get("auth")
-    if isinstance(auth, dict):
-        username = auth.get("username")
-        status = auth.get("status")
-        if username and status:
-            role = _resolve_role(username) if status == "active" else auth.get("role")
-            return {"username": username, "status": status, "role": role}
-
-    session_cookie = request.cookies.get("session")
-    if not session_cookie:
+    if not isinstance(auth, dict):
         return None
-
-    try:
-        import base64
-
-        decoded = base64.b64decode(session_cookie).decode("utf-8")
-        parts = decoded.split(":")
-        if len(parts) < 2:
-            return None
-
-        username = parts[0]
-        status = parts[1]
-        role = _resolve_role(username) if status == "active" else None
-        auth = {"username": username, "status": status, "role": role}
-        request.session["auth"] = auth
-        return auth
-    except Exception:
+    username = auth.get("username")
+    status = auth.get("status")
+    if not isinstance(username, str) or not username or status not in {"active", "mfa_pending", "force_change"}:
         return None
+    role = _resolve_role(username)
+    if role not in ROLE_PERMISSIONS:
+        return None
+    return {"username": username, "status": status, "role": role}
 
 
 def set_auth_context(request: Request, username: str, status: str) -> dict:
-    """Persist the signed auth context in the server session."""
-    role = _resolve_role(username) if status == "active" else None
+    """Persist a signed context only for a valid administrator and role."""
+    role = _resolve_role(username)
+    if role not in ROLE_PERMISSIONS or status not in {"active", "mfa_pending", "force_change"}:
+        raise HTTPException(status_code=403, detail="Invalid administrator role or session status")
     auth = {"username": username, "status": status, "role": role}
     request.session["auth"] = auth
     return auth
@@ -170,7 +151,7 @@ def require_role(*allowed_roles: str):
 
         username = auth["username"]
         status = auth["status"]
-        role = auth.get("role") or Role.ADMIN
+        role = auth.get("role")
 
         if status != "active":
             raise HTTPException(status_code=401, detail="Session not active")
@@ -197,7 +178,7 @@ def require_action(action: str):
         if auth["status"] != "active":
             raise HTTPException(status_code=401, detail="Session not active")
 
-        role = auth.get("role") or Role.ADMIN
+        role = auth.get("role")
         if not check_permission(role, action):
             raise HTTPException(status_code=403, detail=f"Missing permission: {action}")
         return auth["username"]

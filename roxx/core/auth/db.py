@@ -156,8 +156,8 @@ class AdminDatabase:
             return False
 
     @classmethod
-    def get_role(cls, username: str) -> str:
-        """Get the role for a user. Returns 'admin' as default."""
+    def get_role(cls, username: str) -> str | None:
+        """Return a stored role only for an existing administrator."""
         conn = cls.get_connection()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -166,9 +166,7 @@ class AdminDatabase:
             (username,)
         ).fetchone()
         conn.close()
-        if not row:
-            return 'admin'
-        return row['role'] or 'admin'
+        return row['role'] if row else None
 
     @classmethod
     def set_role(cls, username: str, role: str) -> bool:

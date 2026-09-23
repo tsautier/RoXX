@@ -38,6 +38,7 @@ from roxx.core.auth.rbac import (
     Action,
     require_role,
     require_action,
+    check_permission,
     get_role_from_session,
     get_auth_context,
     set_auth_context,
@@ -192,7 +193,7 @@ app.include_router(observability_router)
 
 
 # ------------------------------------------------------------------------------
-# Auth Logic (Hybrid: Cookie + Basic)
+# Auth Logic (Signed Session)
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 # Auth Logic (Database Backed)
@@ -230,7 +231,7 @@ async def get_current_username(request: Request):
     """
     Verifies authentication via Session Cookie.
     Enforces 'active' status for general access.
-    Also extracts role from cookie.
+    Revalidates the administrator role against the database.
     """
     auth = get_auth_context(request)
     if auth and auth.get("username") and auth.get("status") == "active":
@@ -245,7 +246,6 @@ async def get_current_username(request: Request):
         raise HTTPException(
             status_code=401,
             detail="Not authenticated",
-            headers={"WWW-Authenticate": "Basic"},
         )
 
 
@@ -802,7 +802,7 @@ async def webauthn_auth_verify(request: Request):
 
 def get_page_context(request: Request, username: str, active_page: str, **kwargs):
     """Helper to generate standard page context with sidebar variables"""
-    user_role = get_role_from_session(request) or 'admin'
+    user_role = get_role_from_session(request)
     context = {
         "request": request,
         "username": username,
@@ -1758,29 +1758,10 @@ async def admin_webauthn_register_verify(request: Request, username: str):
 active_log_websockets: List[WebSocket] = []
 
 async def get_current_username_ws(websocket: WebSocket):
-    """Require an authenticated WebSocket session, with legacy Basic Auth fallback."""
+    """Require an active signed session with log-viewing permission."""
     auth = get_auth_context(websocket)
-    if auth and auth.get("username") and auth.get("status") == "active":
+    if auth and auth.get("status") == "active" and check_permission(auth.get("role"), Action.VIEW_LOGS):
         return auth["username"]
-
-    auth_header = websocket.headers.get("authorization")
-    if not auth_header:
-        return None
-
-    try:
-        scheme, param = auth_header.split()
-        if scheme.lower() != "basic":
-            return None
-        decoded = base64.b64decode(param).decode("utf-8")
-        username,password = decoded.split(":")
-        
-        correct_username = os.getenv("ROXX_ADMIN_USER", "admin")
-        correct_password = os.getenv("ROXX_ADMIN_PASSWORD", "admin")
-        
-        if secrets.compare_digest(username, correct_username) and secrets.compare_digest(password, correct_password):
-            return username
-    except:
-        return None
     return None
 
 @app.websocket("/ws/logs")

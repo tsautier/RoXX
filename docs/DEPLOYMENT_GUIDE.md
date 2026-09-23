@@ -106,7 +106,7 @@ cd RoXX
 
 # Build Docker image
 export ROXX_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-docker build -t roxx:v1.1.2 .
+docker build -t roxx:v1.1.3 .
 
 # Run container
 docker run -d \
@@ -115,7 +115,7 @@ docker run -d \
   -v /etc/roxx:/etc/roxx \
   -v /var/lib/roxx:/var/lib/roxx \
   -e ROXX_SECRET_KEY="$ROXX_SECRET_KEY" \
-  roxx:v1.1.2
+  roxx:v1.1.3
 ```
 
 **Dockerfile:**

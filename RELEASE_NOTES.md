@@ -1,8 +1,8 @@
-# RoXX v1.1.2 Release Notes
+# RoXX v1.1.3 Release Notes
 
-**Release Date:** September 22, 2026
-**Tag:** v1.1.2
+**Release Date:** September 23, 2026
+**Tag:** v1.1.3
 
-RoXX 1.1.2 fixes Windows service startup and hardens upgrade, rollback, and uninstall around the single executable. A disposable-runner installation pilot now covers the Windows service and Debian package lifecycles.
+RoXX 1.1.3 closes authentication and authorization bypasses in the administration web service. Upgrade promptly, particularly if the web service is reachable by untrusted clients.
 
-See `RELEASE_NOTES_v1.1.2.md` for verification scope and remaining limitations.
+See `RELEASE_NOTES_v1.1.3.md` for the security fixes, upgrade impact, and verification scope.

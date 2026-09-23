@@ -95,3 +95,4 @@ The live RBAC implementation is enforced in:
 - [`roxx/core/auth/db.py`](https://github.com/tsautier/RoXX/blob/master/roxx/core/auth/db.py)
 
 The database source of truth for roles is the `admins.role` column in `roxx.db`.
+An unknown account or an account with a missing or invalid role has no permissions. RoXX rechecks the stored role for each signed-session request, including after role changes or account deletion. Legacy unsigned `session` cookies and Basic credentials on `/ws/logs` are not authentication methods; clients must use the normal login and MFA flow to obtain a signed `roxx_session` cookie.

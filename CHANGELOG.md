@@ -4,6 +4,13 @@ All notable changes to RoXX will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-23
+
+- Rejected unsigned legacy `session` cookies instead of migrating them into authenticated sessions.
+- Removed implicit administrator roles for unknown accounts and records without a role; active sessions now revalidate the database role on every request.
+- Removed the WebSocket logs endpoint's Basic Auth fallback and require an active, authorized signed session.
+- Added security regression tests for forged cookies, invalid or deleted accounts, role changes, and WebSocket access.
+
 ## [1.1.2] - 2026-09-22
 
 - Fixed Windows service startup for the single frozen executable by dispatching service control commands through its registered service mode.

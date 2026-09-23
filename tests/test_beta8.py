@@ -328,8 +328,8 @@ def _run_admin_roles():
 
         # Non-existent user
         role = AdminDatabase.get_role('nonexistent')
-        assert role == 'admin', f"Default should be 'admin', got '{role}'"
-        print("✓ Default role for unknown user OK")
+        assert role is None, f"Unknown user must have no role, got '{role}'"
+        print("✓ Unknown user has no role OK")
         passed += 1
 
     except Exception as e:
