@@ -1,10 +1,10 @@
-# RoXX (v1.1.3)
+# RoXX (v1.1.4)
 
 **RADIUS authentication integration with an admin portal, multi-factor authentication, and enterprise identity provider support.**
 
 RoXX does not listen for RADIUS packets on UDP 1812 by itself. Deploy FreeRADIUS with the documented `rlm_python3` integration for RADIUS clients; `roxx server` runs the administration web service.
 
-![Version](https://img.shields.io/badge/version-1.1.3-blue)
+![Version](https://img.shields.io/badge/version-1.1.4-blue)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-green)
 [![Release](https://github.com/tsautier/RoXX/actions/workflows/release.yml/badge.svg)](https://github.com/tsautier/RoXX/actions/workflows/release.yml)
@@ -230,6 +230,7 @@ ROXX_SESSION_TIMEOUT=3600
 ROXX_SECURITY_PROFILE=production
 ROXX_SECURE_COOKIES=true
 ROXX_HSTS=true
+ROXX_ALLOWED_ORIGINS=https://your-domain.com
 ROXX_METRICS_TOKEN=your-monitoring-token
 
 # SAML

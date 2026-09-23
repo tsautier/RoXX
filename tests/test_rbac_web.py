@@ -12,6 +12,7 @@ from starlette.requests import Request
 import roxx.web.app as web_app
 from roxx.core.auth.db import AdminDatabase
 from roxx.core.auth.rbac import Action, get_auth_context, require_action, require_role, set_auth_context
+from roxx.core.security.origin import is_trusted_origin
 
 
 def make_request(*, cookie_value=None, session_auth=None):
@@ -91,15 +92,108 @@ def test_websocket_rejects_basic_auth_without_signed_session():
     assert error.value.code == 1008
 
 
-def test_websocket_accepts_valid_signed_session(monkeypatch):
-    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "auditor")
+def signed_session_cookie():
     session = base64.b64encode(json.dumps({"auth": {
         "username": "alice", "status": "active", "role": "superadmin"
     }}).encode("utf-8"))
-    signed = TimestampSigner(web_app.SECRET_KEY).sign(session).decode("utf-8")
+    return TimestampSigner(web_app.SECRET_KEY).sign(session).decode("utf-8")
+
+
+def test_websocket_accepts_valid_signed_session(monkeypatch):
+    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "auditor")
     client = TestClient(web_app.app)
-    with client.websocket_connect("/ws/logs", headers={"Cookie": f"roxx_session={signed}"}) as websocket:
+    headers = {"Cookie": f"roxx_session={signed_session_cookie()}", "Origin": "http://testserver"}
+    with client.websocket_connect("/ws/logs", headers=headers) as websocket:
         assert "Connected" in websocket.receive_text()
+
+
+@pytest.mark.parametrize("origin", [None, "https://attacker.example", "null", "http://testserver.evil"])
+def test_websocket_rejects_untrusted_origin_with_valid_session(monkeypatch, origin):
+    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "auditor")
+    headers = {"Cookie": f"roxx_session={signed_session_cookie()}"}
+    if origin is not None:
+        headers["Origin"] = origin
+    with pytest.raises(WebSocketDisconnect) as error:
+        with TestClient(web_app.app).websocket_connect("/ws/logs", headers=headers):
+            pass
+    assert error.value.code == 1008
+
+
+def test_websocket_rejects_cross_site_fetch_metadata(monkeypatch):
+    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "auditor")
+    headers = {
+        "Cookie": f"roxx_session={signed_session_cookie()}",
+        "Origin": "http://testserver",
+        "Sec-Fetch-Site": "cross-site",
+    }
+    with pytest.raises(WebSocketDisconnect) as error:
+        with TestClient(web_app.app).websocket_connect("/ws/logs", headers=headers):
+            pass
+    assert error.value.code == 1008
+
+
+def test_cookie_authenticated_mutation_requires_same_origin(monkeypatch):
+    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "admin")
+    monkeypatch.setattr(web_app.SystemManager, "add_radius_user", lambda username, password: False)
+    client = TestClient(web_app.app)
+    client.cookies.set("roxx_session", signed_session_cookie())
+    for headers in ({}, {"Origin": "https://attacker.example"}, {"Origin": "null"},
+                    {"Origin": "http://testserver", "Sec-Fetch-Site": "cross-site"}):
+        response = client.post("/api/users", json={"username": "test", "password": "test"}, headers=headers)
+        assert response.status_code == 403
+    response = client.post("/api/users", json={"username": "test", "password": "test"},
+                           headers={"Origin": "http://testserver"})
+    assert response.status_code == 200
+    assert response.json() == {"success": False}
+    response = client.post("/api/users", json={"username": "test", "password": "test"},
+                           headers={"Referer": "http://testserver/users"})
+    assert response.status_code == 200
+    response = client.post("/api/users", json={"username": "test", "password": "test"},
+                           headers={"Referer": "https://attacker.example/form"})
+    assert response.status_code == 403
+
+
+def test_logout_requires_post_and_same_origin():
+    client = TestClient(web_app.app)
+    client.cookies.set("roxx_session", signed_session_cookie())
+    assert client.get("/logout").status_code == 405
+    assert client.post("/logout", headers={"Origin": "https://attacker.example"}).status_code == 403
+    assert client.post("/logout", headers={"Origin": "http://testserver"},
+                       follow_redirects=False).status_code == 307
+
+
+def test_radius_user_list_does_not_disclose_password(monkeypatch, tmp_path):
+    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "admin")
+    monkeypatch.setattr(web_app.SystemManager, "get_config_dir", lambda: tmp_path)
+    (tmp_path / "users.conf").write_text('alice Cleartext-Password := "top-secret"\n')
+    client = TestClient(web_app.app)
+    client.cookies.set("roxx_session", signed_session_cookie())
+    response = client.get("/api/users")
+    assert response.status_code == 200
+    assert response.json() == [{"username": "alice", "attribute": "Cleartext-Password", "op": ":="}]
+    assert "top-secret" not in response.text
+
+
+def test_configured_proxy_origin_is_accepted(monkeypatch):
+    monkeypatch.setenv("ROXX_ALLOWED_ORIGINS", "https://roxx.example")
+    monkeypatch.setattr(AdminDatabase, "get_role", lambda username: "admin")
+    monkeypatch.setattr(web_app.SystemManager, "add_radius_user", lambda username, password: False)
+    client = TestClient(web_app.app)
+    client.cookies.set("roxx_session", signed_session_cookie())
+    response = client.post("/api/users", json={"username": "test", "password": "test"},
+                           headers={"Origin": "https://roxx.example"})
+    assert response.status_code == 200
+    response = client.post("/api/users", json={"username": "test", "password": "test"},
+                           headers={"Origin": "http://testserver"})
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("origin", ["null", "https://roxx.example.evil", "https://roxx.example/path",
+                                     "https://user@roxx.example", "https://[invalid"])
+def test_origin_allowlist_rejects_ambiguous_values(monkeypatch, origin):
+    monkeypatch.setenv("ROXX_ALLOWED_ORIGINS", "https://roxx.example")
+    from starlette.datastructures import URL
+    assert not is_trusted_origin(origin, URL("http://testserver/api/users"))
 
 
 def test_require_action_denies_auditor_for_mutation(monkeypatch):

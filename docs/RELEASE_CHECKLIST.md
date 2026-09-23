@@ -13,9 +13,13 @@ Use this checklist for every tagged release.
 
 ## 2. Local Verification
 
+- Review security-sensitive changes against the [secure development baseline](../SECURITY.md) and applicable OWASP ASVS 5.0.0 requirements. Record unmet or untested controls; do not claim blanket OWASP compliance.
+- Audit every new or changed endpoint's authentication, role and object authorization, CSRF exposure, input handling, and sensitive output. Include WebSocket origin and session-lifetime checks where applicable.
+- Add and run denial-path regression tests for missing roles, revoked accounts, unauthorized actions, and malformed or unsigned sessions.
 - Run `python -m pytest`.
 - Run `python -m build`.
 - Run `python -m pip check`.
+- Run `python -m pip_audit` and review unresolved advisories before publication.
 - Run `python scripts/build_binaries.py` on Windows when validating executables locally.
 - Run `sh scripts/build_linux_packages.sh` in a Linux environment with nFPM.
 - Smoke check `dist/bin/roxx.exe --help`.

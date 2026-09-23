@@ -54,7 +54,7 @@ The implementation is present, but these outcomes cannot be truthfully claimed u
 
 ## Verification Baseline
 
-- `152` local tests pass on Python 3.12 for Windows in the v1.1.3 security release.
+- `166` local tests pass on Python 3.12 for Windows in the v1.1.4 hardening candidate.
 - The local PyInstaller build and executable smoke suite pass with exactly one `roxx.exe`.
 - Ruff critical rules, ShellCheck, Actionlint, workflow YAML, PowerShell syntax, wheel/sdist builds, dependency integrity, vulnerability audit and Git whitespace checks pass.
 - Linux-native standalone, `.deb`, and `.rpm` builds passed in manual GitHub Release validation.
@@ -63,6 +63,7 @@ The implementation is present, but these outcomes cannot be truthfully claimed u
 
 ## Next Review Horizon
 
+- Work through the [OWASP ASVS 5.0.0 Level 2 target](SECURITY.md) as a tracked gap assessment, including route/object authorization, CSRF protection beyond the origin checks, long-lived WebSocket session revocation, and negative security tests. Do not describe the project as OWASP-compliant until the applicable controls have been verified.
 - Design an opt-in `guest` role for a future release. Start with an explicit minimum permission matrix, audit every route that currently requires only an active session, and add denial tests for logs, administrator data, configuration, MFA, tokens, and mutations before exposing any guest account. Do not infer guest access from existing `auditor` permissions.
 - Finish the remaining 75 Ruff findings in behavior-reviewed batches.
 - Add real provider contract tests where test tenants and credentials are available.

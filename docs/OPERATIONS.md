@@ -12,6 +12,8 @@ sudo ROXX_CONFIG_DIR=/etc/roxx ROXX_DATA_DIR=/var/lib/roxx ROXX_LOG_DIR=/var/log
 
 Review `/etc/roxx/roxx.env`, replace generated TLS material with a certificate issued by the production CA when required, then restart the service. The production profile refuses to start without a persistent `ROXX_SECRET_KEY`, enables secure cookies and HSTS, and adds CSP, referrer and permissions-policy headers.
 
+Cookie-authenticated POST, PUT, PATCH, and DELETE requests require a same-origin `Origin` header or, when it is absent, a same-origin `Referer`. The `/ws/logs` handshake requires `Origin` and an active signed session. The SAML assertion callback is exempt from the HTTP origin check because it validates the provider response independently. A reverse proxy that changes the application's public scheme or host must set `ROXX_ALLOWED_ORIGINS` to a comma-separated list of exact public origins (for example, `https://roxx.example.com`); when set, only those origins are accepted. Do not use wildcard origins. Logout uses `POST /logout`; older `GET /logout` links must be updated. Non-browser clients authenticated without the session cookie are unaffected by the origin check.
+
 Setup also creates a unique initial `superadmin` password in
 `/etc/roxx/initial-admin-credentials.txt`. Read it only from a trusted administrative console.
 The portal requires a password change and removes the file after rotation. Existing installations

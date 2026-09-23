@@ -68,18 +68,23 @@ async function loadUsers() {
     const response = await fetch('/api/users');
     const users = await response.json();
     const body = document.getElementById('usersTableBody');
-    body.innerHTML = '';
+    body.replaceChildren();
     users.forEach(u => {
-        body.innerHTML += `
-            <tr>
-                <td>${u.username}</td>
-                <td>${u.attribute}</td>
-                <td>${u.op}</td>
-                <td>
-                    <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.username}')">Delete</button>
-                </td>
-            </tr>
-        `;
+        const row = document.createElement('tr');
+        for (const value of [u.username, u.attribute, u.op]) {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            row.appendChild(cell);
+        }
+        const actions = document.createElement('td');
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn btn-danger btn-sm';
+        remove.textContent = 'Delete';
+        remove.addEventListener('click', () => deleteUser(u.username));
+        actions.appendChild(remove);
+        row.appendChild(actions);
+        body.appendChild(row);
     });
 }
 

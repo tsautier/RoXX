@@ -30,6 +30,7 @@ from typing import List
 
 from roxx.core.observability import request_metrics
 from roxx.core.security.profiles import SecurityProfile
+from roxx.core.security.origin import is_trusted_origin, is_trusted_referer
 from roxx.utils.system import SystemManager
 from roxx import __version__
 from roxx.core.auth.saml_provider import SAMLProvider
@@ -114,7 +115,23 @@ security_profile = SecurityProfile.from_env()
 async def add_integrity_headers(request: Request, call_next):
     """Adds ownership and integrity headers to protect against dishonest clones"""
     started = time.perf_counter()
-    response = await call_next(request)
+    response = None
+    # SAML ACS validates the provider response independently of browser origin.
+    if (
+        request.method not in {"GET", "HEAD", "OPTIONS"}
+        and request.cookies.get("roxx_session")
+        and not request.url.path.startswith("/auth/saml/acs/")
+    ):
+        origin = request.headers.get("origin")
+        trusted = (
+            is_trusted_origin(origin, request.url)
+            if origin is not None
+            else is_trusted_referer(request.headers.get("referer"), request.url)
+        )
+        if not trusted or request.headers.get("sec-fetch-site") == "cross-site":
+            response = JSONResponse(status_code=403, content={"detail": "Untrusted request origin"})
+    if response is None:
+        response = await call_next(request)
     route = request.scope.get("route")
     route_path = getattr(route, "path", "unmatched")
     request_metrics.observe(
@@ -481,7 +498,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
     return JSONResponse(status_code=401, content={"success": False, "detail": "Invalid credentials"})
 
 
-@app.get("/logout")
+@app.post("/logout")
 async def logout(request: Request):
     response = RedirectResponse(url="/login")
     response.delete_cookie("session")
@@ -1126,7 +1143,6 @@ async def get_radius_users():
                         "username": parts[0],
                         "attribute": parts[1],
                         "op": parts[2],
-                        "password": parts[3].strip('"')
                     })
     return users
 
@@ -1759,6 +1775,9 @@ active_log_websockets: List[WebSocket] = []
 
 async def get_current_username_ws(websocket: WebSocket):
     """Require an active signed session with log-viewing permission."""
+    if (not is_trusted_origin(websocket.headers.get("origin"), websocket.url)
+            or websocket.headers.get("sec-fetch-site") == "cross-site"):
+        return None
     auth = get_auth_context(websocket)
     if auth and auth.get("status") == "active" and check_permission(auth.get("role"), Action.VIEW_LOGS):
         return auth["username"]

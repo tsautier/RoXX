@@ -4,6 +4,14 @@ All notable changes to RoXX will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-09-23
+
+- Documented an OWASP ASVS 5.0.0 Level 2 hardening target, security review gates, and outstanding verification work; corrected the private vulnerability reporting guidance.
+- Rejected cross-origin cookie-authenticated mutations and WebSocket log handshakes; trusted reverse-proxy origins can be configured explicitly.
+- Changed logout from GET to POST so it is protected by the same origin check.
+- Removed RADIUS user passwords from the user-list API response.
+- Rendered RADIUS user names as text nodes in the admin UI to prevent HTML/script interpretation.
+
 ## [1.1.3] - 2026-09-23
 
 - Rejected unsigned legacy `session` cookies instead of migrating them into authenticated sessions.
