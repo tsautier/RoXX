@@ -90,8 +90,8 @@ Only `superadmin` can access those role-management operations.
 ## Implementation Notes
 
 The live RBAC implementation is enforced in:
-- [`roxx/core/auth/rbac.py`](/C:/RoXX/roxx/core/auth/rbac.py)
-- [`roxx/web/app.py`](/C:/RoXX/roxx/web/app.py)
-- [`roxx/core/auth/db.py`](/C:/RoXX/roxx/core/auth/db.py)
+- [`roxx/core/auth/rbac.py`](https://github.com/tsautier/RoXX/blob/master/roxx/core/auth/rbac.py)
+- [`roxx/web/app.py`](https://github.com/tsautier/RoXX/blob/master/roxx/web/app.py)
+- [`roxx/core/auth/db.py`](https://github.com/tsautier/RoXX/blob/master/roxx/core/auth/db.py)
 
 The database source of truth for roles is the `admins.role` column in `roxx.db`.
